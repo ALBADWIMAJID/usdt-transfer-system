@@ -18,7 +18,13 @@ import {
   NEW_TRANSFER_CUSTOMERS_SNAPSHOT_KEY,
 } from '../lib/offline/cacheKeys.js'
 import { getOfflineSnapshotMissingMessage } from '../lib/offline/freshness.js'
-import { loadReadSnapshot, saveReadSnapshot } from '../lib/offline/readCache.js'
+import {
+  isBrowserOffline,
+  isLikelyOfflineReadFailure,
+  loadReadSnapshot,
+  saveReadSnapshot,
+  withLiveReadTimeout,
+} from '../lib/offline/readCache.js'
 import { queueOfflineTransfer } from '../lib/offline/transferQueue.js'
 import { supabase } from '../lib/supabase.js'
 
@@ -199,7 +205,9 @@ function NewTransferPage() {
 
     let isMounted = true
 
-    const hydrateFromSnapshot = async () => {
+    const hydrateFromSnapshot = async (options = {}) => {
+      const { fallbackErrorMessage = '' } = options
+
       setCustomersLoading(true)
       setCustomersError('')
 
@@ -212,16 +220,18 @@ function NewTransferPage() {
       if (!cachedCustomers) {
         clearSnapshotState()
         setCustomers([])
+        const missingSnapshotMessage = `${getOfflineSnapshotMissingMessage('لقائمة العملاء')} يلزم وجود عميل محفوظ محليا قبل إنشاء حوالة دون اتصال.`
         setCustomersError(
-          `${getOfflineSnapshotMissingMessage('لقائمة العملاء')} يلزم وجود عميل محفوظ محليا قبل إنشاء حوالة دون اتصال.`
+          fallbackErrorMessage || missingSnapshotMessage
         )
         setCustomersLoading(false)
-        return
+        return false
       }
 
       setCustomers(cachedCustomers.customers)
       setCustomersLoading(false)
       markCachedSnapshot(cachedCustomers.savedAt)
+      return true
     }
 
     const loadCustomers = async () => {
@@ -229,42 +239,60 @@ function NewTransferPage() {
       setCustomersLoading(true)
       setCustomersError('')
 
-      const { data, error } = await supabase
-        .schema('public')
-        .from('customers')
-        .select('id, full_name')
-        .order('full_name', { ascending: true })
+      try {
+        const { data, error } = await withLiveReadTimeout(
+          supabase
+            .schema('public')
+            .from('customers')
+            .select('id, full_name')
+            .order('full_name', { ascending: true }),
+          {
+            timeoutMessage: 'تعذر إكمال تحميل قائمة العملاء في الوقت المتوقع.',
+          }
+        )
 
-      if (!isMounted) {
-        return
-      }
+        if (!isMounted) {
+          return
+        }
 
-      if (error) {
-        setCustomers([])
-        setCustomersError(error.message)
+        if (error) {
+          const preferSnapshot = isOffline || isBrowserOffline() || isLikelyOfflineReadFailure(error)
+          await hydrateFromSnapshot({
+            fallbackErrorMessage: preferSnapshot ? '' : error.message,
+          })
+          return
+        }
+
+        const normalizedCustomers = normalizeCustomerOptions(data ?? [])
+        const savedSnapshot = await saveReadSnapshot({
+          data: {
+            customers: normalizedCustomers,
+          },
+          key: NEW_TRANSFER_CUSTOMERS_SNAPSHOT_KEY,
+          scope: {
+            page: 'new_transfer',
+          },
+          type: 'customer_options',
+        })
+
+        if (!isMounted) {
+          return
+        }
+
+        setCustomers(normalizedCustomers)
         setCustomersLoading(false)
-        return
+        markLiveSnapshot(savedSnapshot?.savedAt || '')
+      } catch (error) {
+        if (!isMounted) {
+          return
+        }
+
+        const preferSnapshot = isOffline || isBrowserOffline() || isLikelyOfflineReadFailure(error)
+
+        await hydrateFromSnapshot({
+          fallbackErrorMessage: preferSnapshot ? '' : error.message,
+        })
       }
-
-      const normalizedCustomers = normalizeCustomerOptions(data ?? [])
-      const savedSnapshot = await saveReadSnapshot({
-        data: {
-          customers: normalizedCustomers,
-        },
-        key: NEW_TRANSFER_CUSTOMERS_SNAPSHOT_KEY,
-        scope: {
-          page: 'new_transfer',
-        },
-        type: 'customer_options',
-      })
-
-      if (!isMounted) {
-        return
-      }
-
-      setCustomers(normalizedCustomers)
-      setCustomersLoading(false)
-      markLiveSnapshot(savedSnapshot?.savedAt || '')
     }
 
     if (isOffline) {

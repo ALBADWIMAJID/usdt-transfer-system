@@ -1,8 +1,45 @@
 import { PAYMENT_MUTATION_QUEUE_STORE } from './queueStores.js'
 import { OFFLINE_DB_NAME, OFFLINE_DB_VERSION, READ_SNAPSHOT_STORE } from './stores.js'
 
+const OFFLINE_DB_REQUEST_TIMEOUT_MS = 3000
+
 function isIndexedDbAvailable() {
   return typeof indexedDB !== 'undefined'
+}
+
+function createOfflineDbTimeoutError(actionLabel) {
+  const error = new Error(`IndexedDB timeout while ${actionLabel}.`)
+  error.name = 'OfflineDbTimeoutError'
+  return error
+}
+
+function withTimeout(executor, actionLabel) {
+  return new Promise((resolve, reject) => {
+    let settled = false
+    const timeoutId = setTimeout(() => {
+      if (settled) {
+        return
+      }
+
+      settled = true
+      reject(createOfflineDbTimeoutError(actionLabel))
+    }, OFFLINE_DB_REQUEST_TIMEOUT_MS)
+
+    const finish = (handler) => (value) => {
+      if (settled) {
+        return
+      }
+
+      settled = true
+      clearTimeout(timeoutId)
+      handler(value)
+    }
+
+    executor({
+      reject: finish(reject),
+      resolve: finish(resolve),
+    })
+  })
 }
 
 function ensureReadSnapshotStore(database) {
@@ -34,7 +71,7 @@ function openOfflineDb() {
     return Promise.resolve(null)
   }
 
-  return new Promise((resolve, reject) => {
+  return withTimeout(({ resolve, reject }) => {
     const request = indexedDB.open(OFFLINE_DB_NAME, OFFLINE_DB_VERSION)
 
     request.onupgradeneeded = () => {
@@ -51,7 +88,11 @@ function openOfflineDb() {
     request.onerror = () => {
       reject(request.error || new Error('Failed to open IndexedDB.'))
     }
-  })
+
+    request.onblocked = () => {
+      reject(new Error('IndexedDB open request is blocked.'))
+    }
+  }, 'opening the offline database')
 }
 
 async function readFromStore(key, storeName = READ_SNAPSHOT_STORE) {
@@ -61,7 +102,7 @@ async function readFromStore(key, storeName = READ_SNAPSHOT_STORE) {
     return null
   }
 
-  return new Promise((resolve, reject) => {
+  return withTimeout(({ resolve, reject }) => {
     const transaction = database.transaction(storeName, 'readonly')
     const store = transaction.objectStore(storeName)
     const request = store.get(key)
@@ -73,7 +114,11 @@ async function readFromStore(key, storeName = READ_SNAPSHOT_STORE) {
     request.onerror = () => {
       reject(request.error || new Error(`Failed to read record: ${key}`))
     }
-  })
+
+    transaction.onabort = () => {
+      reject(transaction.error || new Error(`IndexedDB transaction aborted for record: ${key}`))
+    }
+  }, `reading ${storeName}:${key}`)
 }
 
 async function getAllFromStore(storeName = READ_SNAPSHOT_STORE) {
@@ -83,7 +128,7 @@ async function getAllFromStore(storeName = READ_SNAPSHOT_STORE) {
     return []
   }
 
-  return new Promise((resolve, reject) => {
+  return withTimeout(({ resolve, reject }) => {
     const transaction = database.transaction(storeName, 'readonly')
     const store = transaction.objectStore(storeName)
     const request = store.getAll()
@@ -95,7 +140,11 @@ async function getAllFromStore(storeName = READ_SNAPSHOT_STORE) {
     request.onerror = () => {
       reject(request.error || new Error(`Failed to read records from store: ${storeName}`))
     }
-  })
+
+    transaction.onabort = () => {
+      reject(transaction.error || new Error(`IndexedDB transaction aborted for store: ${storeName}`))
+    }
+  }, `reading all records from ${storeName}`)
 }
 
 async function writeToStore(record, storeName = READ_SNAPSHOT_STORE) {

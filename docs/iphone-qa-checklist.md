@@ -32,7 +32,7 @@ Status fields:
 
 | Scenario | Preconditions | Test Steps | Expected Result | Status | Notes |
 | --- | --- | --- | --- | --- | --- |
-| Offline after prior dashboard/customers/transfers visit | Relevant screens opened online previously | Go offline and reopen supported read screens | Snapshot-backed screens show locally saved data notice or safe missing-data state | Not Run |  |
+| Offline after prior dashboard/customers/transfers/details visit | Relevant supported screens opened online previously | Go offline and reopen `CustomersPage`, `TransfersPage`, `CustomerDetailsPage`, `TransferDetailsPage`, and `NewTransferPage` customer options where applicable | Supported snapshot-backed screens do not stay on `جار التحميل...`; they show locally saved data or an explicit offline/no-snapshot state | Not Run |  |
 | Offline unsupported surface | Go offline on a surface with no local snapshot | Open a screen without a saved snapshot | App fails safely and does not fake live data | Not Run |  |
 | Network switch Wi-Fi -> cellular/offline | App open with pending or cached state | Toggle connectivity types and observe banners/notices | Connection/sync messaging stays clear and non-duplicative | Not Run |  |
 

@@ -16,7 +16,13 @@ import useNetworkStatus from '../hooks/useNetworkStatus.js'
 import useOfflineSnapshot from '../hooks/useOfflineSnapshot.js'
 import { CUSTOMERS_LIST_SNAPSHOT_KEY } from '../lib/offline/cacheKeys.js'
 import { getOfflineSnapshotMissingMessage } from '../lib/offline/freshness.js'
-import { loadReadSnapshot, saveReadSnapshot } from '../lib/offline/readCache.js'
+import {
+  isBrowserOffline,
+  isLikelyOfflineReadFailure,
+  loadReadSnapshot,
+  saveReadSnapshot,
+  withLiveReadTimeout,
+} from '../lib/offline/readCache.js'
 import { getPaymentMethodLabel, getTransferStatusMeta } from '../lib/transfer-ui.js'
 import { supabase } from '../lib/supabase.js'
 
@@ -376,7 +382,9 @@ function CustomersPage() {
 
     let isMounted = true
 
-    const hydrateFromSnapshot = async () => {
+    const hydrateFromSnapshot = async (options = {}) => {
+      const { fallbackErrorMessage = '' } = options
+
       setLoading(true)
       setLoadError('')
       setPortfolioWarning('')
@@ -393,9 +401,9 @@ function CustomersPage() {
         setAttentionCustomers([])
         setRecentActivityItems([])
         setPortfolioStats(emptyPortfolioStats)
-        setLoadError(getOfflineSnapshotMissingMessage('لملفات العملاء'))
+        setLoadError(fallbackErrorMessage || getOfflineSnapshotMissingMessage('لملفات العملاء'))
         setLoading(false)
-        return
+        return false
       }
 
       setCustomers(snapshot.data.customers || [])
@@ -406,6 +414,7 @@ function CustomersPage() {
       setLoadError('')
       setLoading(false)
       markCachedSnapshot(snapshot.savedAt)
+      return true
     }
 
     const loadCustomers = async () => {
@@ -414,145 +423,161 @@ function CustomersPage() {
       setLoadError('')
       setPortfolioWarning('')
 
-      const { data: customersData, error: customersError } = await supabase
-        .schema('public')
-        .from('customers')
-        .select('*')
-        .order('full_name', { ascending: true })
-
-      if (!isMounted) {
-        return
-      }
-
-      if (customersError) {
-        setCustomers([])
-        setAttentionCustomers([])
-        setRecentActivityItems([])
-        setPortfolioStats(emptyPortfolioStats)
-        setLoadError(customersError.message)
-        setLoading(false)
-        return
-      }
-
-      const customerMap = Object.fromEntries((customersData ?? []).map((customer) => [customer.id, customer]))
-      const baseEntries = (customersData ?? []).map((customer, index) =>
-        buildBaseCustomerEntry(customer, index)
-      )
-
-      const [transfersResult, paymentsResult] = await Promise.all([
-        supabase
-          .schema('public')
-          .from('transfers')
-          .select('id, customer_id, reference_number, status, payable_rub, created_at')
-          .order('created_at', { ascending: false }),
-        supabase
-          .schema('public')
-          .from('transfer_payments')
-          .select('id, transfer_id, amount_rub, payment_method, note, paid_at, created_at')
-          .order('created_at', { ascending: false }),
-      ])
-
-      if (!isMounted) {
-        return
-      }
-
-      if (transfersResult.error || paymentsResult.error) {
-        setCustomers(baseEntries)
-        setAttentionCustomers([])
-        setRecentActivityItems([])
-        setPortfolioStats({
-          ...emptyPortfolioStats,
-          totalCustomers: baseEntries.length,
-        })
-        setPortfolioFilter('all')
-        setPortfolioWarning(
-          transfersResult.error?.message ||
-            paymentsResult.error?.message ||
-            'تم تحميل العملاء، لكن تعذر بناء مؤشرات المتابعة المالية حاليا.'
+      try {
+        const { data: customersData, error: customersError } = await withLiveReadTimeout(
+          supabase.schema('public').from('customers').select('*').order('full_name', { ascending: true }),
+          {
+            timeoutMessage: 'تعذر إكمال تحميل ملفات العملاء في الوقت المتوقع.',
+          }
         )
-        setLoading(false)
-        return
-      }
 
-      const transfers = transfersResult.data ?? []
-      const payments = paymentsResult.data ?? []
-      const transferMap = {}
-      const paymentTotalsByTransfer = {}
-      const latestPaymentByTransfer = {}
-      const paymentsByCustomerId = {}
-
-      payments.forEach((payment) => {
-        if (!payment.transfer_id) {
+        if (!isMounted) {
           return
         }
 
-        const activityAt = payment.paid_at || payment.created_at
-        paymentTotalsByTransfer[payment.transfer_id] = roundCurrency(
-          (paymentTotalsByTransfer[payment.transfer_id] || 0) + (Number(payment.amount_rub) || 0)
-        )
-
-        const currentLatest = latestPaymentByTransfer[payment.transfer_id]
-        const nextTimestamp = parseDateValue(activityAt)?.getTime() || 0
-        const currentTimestamp = parseDateValue(currentLatest?.activityAt)?.getTime() || 0
-
-        if (!currentLatest || nextTimestamp >= currentTimestamp) {
-          latestPaymentByTransfer[payment.transfer_id] = {
-            ...payment,
-            activityAt,
-          }
-        }
-      })
-
-      const transferRecords = transfers.map((transfer) => {
-        const payableRub = Number(transfer.payable_rub) || 0
-        const totalPaidRub = paymentTotalsByTransfer[transfer.id] || 0
-        const remainingRub = roundCurrency(payableRub - totalPaidRub)
-        const normalizedStatus = normalizeStatus(transfer.status)
-        const isOverpaid = remainingRub < -0.009
-        const isPartialOutstanding = isPartialStatus(normalizedStatus) && remainingRub > 0.009
-        const isOpenOutstanding = isOpenStatus(normalizedStatus) && remainingRub > 0.009
-        const latestPayment = latestPaymentByTransfer[transfer.id] || null
-
-        const record = {
-          ...transfer,
-          payableRub,
-          totalPaidRub,
-          remainingRub,
-          normalizedStatus,
-          isOverpaid,
-          isPartialOutstanding,
-          isOpenOutstanding,
-          latestPayment,
-        }
-
-        transferMap[transfer.id] = record
-        return record
-      })
-
-      const transfersByCustomerId = {}
-
-      transferRecords.forEach((transfer) => {
-        if (!transfer.customer_id) {
-          return
-        }
-
-        if (!transfersByCustomerId[transfer.customer_id]) {
-          transfersByCustomerId[transfer.customer_id] = []
-        }
-
-        transfersByCustomerId[transfer.customer_id].push(transfer)
-
-        if (transfer.latestPayment) {
-          if (!paymentsByCustomerId[transfer.customer_id]) {
-            paymentsByCustomerId[transfer.customer_id] = []
-          }
-
-          paymentsByCustomerId[transfer.customer_id].push({
-            ...transfer.latestPayment,
-            transfer,
+        if (customersError) {
+          const preferSnapshot = isOffline || isBrowserOffline() || isLikelyOfflineReadFailure(customersError)
+          await hydrateFromSnapshot({
+            fallbackErrorMessage: preferSnapshot ? '' : customersError.message,
           })
+          return
         }
-      })
+
+        const customerMap = Object.fromEntries((customersData ?? []).map((customer) => [customer.id, customer]))
+        const baseEntries = (customersData ?? []).map((customer, index) =>
+          buildBaseCustomerEntry(customer, index)
+        )
+
+        const [transfersResult, paymentsResult] = await withLiveReadTimeout(
+          Promise.all([
+            supabase
+              .schema('public')
+              .from('transfers')
+              .select('id, customer_id, reference_number, status, payable_rub, created_at')
+              .order('created_at', { ascending: false }),
+            supabase
+              .schema('public')
+              .from('transfer_payments')
+              .select('id, transfer_id, amount_rub, payment_method, note, paid_at, created_at')
+              .order('created_at', { ascending: false }),
+          ]),
+          {
+            timeoutMessage: 'تعذر إكمال تحميل مؤشرات متابعة العملاء في الوقت المتوقع.',
+          }
+        )
+
+        if (!isMounted) {
+          return
+        }
+
+        if (transfersResult.error || paymentsResult.error) {
+          const metricsError =
+            transfersResult.error ||
+            paymentsResult.error ||
+            new Error('تم تحميل العملاء، لكن تعذر بناء مؤشرات المتابعة المالية حاليا.')
+          const preferSnapshot = isOffline || isBrowserOffline() || isLikelyOfflineReadFailure(metricsError)
+
+          if (preferSnapshot) {
+            await hydrateFromSnapshot()
+            return
+          }
+
+          setCustomers(baseEntries)
+          setAttentionCustomers([])
+          setRecentActivityItems([])
+          setPortfolioStats({
+            ...emptyPortfolioStats,
+            totalCustomers: baseEntries.length,
+          })
+          setPortfolioFilter('all')
+          setPortfolioWarning(
+            transfersResult.error?.message ||
+              paymentsResult.error?.message ||
+              'تم تحميل العملاء، لكن تعذر بناء مؤشرات المتابعة المالية حاليا.'
+          )
+          setLoading(false)
+          return
+        }
+
+        const transfers = transfersResult.data ?? []
+        const payments = paymentsResult.data ?? []
+        const transferMap = {}
+        const paymentTotalsByTransfer = {}
+        const latestPaymentByTransfer = {}
+        const paymentsByCustomerId = {}
+
+        payments.forEach((payment) => {
+          if (!payment.transfer_id) {
+            return
+          }
+
+          const activityAt = payment.paid_at || payment.created_at
+          paymentTotalsByTransfer[payment.transfer_id] = roundCurrency(
+            (paymentTotalsByTransfer[payment.transfer_id] || 0) + (Number(payment.amount_rub) || 0)
+          )
+
+          const currentLatest = latestPaymentByTransfer[payment.transfer_id]
+          const nextTimestamp = parseDateValue(activityAt)?.getTime() || 0
+          const currentTimestamp = parseDateValue(currentLatest?.activityAt)?.getTime() || 0
+
+          if (!currentLatest || nextTimestamp >= currentTimestamp) {
+            latestPaymentByTransfer[payment.transfer_id] = {
+              ...payment,
+              activityAt,
+            }
+          }
+        })
+
+        const transferRecords = transfers.map((transfer) => {
+          const payableRub = Number(transfer.payable_rub) || 0
+          const totalPaidRub = paymentTotalsByTransfer[transfer.id] || 0
+          const remainingRub = roundCurrency(payableRub - totalPaidRub)
+          const normalizedStatus = normalizeStatus(transfer.status)
+          const isOverpaid = remainingRub < -0.009
+          const isPartialOutstanding = isPartialStatus(normalizedStatus) && remainingRub > 0.009
+          const isOpenOutstanding = isOpenStatus(normalizedStatus) && remainingRub > 0.009
+          const latestPayment = latestPaymentByTransfer[transfer.id] || null
+
+          const record = {
+            ...transfer,
+            payableRub,
+            totalPaidRub,
+            remainingRub,
+            normalizedStatus,
+            isOverpaid,
+            isPartialOutstanding,
+            isOpenOutstanding,
+            latestPayment,
+          }
+
+          transferMap[transfer.id] = record
+          return record
+        })
+
+        const transfersByCustomerId = {}
+
+        transferRecords.forEach((transfer) => {
+          if (!transfer.customer_id) {
+            return
+          }
+
+          if (!transfersByCustomerId[transfer.customer_id]) {
+            transfersByCustomerId[transfer.customer_id] = []
+          }
+
+          transfersByCustomerId[transfer.customer_id].push(transfer)
+
+          if (transfer.latestPayment) {
+            if (!paymentsByCustomerId[transfer.customer_id]) {
+              paymentsByCustomerId[transfer.customer_id] = []
+            }
+
+            paymentsByCustomerId[transfer.customer_id].push({
+              ...transfer.latestPayment,
+              transfer,
+            })
+          }
+        })
 
       const portfolioEntries = (customersData ?? [])
         .map((customer, index) => {
@@ -757,58 +782,69 @@ function CustomersPage() {
         .sort((left, right) => right.eventAt - left.eventAt)
         .slice(0, 6)
 
-      const followUpCustomers = portfolioEntries.filter((customer) => customer.needsFollowUp)
-      const activeCollectionCustomers = portfolioEntries.filter(isActiveCollectionCustomer)
-      const openAwaitingCustomers = portfolioEntries.filter(isOpenWaitingCustomer)
+        const followUpCustomers = portfolioEntries.filter((customer) => customer.needsFollowUp)
+        const activeCollectionCustomers = portfolioEntries.filter(isActiveCollectionCustomer)
+        const openAwaitingCustomers = portfolioEntries.filter(isOpenWaitingCustomer)
 
-      setCustomers(portfolioEntries)
-      setPortfolioStats({
-        totalCustomers: portfolioEntries.length,
-        activeCollectionCustomers: activeCollectionCustomers.length,
-        openAwaitingCustomers: openAwaitingCustomers.length,
-        overpaidCustomers: portfolioEntries.filter((customer) => customer.hasOverpaid).length,
-        followUpCustomers: followUpCustomers.length,
-        todayFollowUpCustomers: portfolioEntries.filter(
-          (customer) => customer.needsFollowUp && customer.hasActivityToday
-        ).length,
-        totalOutstandingRub: roundCurrency(
-          portfolioEntries.reduce((sum, customer) => sum + customer.outstandingRub, 0)
-        ),
-      })
-      setAttentionCustomers(followUpCustomers.slice(0, 4))
-      setRecentActivityItems(portfolioActivityItems)
-      setLoading(false)
+        setCustomers(portfolioEntries)
+        setPortfolioStats({
+          totalCustomers: portfolioEntries.length,
+          activeCollectionCustomers: activeCollectionCustomers.length,
+          openAwaitingCustomers: openAwaitingCustomers.length,
+          overpaidCustomers: portfolioEntries.filter((customer) => customer.hasOverpaid).length,
+          followUpCustomers: followUpCustomers.length,
+          todayFollowUpCustomers: portfolioEntries.filter(
+            (customer) => customer.needsFollowUp && customer.hasActivityToday
+          ).length,
+          totalOutstandingRub: roundCurrency(
+            portfolioEntries.reduce((sum, customer) => sum + customer.outstandingRub, 0)
+          ),
+        })
+        setAttentionCustomers(followUpCustomers.slice(0, 4))
+        setRecentActivityItems(portfolioActivityItems)
+        setLoading(false)
 
-      const savedSnapshot = await saveReadSnapshot({
-        key: CUSTOMERS_LIST_SNAPSHOT_KEY,
-        scope: 'customers-list',
-        type: 'customers_list',
-        data: {
-          customers: portfolioEntries,
-          portfolioStats: {
-            totalCustomers: portfolioEntries.length,
-            activeCollectionCustomers: activeCollectionCustomers.length,
-            openAwaitingCustomers: openAwaitingCustomers.length,
-            overpaidCustomers: portfolioEntries.filter((customer) => customer.hasOverpaid).length,
-            followUpCustomers: followUpCustomers.length,
-            todayFollowUpCustomers: portfolioEntries.filter(
-              (customer) => customer.needsFollowUp && customer.hasActivityToday
-            ).length,
-            totalOutstandingRub: roundCurrency(
-              portfolioEntries.reduce((sum, customer) => sum + customer.outstandingRub, 0)
-            ),
+        const savedSnapshot = await saveReadSnapshot({
+          key: CUSTOMERS_LIST_SNAPSHOT_KEY,
+          scope: 'customers-list',
+          type: 'customers_list',
+          data: {
+            customers: portfolioEntries,
+            portfolioStats: {
+              totalCustomers: portfolioEntries.length,
+              activeCollectionCustomers: activeCollectionCustomers.length,
+              openAwaitingCustomers: openAwaitingCustomers.length,
+              overpaidCustomers: portfolioEntries.filter((customer) => customer.hasOverpaid).length,
+              followUpCustomers: followUpCustomers.length,
+              todayFollowUpCustomers: portfolioEntries.filter(
+                (customer) => customer.needsFollowUp && customer.hasActivityToday
+              ).length,
+              totalOutstandingRub: roundCurrency(
+                portfolioEntries.reduce((sum, customer) => sum + customer.outstandingRub, 0)
+              ),
+            },
+            attentionCustomers: followUpCustomers.slice(0, 4),
+            recentActivityItems: portfolioActivityItems,
+            portfolioWarning: '',
           },
-          attentionCustomers: followUpCustomers.slice(0, 4),
-          recentActivityItems: portfolioActivityItems,
-          portfolioWarning: '',
-        },
-      })
+        })
 
-      if (!isMounted) {
-        return
+        if (!isMounted) {
+          return
+        }
+
+        markLiveSnapshot(savedSnapshot?.savedAt || '')
+      } catch (error) {
+        if (!isMounted) {
+          return
+        }
+
+        const preferSnapshot = isOffline || isBrowserOffline() || isLikelyOfflineReadFailure(error)
+
+        await hydrateFromSnapshot({
+          fallbackErrorMessage: preferSnapshot ? '' : error.message,
+        })
       }
-
-      markLiveSnapshot(savedSnapshot?.savedAt || '')
     }
 
     if (isOffline) {

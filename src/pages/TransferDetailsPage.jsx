@@ -22,7 +22,13 @@ import useReplayQueue from '../hooks/useReplayQueue.js'
 import { getTransferDetailsSnapshotKey } from '../lib/offline/cacheKeys.js'
 import { getOfflineSnapshotMissingMessage } from '../lib/offline/freshness.js'
 import { queueOfflinePayment } from '../lib/offline/paymentQueue.js'
-import { loadReadSnapshot, saveReadSnapshot } from '../lib/offline/readCache.js'
+import {
+  isBrowserOffline,
+  isLikelyOfflineReadFailure,
+  loadReadSnapshot,
+  saveReadSnapshot,
+  withLiveReadTimeout,
+} from '../lib/offline/readCache.js'
 import { getPaymentMethodLabel, getTransferStatusMeta } from '../lib/transfer-ui.js'
 import { supabase } from '../lib/supabase.js'
 
@@ -136,7 +142,9 @@ function TransferDetailsPage() {
 
     let isMounted = true
 
-    const hydrateTransferFromSnapshot = async () => {
+    const hydrateTransferFromSnapshot = async (options = {}) => {
+      const { fallbackErrorMessage = '' } = options
+
       setTransferLoading(true)
       setTransferError('')
 
@@ -150,9 +158,9 @@ function TransferDetailsPage() {
         clearSnapshotState()
         setTransfer(null)
         setCustomerName('')
-        setTransferError(getOfflineSnapshotMissingMessage('لهذه الحوالة'))
+        setTransferError(fallbackErrorMessage || getOfflineSnapshotMissingMessage('لهذه الحوالة'))
         setTransferLoading(false)
-        return
+        return false
       }
 
       setTransfer(snapshot.data.transfer)
@@ -160,6 +168,7 @@ function TransferDetailsPage() {
       setTransferError('')
       setTransferLoading(false)
       markCachedSnapshot(snapshot.savedAt)
+      return true
     }
 
     const loadTransfer = async () => {
@@ -167,57 +176,79 @@ function TransferDetailsPage() {
       setTransferLoading(true)
       setTransferError('')
 
-      const { data, error } = await supabase
-        .schema('public')
-        .from('transfers')
-        .select(
-          'id, reference_number, customer_id, usdt_amount, market_rate, client_rate, pricing_mode, commission_pct, commission_rub, gross_rub, payable_rub, status, notes, created_at'
+      try {
+        const { data, error } = await withLiveReadTimeout(
+          supabase
+            .schema('public')
+            .from('transfers')
+            .select(
+              'id, reference_number, customer_id, usdt_amount, market_rate, client_rate, pricing_mode, commission_pct, commission_rub, gross_rub, payable_rub, status, notes, created_at'
+            )
+            .eq('id', transferId)
+            .maybeSingle(),
+          {
+            timeoutMessage: 'تعذر إكمال تحميل هذه الحوالة في الوقت المتوقع.',
+          }
         )
-        .eq('id', transferId)
-        .maybeSingle()
-
-      if (!isMounted) {
-        return
-      }
-
-      if (error) {
-        setTransfer(null)
-        setCustomerName('')
-        setTransferError(error.message)
-        setTransferLoading(false)
-        return
-      }
-
-      if (!data) {
-        setTransfer(null)
-        setCustomerName('')
-        setTransferError('الحوالة غير موجودة أو غير متاحة ضمن صلاحيات الجلسة الحالية.')
-        setTransferLoading(false)
-        return
-      }
-
-      let nextCustomerName = ''
-
-      if (data.customer_id) {
-        const { data: customerData, error: customerError } = await supabase
-          .schema('public')
-          .from('customers')
-          .select('full_name')
-          .eq('id', data.customer_id)
-          .maybeSingle()
 
         if (!isMounted) {
           return
         }
 
-        if (!customerError) {
-          nextCustomerName = customerData?.full_name || ''
+        if (error) {
+          const preferSnapshot = isOffline || isBrowserOffline() || isLikelyOfflineReadFailure(error)
+          await hydrateTransferFromSnapshot({
+            fallbackErrorMessage: preferSnapshot ? '' : error.message,
+          })
+          return
         }
-      }
 
-      setTransfer(data)
-      setCustomerName(nextCustomerName)
-      setTransferLoading(false)
+        if (!data) {
+          setTransfer(null)
+          setCustomerName('')
+          setTransferError('الحوالة غير موجودة أو غير متاحة ضمن صلاحيات الجلسة الحالية.')
+          setTransferLoading(false)
+          return
+        }
+
+        let nextCustomerName = ''
+
+        if (data.customer_id) {
+          const { data: customerData, error: customerError } = await withLiveReadTimeout(
+            supabase
+              .schema('public')
+              .from('customers')
+              .select('full_name')
+              .eq('id', data.customer_id)
+              .maybeSingle(),
+            {
+              timeoutMessage: 'تعذر إكمال تحميل اسم العميل لهذه الحوالة في الوقت المتوقع.',
+            }
+          )
+
+          if (!isMounted) {
+            return
+          }
+
+          if (!customerError) {
+            nextCustomerName = customerData?.full_name || ''
+          }
+        }
+
+        setTransfer(data)
+        setCustomerName(nextCustomerName)
+        setTransferLoading(false)
+      } catch (error) {
+        if (!isMounted) {
+          return
+        }
+
+        const preferSnapshot = isOffline || isBrowserOffline() || isLikelyOfflineReadFailure(error)
+
+        await hydrateTransferFromSnapshot({
+          fallbackErrorMessage: preferSnapshot ? '' : error.message,
+        })
+      }
     }
 
     if (isOffline) {
@@ -245,7 +276,9 @@ function TransferDetailsPage() {
 
     let isMounted = true
 
-    const hydratePaymentsFromSnapshot = async () => {
+    const hydratePaymentsFromSnapshot = async (options = {}) => {
+      const { fallbackErrorMessage = '' } = options
+
       setPaymentsLoading(true)
       setPaymentsError('')
 
@@ -257,41 +290,60 @@ function TransferDetailsPage() {
 
       if (!snapshot?.data) {
         setPayments([])
-        setPaymentsError(getOfflineSnapshotMissingMessage('لمدفوعات هذه الحوالة'))
+        setPaymentsError(fallbackErrorMessage || getOfflineSnapshotMissingMessage('لمدفوعات هذه الحوالة'))
         setPaymentsLoading(false)
-        return
+        return false
       }
 
       setPayments(snapshot.data.payments || [])
       setPaymentsError('')
       setPaymentsLoading(false)
+      return true
     }
 
     const loadPayments = async () => {
       setPaymentsLoading(true)
       setPaymentsError('')
 
-      const { data, error } = await supabase
-        .schema('public')
-        .from('transfer_payments')
-        .select('id, amount_rub, payment_method, note, paid_at, created_at')
-        .eq('transfer_id', transferId)
-        .order('paid_at', { ascending: false })
-        .order('created_at', { ascending: false })
+      try {
+        const { data, error } = await withLiveReadTimeout(
+          supabase
+            .schema('public')
+            .from('transfer_payments')
+            .select('id, amount_rub, payment_method, note, paid_at, created_at')
+            .eq('transfer_id', transferId)
+            .order('paid_at', { ascending: false })
+            .order('created_at', { ascending: false }),
+          {
+            timeoutMessage: 'تعذر إكمال تحميل مدفوعات هذه الحوالة في الوقت المتوقع.',
+          }
+        )
 
-      if (!isMounted) {
-        return
-      }
+        if (!isMounted) {
+          return
+        }
 
-      if (error) {
-        setPayments([])
-        setPaymentsError(error.message)
+        if (error) {
+          const preferSnapshot = isOffline || isBrowserOffline() || isLikelyOfflineReadFailure(error)
+          await hydratePaymentsFromSnapshot({
+            fallbackErrorMessage: preferSnapshot ? '' : error.message,
+          })
+          return
+        }
+
+        setPayments(data ?? [])
         setPaymentsLoading(false)
-        return
-      }
+      } catch (error) {
+        if (!isMounted) {
+          return
+        }
 
-      setPayments(data ?? [])
-      setPaymentsLoading(false)
+        const preferSnapshot = isOffline || isBrowserOffline() || isLikelyOfflineReadFailure(error)
+
+        await hydratePaymentsFromSnapshot({
+          fallbackErrorMessage: preferSnapshot ? '' : error.message,
+        })
+      }
     }
 
     if (isOffline) {

@@ -12,7 +12,13 @@ import useNetworkStatus from '../hooks/useNetworkStatus.js'
 import useOfflineSnapshot from '../hooks/useOfflineSnapshot.js'
 import { TRANSFERS_LIST_SNAPSHOT_KEY } from '../lib/offline/cacheKeys.js'
 import { getOfflineSnapshotMissingMessage } from '../lib/offline/freshness.js'
-import { loadReadSnapshot, saveReadSnapshot } from '../lib/offline/readCache.js'
+import {
+  isBrowserOffline,
+  isLikelyOfflineReadFailure,
+  loadReadSnapshot,
+  saveReadSnapshot,
+  withLiveReadTimeout,
+} from '../lib/offline/readCache.js'
 import {
   matchesTransferStatusFilter,
   TRANSFER_STATUS_FILTER_OPTIONS,
@@ -310,7 +316,9 @@ function TransfersPage() {
 
     let isMounted = true
 
-    const hydrateFromSnapshot = async () => {
+    const hydrateFromSnapshot = async (options = {}) => {
+      const { fallbackErrorMessage = '' } = options
+
       setLoading(true)
       setLoadError('')
 
@@ -323,15 +331,16 @@ function TransfersPage() {
       if (!snapshot?.data?.transfers) {
         clearSnapshotState()
         setTransfers([])
-        setLoadError(getOfflineSnapshotMissingMessage('لصف الحوالات'))
+        setLoadError(fallbackErrorMessage || getOfflineSnapshotMissingMessage('لصف الحوالات'))
         setLoading(false)
-        return
+        return false
       }
 
       setTransfers(snapshot.data.transfers)
       setLoadError('')
       setLoading(false)
       markCachedSnapshot(snapshot.savedAt)
+      return true
     }
 
     const loadTransfers = async () => {
@@ -339,149 +348,168 @@ function TransfersPage() {
       setLoading(true)
       setLoadError('')
 
-      const [transfersResult, paymentsResult] = await Promise.all([
-        supabase
-          .schema('public')
-          .from('transfers')
-          .select(
-            'id, reference_number, customer_id, usdt_amount, payable_rub, status, created_at'
-          )
-          .order('created_at', { ascending: false }),
-        supabase
-          .schema('public')
-          .from('transfer_payments')
-          .select('transfer_id, amount_rub'),
-      ])
-
-      if (!isMounted) {
-        return
-      }
-
-      if (transfersResult.error || paymentsResult.error) {
-        setTransfers([])
-        setLoadError(
-          transfersResult.error?.message ||
-            paymentsResult.error?.message ||
-            'تعذر تحميل صف الحوالات.'
+      try {
+        const [transfersResult, paymentsResult] = await withLiveReadTimeout(
+          Promise.all([
+            supabase
+              .schema('public')
+              .from('transfers')
+              .select(
+                'id, reference_number, customer_id, usdt_amount, payable_rub, status, created_at'
+              )
+              .order('created_at', { ascending: false }),
+            supabase.schema('public').from('transfer_payments').select('transfer_id, amount_rub'),
+          ]),
+          {
+            timeoutMessage: 'تعذر إكمال تحميل صف الحوالات في الوقت المتوقع.',
+          }
         )
-        setLoading(false)
-        return
-      }
-
-      const transfersData = transfersResult.data ?? []
-      const paymentsData = paymentsResult.data ?? []
-      const paymentTotalsByTransfer = {}
-
-      paymentsData.forEach((payment) => {
-        if (!payment.transfer_id) {
-          return
-        }
-
-        paymentTotalsByTransfer[payment.transfer_id] = roundCurrency(
-          (paymentTotalsByTransfer[payment.transfer_id] || 0) + (Number(payment.amount_rub) || 0)
-        )
-      })
-
-      const customerIds = [
-        ...new Set(transfersData.map((transfer) => transfer.customer_id).filter(Boolean)),
-      ]
-      let customerNames = {}
-
-      if (customerIds.length > 0) {
-        const { data: customersData, error: customersError } = await supabase
-          .schema('public')
-          .from('customers')
-          .select('id, full_name')
-          .in('id', customerIds)
 
         if (!isMounted) {
           return
         }
 
-        if (customersError) {
-          setTransfers([])
-          setLoadError(customersError.message)
-          setLoading(false)
+        if (transfersResult.error || paymentsResult.error) {
+          const loadError =
+            transfersResult.error ||
+            paymentsResult.error ||
+            new Error('تعذر تحميل صف الحوالات.')
+          const preferSnapshot = isOffline || isBrowserOffline() || isLikelyOfflineReadFailure(loadError)
+
+          await hydrateFromSnapshot({
+            fallbackErrorMessage: preferSnapshot ? '' : loadError.message,
+          })
           return
         }
 
-        customerNames = Object.fromEntries(
-          (customersData ?? []).map((customer) => [customer.id, customer.full_name])
-        )
-      }
+        const transfersData = transfersResult.data ?? []
+        const paymentsData = paymentsResult.data ?? []
+        const paymentTotalsByTransfer = {}
 
-      const nextTransfers = transfersData.map((transfer, index) => {
-        const customerName = customerNames[transfer.customer_id] || 'عميل غير متاح'
-        const payableRub = Number(transfer.payable_rub) || 0
-        const totalPaidRub = paymentTotalsByTransfer[transfer.id] || 0
-        const remainingRub = roundCurrency(payableRub - totalPaidRub)
-        const isOpen = isOpenStatus(transfer.status)
-        const isPartial = isPartialStatus(transfer.status)
-        const isOverpaid = remainingRub < -0.009
-        const hasOutstanding = remainingRub > 0.009
-        const queueMeta = getQueueMeta({
-          ...transfer,
-          payableRub,
-          totalPaidRub,
-          remainingRub,
-          isOpen,
-          isPartial,
-          isOverpaid,
-          hasOutstanding,
+        paymentsData.forEach((payment) => {
+          if (!payment.transfer_id) {
+            return
+          }
+
+          paymentTotalsByTransfer[payment.transfer_id] = roundCurrency(
+            (paymentTotalsByTransfer[payment.transfer_id] || 0) + (Number(payment.amount_rub) || 0)
+          )
         })
 
-        return {
-          id: transfer.id ?? transfer.created_at ?? transfer.reference_number ?? `transfer-${index}`,
-          transferId: transfer.id || '--',
-          to: transfer.id ? `/transfers/${transfer.id}` : '/transfers',
-          title: transfer.reference_number || 'المرجع قيد التخصيص',
-          referenceNumber: transfer.reference_number || 'قيد التخصيص',
-          customerName,
-          internalId: transfer.id || '--',
-          createdAt: transfer.created_at || '',
-          createdAtLabel: formatDate(transfer.created_at),
-          ageLabel: formatRelativeAge(transfer.created_at),
-          status: transfer.status,
-          usdtAmountLabel: formatNumber(transfer.usdt_amount, 2),
-          payableRub,
-          payableRubLabel: `${formatNumber(payableRub, 2)} RUB`,
-          totalPaidRub,
-          totalPaidRubLabel: `${formatNumber(totalPaidRub, 2)} RUB`,
-          remainingRub,
-          remainingRubLabel: `${formatNumber(remainingRub, 2)} RUB`,
-          remainingCardClassName: getRemainingCardClassName({
-            isOverpaid,
-            hasOutstanding,
-          }),
-          remainingValueClassName: getRemainingValueClassName({
-            isOverpaid,
-            hasOutstanding,
-          }),
-          isOpen,
-          isPartial,
-          isOverpaid,
-          hasOutstanding,
-          ...queueMeta,
+        const customerIds = [
+          ...new Set(transfersData.map((transfer) => transfer.customer_id).filter(Boolean)),
+        ]
+        let customerNames = {}
+
+        if (customerIds.length > 0) {
+          const { data: customersData, error: customersError } = await withLiveReadTimeout(
+            supabase.schema('public').from('customers').select('id, full_name').in('id', customerIds),
+            {
+              timeoutMessage: 'تعذر إكمال تحميل أسماء العملاء للحوالات في الوقت المتوقع.',
+            }
+          )
+
+          if (!isMounted) {
+            return
+          }
+
+          if (customersError) {
+            const preferSnapshot =
+              isOffline || isBrowserOffline() || isLikelyOfflineReadFailure(customersError)
+            await hydrateFromSnapshot({
+              fallbackErrorMessage: preferSnapshot ? '' : customersError.message,
+            })
+            return
+          }
+
+          customerNames = Object.fromEntries(
+            (customersData ?? []).map((customer) => [customer.id, customer.full_name])
+          )
         }
-      })
 
-      setTransfers(nextTransfers)
-      setLoading(false)
+        const nextTransfers = transfersData.map((transfer, index) => {
+          const customerName = customerNames[transfer.customer_id] || 'عميل غير متاح'
+          const payableRub = Number(transfer.payable_rub) || 0
+          const totalPaidRub = paymentTotalsByTransfer[transfer.id] || 0
+          const remainingRub = roundCurrency(payableRub - totalPaidRub)
+          const isOpen = isOpenStatus(transfer.status)
+          const isPartial = isPartialStatus(transfer.status)
+          const isOverpaid = remainingRub < -0.009
+          const hasOutstanding = remainingRub > 0.009
+          const queueMeta = getQueueMeta({
+            ...transfer,
+            payableRub,
+            totalPaidRub,
+            remainingRub,
+            isOpen,
+            isPartial,
+            isOverpaid,
+            hasOutstanding,
+          })
 
-      const savedSnapshot = await saveReadSnapshot({
-        key: TRANSFERS_LIST_SNAPSHOT_KEY,
-        scope: 'transfers-list',
-        type: 'transfers_list',
-        data: {
-          transfers: nextTransfers,
-        },
-      })
+          return {
+            id: transfer.id ?? transfer.created_at ?? transfer.reference_number ?? `transfer-${index}`,
+            transferId: transfer.id || '--',
+            to: transfer.id ? `/transfers/${transfer.id}` : '/transfers',
+            title: transfer.reference_number || 'المرجع قيد التخصيص',
+            referenceNumber: transfer.reference_number || 'قيد التخصيص',
+            customerName,
+            internalId: transfer.id || '--',
+            createdAt: transfer.created_at || '',
+            createdAtLabel: formatDate(transfer.created_at),
+            ageLabel: formatRelativeAge(transfer.created_at),
+            status: transfer.status,
+            usdtAmountLabel: formatNumber(transfer.usdt_amount, 2),
+            payableRub,
+            payableRubLabel: `${formatNumber(payableRub, 2)} RUB`,
+            totalPaidRub,
+            totalPaidRubLabel: `${formatNumber(totalPaidRub, 2)} RUB`,
+            remainingRub,
+            remainingRubLabel: `${formatNumber(remainingRub, 2)} RUB`,
+            remainingCardClassName: getRemainingCardClassName({
+              isOverpaid,
+              hasOutstanding,
+            }),
+            remainingValueClassName: getRemainingValueClassName({
+              isOverpaid,
+              hasOutstanding,
+            }),
+            isOpen,
+            isPartial,
+            isOverpaid,
+            hasOutstanding,
+            ...queueMeta,
+          }
+        })
 
-      if (!isMounted) {
-        return
+        setTransfers(nextTransfers)
+        setLoading(false)
+
+        const savedSnapshot = await saveReadSnapshot({
+          key: TRANSFERS_LIST_SNAPSHOT_KEY,
+          scope: 'transfers-list',
+          type: 'transfers_list',
+          data: {
+            transfers: nextTransfers,
+          },
+        })
+
+        if (!isMounted) {
+          return
+        }
+
+        markLiveSnapshot(savedSnapshot?.savedAt || '')
+      } catch (error) {
+        if (!isMounted) {
+          return
+        }
+
+        const preferSnapshot = isOffline || isBrowserOffline() || isLikelyOfflineReadFailure(error)
+
+        await hydrateFromSnapshot({
+          fallbackErrorMessage: preferSnapshot ? '' : error.message,
+        })
       }
-
-      markLiveSnapshot(savedSnapshot?.savedAt || '')
     }
 
     if (isOffline) {

@@ -558,3 +558,75 @@ Risks / notes:
 Suggested next step:
 - Execute the new iPhone and deployment checklists on a real staging/production
   deployment before broad rollout
+
+## 2026-03-15T01:40:58.6693317+03:00 - Phase 9 iPhone/Safari offline fallback loading bugfix pass
+
+Requested scope:
+- Implement only a tightly scoped bugfix pass for snapshot-backed offline-read
+  screens
+- Stop approved offline-read pages from remaining indefinitely in loading on
+  iPhone Safari when offline
+- Keep changes minimal, surgical, and bugfix-only
+- Preserve business logic, schema, routes, print flow, queue behavior, and
+  current offline feature scope
+
+Files changed:
+- `src/lib/offline/db.js`
+- `src/lib/offline/readCache.js`
+- `src/pages/CustomersPage.jsx`
+- `src/pages/TransfersPage.jsx`
+- `src/pages/CustomerDetailsPage.jsx`
+- `src/pages/TransferDetailsPage.jsx`
+- `src/pages/NewTransferPage.jsx`
+- `docs/offline-pwa-execution-plan.md`
+- `docs/project-current-state.md`
+- `docs/implementation-log.md`
+- `docs/code-map.md`
+- `docs/last-change-summary.md`
+- `docs/iphone-qa-checklist.md`
+- `docs/manual-test-matrix.md`
+
+What was added:
+- Timeout protection for IndexedDB open/read operations used by snapshot-backed
+  read screens
+- Conservative live-read timeout helpers and likely-offline failure detection
+- Page-level fallback orchestration so approved screens now try local snapshots
+  before surfacing a final error when live reads time out or fail offline-like
+- Clear deterministic exit paths from loading for:
+  - `CustomersPage`
+  - `TransfersPage`
+  - `CustomerDetailsPage`
+  - `TransferDetailsPage`
+  - `NewTransferPage` customer-options lookup
+- Updated manual iPhone/browser test docs to explicitly check for “not stuck in
+  loading” behavior
+
+What was not changed:
+- Business logic
+- Database schema
+- Supabase tables/contracts
+- Routes/navigation
+- Print flow
+- Offline customer creation
+- New offline mutation types
+- Queue/replay architecture
+- Broader conflict resolution
+
+Verification:
+- `npm run lint` - passed
+- `npm run build` - passed
+- Preview HTTP smoke - passed (`PREVIEW_ROOT_STATUS=200`, `PREVIEW_CUSTOMERS_STATUS=200`)
+- Build warning only: client chunk exceeded 500 kB after minification
+
+Risks / notes:
+- Physical iPhone Safari validation was not possible from this environment and
+  remains required
+- Timeout-based fallback hardening is conservative and designed to prevent
+  indefinite loading, not to guarantee perfect network-state detection on every
+  browser edge case
+- The fix intentionally targets only the approved snapshot-backed read pages
+  and does not broaden offline scope
+
+Suggested next step:
+- Re-run the updated offline-read scenarios from `docs/iphone-qa-checklist.md`
+  and `docs/manual-test-matrix.md` on a real iPhone Safari deployment

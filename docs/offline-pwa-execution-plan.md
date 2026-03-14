@@ -268,6 +268,40 @@ Still deferred after this phase:
 - Wider sync-engine refinement beyond the current payment-on-transfer
   dependency rules
 
+## Phase 9 - iPhone / Safari Offline Fallback Bugfix Pass
+
+Status: Implemented
+
+Implemented scope:
+- Hardened snapshot-backed read pages so offline fallback no longer depends on
+  long-running live fetches resolving cleanly first
+- Added deterministic IndexedDB open/read timeouts for offline snapshot access
+  to avoid indefinite hangs on Safari-style offline conditions
+- Added conservative live-read timeouts plus snapshot fallback-first behavior on
+  approved snapshot-backed pages
+- Preserved explicit page outcomes so supported screens now settle into:
+  - live data
+  - locally saved snapshot data
+  - explicit offline/no-snapshot state
+  - explicit real error state
+
+Hardened pages:
+- `CustomersPage`
+- `TransfersPage`
+- `CustomerDetailsPage`
+- `TransferDetailsPage`
+- `NewTransferPage` customer-options lookup only
+
+Current behavior:
+- If offline is known early, the approved pages now prefer snapshot hydration
+  immediately instead of waiting on doomed live reads
+- If a live read times out or fails with a likely network/offline error, the
+  approved pages now try local snapshot fallback before surfacing a final error
+- If no snapshot exists, the page exits loading and shows an explicit
+  offline/no-snapshot message instead of staying in `جار التحميل...`
+- Real iPhone retesting is still required; this phase hardens the code path but
+  does not claim physical device validation
+
 ## Guardrails
 
 - Do not change database schema as part of offline work unless explicitly

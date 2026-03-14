@@ -1,41 +1,39 @@
 # Last Change Summary
 
 Task completed:
-- Phase 8 iPhone QA pass and deployment readiness hardening
+- Phase 9 iPhone/Safari offline fallback loading bugfix pass for
+  snapshot-backed read pages
 
 Scope implemented:
-- Reviewed the current PWA shell and deployment-sensitive files
-- Hardened manifest URLs so install metadata is relative/base-safe
-- Added PNG placeholder icons for iPhone/Home Screen and general install flows
-- Hardened service worker registration and scope handling around Vite base path
-- Hardened service worker precache/fallback logic to resolve assets relative to
-  the worker scope
-- Updated the offline fallback page to reopen the cached shell relative to the
-  current app scope
-- Added formal in-repo QA/deployment artifacts:
-  - `docs/iphone-qa-checklist.md`
-  - `docs/deployment-readiness-checklist.md`
-  - `docs/manual-test-matrix.md`
-- Updated persistent repository docs to reflect current readiness and remaining
-  manual validation work
+- Hardened the shared offline read layer so IndexedDB open/read operations time
+  out safely instead of hanging indefinitely
+- Added conservative live-read timeouts and offline-like failure detection for
+  approved snapshot-backed pages
+- Updated supported pages so they now settle into a clear state instead of
+  remaining stuck on `جار التحميل...`
+- Hardened the following pages only:
+  - `src/pages/CustomersPage.jsx`
+  - `src/pages/TransfersPage.jsx`
+  - `src/pages/CustomerDetailsPage.jsx`
+  - `src/pages/TransferDetailsPage.jsx`
+  - `src/pages/NewTransferPage.jsx` customer-options lookup only
+- Updated QA docs so manual iPhone/browser retesting explicitly checks for “no
+  indefinite loading” behavior on supported offline-read screens
 
 Files changed:
-- `public/manifest.webmanifest`
-- `public/sw.js`
-- `public/offline.html`
-- `public/icons/apple-touch-icon-180.png`
-- `public/icons/icon-192.png`
-- `public/icons/icon-512.png`
-- `public/icons/icon-maskable-512.png`
-- `src/pwa/registerServiceWorker.js`
-- `index.html`
+- `src/lib/offline/db.js`
+- `src/lib/offline/readCache.js`
+- `src/pages/CustomersPage.jsx`
+- `src/pages/TransfersPage.jsx`
+- `src/pages/CustomerDetailsPage.jsx`
+- `src/pages/TransferDetailsPage.jsx`
+- `src/pages/NewTransferPage.jsx`
 - `docs/offline-pwa-execution-plan.md`
 - `docs/project-current-state.md`
 - `docs/implementation-log.md`
 - `docs/code-map.md`
 - `docs/last-change-summary.md`
 - `docs/iphone-qa-checklist.md`
-- `docs/deployment-readiness-checklist.md`
 - `docs/manual-test-matrix.md`
 
 What did NOT change:
@@ -46,23 +44,22 @@ What did NOT change:
 - Print flow
 - Offline customer creation
 - New offline mutation types
+- Queue/replay architecture
 - Broader conflict handling
 
 Verification results:
 - `npm run lint` - passed
 - `npm run build` - passed
-- Local dev HTTP smoke - passed (`DEV_STATUS=200`)
-- Preview HTTP smoke - passed (`PREVIEW_STATUS=200`)
+- Preview HTTP smoke - passed (`PREVIEW_ROOT_STATUS=200`,
+  `PREVIEW_CUSTOMERS_STATUS=200`)
 
 Known limitations:
-- Real iPhone validation is still required and was not performed from this
-  environment
-- Placeholder PNG icons are ready for testing but should still be replaced with
-  final production artwork
-- Non-root deployment is safer than before, but it still requires matching
-  Vite `base` configuration and host SPA rewrite rules
+- Real iPhone Safari retesting is still required and was not performed from
+  this environment
+- Timeout-based fallback hardening is conservative; it prevents indefinite
+  loading but does not replace physical browser/device verification
 - Build still shows the existing chunk-size warning above 500 kB
 
 Recommended next step:
-- Execute the new iPhone QA and deployment readiness checklists against a real
-  staging/production deployment before launch sign-off
+- Run the updated offline-read scenarios in `docs/iphone-qa-checklist.md` and
+  `docs/manual-test-matrix.md` on the deployed Vercel app using a real iPhone

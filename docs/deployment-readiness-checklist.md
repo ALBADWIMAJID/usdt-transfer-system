@@ -23,6 +23,7 @@ Status fields:
 | Supabase env configured | Production environment variables must be set correctly | Auth and live reads/writes work when online | Not Run |  |
 | Auth domain/session behavior | Auth redirect/session behavior must match deployment origin | Login persists correctly across reloads/backgrounding | Not Run |  |
 | IndexedDB allowed | Browser storage must not be blocked by host/browser policy | Offline snapshots and local queue can persist | Not Run |  |
+| Snapshot-backed offline fallback | Supported cached read pages must exit loading deterministically when offline | Approved pages show cached data or explicit offline/no-snapshot state instead of hanging on loading | Not Run |  |
 | Queue replay after reconnect | Pending local transfer/payment items can replay when network returns | Replay results are visible and trustworthy | Not Run |  |
 | Print flow unchanged | Transfer print statement must still work in production | Print view excludes local-only unsynced records | Not Run |  |
 

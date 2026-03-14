@@ -28,12 +28,15 @@ Implemented:
 - Controlled offline mutation foundation for transfer creation only (Phase 6)
 - Sync refinement / dependency-aware replay polishing (Phase 7)
 - iPhone QA pass + deployment readiness hardening (Phase 8)
+- iPhone/Safari offline fallback loading bugfix pass for snapshot-backed pages
+  (Phase 9)
 
 ## Active Phase
 
 Offline / PWA work is currently at:
-- Phase 8 complete: shell + status UI + snapshot reads + payment queue +
+- Phase 9 complete: shell + status UI + snapshot reads + payment queue +
   transfer queue + dependency-aware replay refinement + QA/deployment hardening
+  + Safari/iPhone offline fallback loading bugfixes for snapshot-backed pages
 
 What that means:
 - Manifest is linked
@@ -88,6 +91,13 @@ What that means:
   - `docs/iphone-qa-checklist.md`
   - `docs/deployment-readiness-checklist.md`
   - `docs/manual-test-matrix.md`
+- Approved snapshot-backed read pages now use deterministic offline-read
+  hardening:
+  - IndexedDB snapshot reads time out safely instead of hanging indefinitely
+  - live page reads time out conservatively and try snapshot fallback before a
+    final error state is shown
+  - supported pages now exit loading deterministically into live data, cached
+    snapshot data, explicit offline/no-snapshot state, or explicit real error
 - Real iPhone validation is still pending and must be executed manually on a
   physical device
 
@@ -144,6 +154,8 @@ Current cached offline-read coverage:
 - IndexedDB stores conservative page snapshots rather than a normalized offline
   data model
 - Offline fallback is localized to approved read surfaces, not global
+- Snapshot-backed read pages now use timeout-based fallback hardening to avoid
+  indefinite loading during Safari/iPhone offline conditions
 - Offline payment capture is currently limited to queued payment creation on
   `TransferDetailsPage`
 - Offline transfer capture is currently limited to queued transfer creation on
@@ -202,3 +214,6 @@ Current cached offline-read coverage:
   are not the final server `reference_number`.
 - Real iPhone QA has not been executed from this environment; only code-level
   hardening and browser-based smoke checks were completed.
+- Safari/iPhone offline fallback is now hardened for the approved
+  snapshot-backed pages, but physical retesting is still required to confirm
+  the original stuck-loading bug is resolved on device.

@@ -106,6 +106,13 @@ Snapshot-based offline fallback exists for:
 - `src/pages/TransferDetailsPage.jsx`
 - `src/pages/NewTransferPage.jsx` for customer-options lookup only
 
+Approved snapshot-backed pages now use deterministic fallback hardening:
+- IndexedDB snapshot access times out safely instead of hanging indefinitely
+- Live page reads use conservative timeout wrappers before falling back to
+  approved local snapshots
+- Supported pages exit loading into a concrete state instead of staying in an
+  ambiguous spinner when offline fallback is possible
+
 ## Write / Mutation Points
 
 - Customer creation:
@@ -153,10 +160,14 @@ Snapshot-based offline fallback exists for:
   - Stable read-snapshot keys by surface/scope
 - `src/lib/offline/db.js`
   - Thin IndexedDB access wrapper
+  - Adds timeout protection for IndexedDB open/read operations used by
+    snapshot-backed pages
 - `src/lib/offline/serializers.js`
   - Snapshot record shape and metadata
 - `src/lib/offline/readCache.js`
   - Safe read/write helpers for snapshots
+  - Exposes conservative live-read timeout and likely-offline failure helpers
+    used by the approved snapshot-backed pages
 - `src/lib/offline/freshness.js`
   - Shared formatting and conservative freshness/staleness helpers for locally
     saved snapshots
