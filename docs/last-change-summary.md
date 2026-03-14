@@ -1,33 +1,23 @@
 # Last Change Summary
 
 Task completed:
-- Phase 9 iPhone/Safari offline fallback loading bugfix pass for
-  snapshot-backed read pages
+- Phase 10 expanded offline READ coverage for the remaining major read-only
+  operator surfaces
 
 Scope implemented:
-- Hardened the shared offline read layer so IndexedDB open/read operations time
-  out safely instead of hanging indefinitely
-- Added conservative live-read timeouts and offline-like failure detection for
-  approved snapshot-backed pages
-- Updated supported pages so they now settle into a clear state instead of
-  remaining stuck on `جار التحميل...`
-- Hardened the following pages only:
-  - `src/pages/CustomersPage.jsx`
-  - `src/pages/TransfersPage.jsx`
-  - `src/pages/CustomerDetailsPage.jsx`
-  - `src/pages/TransferDetailsPage.jsx`
-  - `src/pages/NewTransferPage.jsx` customer-options lookup only
-- Updated QA docs so manual iPhone/browser retesting explicitly checks for “no
-  indefinite loading” behavior on supported offline-read screens
+- Added snapshot-backed offline read support for `DashboardPage`
+- Added dashboard snapshot save/load behavior for:
+  - top financial summary metrics
+  - urgent attention and work-queue sections
+  - recent transfer/payment activity sections
+  - dashboard drill-down inputs used by the existing sheet experience
+- Added the shared cached-data notice to the dashboard
+- Updated manual QA docs so offline dashboard and dashboard drill-down behavior
+  are now part of the required staging/iPhone checks
 
 Files changed:
-- `src/lib/offline/db.js`
-- `src/lib/offline/readCache.js`
-- `src/pages/CustomersPage.jsx`
-- `src/pages/TransfersPage.jsx`
-- `src/pages/CustomerDetailsPage.jsx`
-- `src/pages/TransferDetailsPage.jsx`
-- `src/pages/NewTransferPage.jsx`
+- `src/lib/offline/cacheKeys.js`
+- `src/pages/DashboardPage.jsx`
 - `docs/offline-pwa-execution-plan.md`
 - `docs/project-current-state.md`
 - `docs/implementation-log.md`
@@ -35,6 +25,7 @@ Files changed:
 - `docs/last-change-summary.md`
 - `docs/iphone-qa-checklist.md`
 - `docs/manual-test-matrix.md`
+- `docs/deployment-readiness-checklist.md`
 
 What did NOT change:
 - Business logic
@@ -43,23 +34,24 @@ What did NOT change:
 - Routes/navigation
 - Print flow
 - Offline customer creation
-- New offline mutation types
-- Queue/replay architecture
+- Offline customer edit/delete
+- Offline transfer edit/delete
+- Offline payment edit/delete
 - Broader conflict handling
 
 Verification results:
 - `npm run lint` - passed
 - `npm run build` - passed
 - Preview HTTP smoke - passed (`PREVIEW_ROOT_STATUS=200`,
-  `PREVIEW_CUSTOMERS_STATUS=200`)
+  `PREVIEW_DASHBOARD_STATUS=200`)
 
 Known limitations:
-- Real iPhone Safari retesting is still required and was not performed from
-  this environment
-- Timeout-based fallback hardening is conservative; it prevents indefinite
-  loading but does not replace physical browser/device verification
+- Real iPhone retesting is still required and was not performed from this
+  environment
+- Dashboard offline drill-down support only works when a dashboard snapshot was
+  already saved locally during a prior online visit
 - Build still shows the existing chunk-size warning above 500 kB
 
 Recommended next step:
-- Run the updated offline-read scenarios in `docs/iphone-qa-checklist.md` and
-  `docs/manual-test-matrix.md` on the deployed Vercel app using a real iPhone
+- Re-run the updated staging/iPhone offline-read checklist for `DashboardPage`
+  and its drill-down sheets on a real iPhone Safari/Home Screen deployment

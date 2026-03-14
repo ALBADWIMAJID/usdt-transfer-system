@@ -7,16 +7,57 @@ import DashboardRecentActivitySection from '../components/dashboard/DashboardRec
 import DashboardWorkQueueSection from '../components/dashboard/DashboardWorkQueueSection.jsx'
 import TransferRecordCard from '../components/transfers/TransferRecordCard.jsx'
 import InlineMessage from '../components/ui/InlineMessage.jsx'
+import OfflineSnapshotNotice from '../components/ui/OfflineSnapshotNotice.jsx'
 import OperationsDrillDownSheet from '../components/ui/OperationsDrillDownSheet.jsx'
 import PageHeader from '../components/ui/PageHeader.jsx'
 import RecordCard from '../components/ui/RecordCard.jsx'
 import RecordHeader from '../components/ui/RecordHeader.jsx'
 import RetryBlock from '../components/ui/RetryBlock.jsx'
 import { useAuth } from '../context/auth-context.js'
+import useNetworkStatus from '../hooks/useNetworkStatus.js'
+import useOfflineSnapshot from '../hooks/useOfflineSnapshot.js'
+import { DASHBOARD_SNAPSHOT_KEY } from '../lib/offline/cacheKeys.js'
+import { getOfflineSnapshotMissingMessage } from '../lib/offline/freshness.js'
+import {
+  isBrowserOffline,
+  isLikelyOfflineReadFailure,
+  loadReadSnapshot,
+  saveReadSnapshot,
+  withLiveReadTimeout,
+} from '../lib/offline/readCache.js'
 import { ACTIVE_TRANSFER_STATUSES, getPaymentMethodLabel } from '../lib/transfer-ui.js'
 import { supabase } from '../lib/supabase.js'
 
 const DAY_IN_MS = 24 * 60 * 60 * 1000
+const emptyDashboardStats = {
+  customers: null,
+  transfers: null,
+  activeTransfers: null,
+  openTransfers: null,
+  partialTransfers: null,
+  paidTransfers: null,
+  totalPayableRub: null,
+  totalRemainingRub: null,
+  totalPaidRub: null,
+  overpaidTransfers: null,
+  overpaidAmountRub: null,
+  todayPaidRub: null,
+  todayPaymentCount: null,
+  todayPaymentTransferCount: null,
+}
+const emptyDashboardQueueItems = { partial: [], open: [] }
+const emptyDashboardDrillDownData = {
+  allTransfers: [],
+  remainingTransfers: [],
+  openTransfers: [],
+  partialTransfers: [],
+  paidTransfers: [],
+  overpaidTransfers: [],
+  urgentTransfers: [],
+  recentTransfers: [],
+  recentPayments: [],
+  todayPayments: [],
+}
 
 function roundCurrency(value) {
   return Math.round((value + Number.EPSILON) * 100) / 100
@@ -329,42 +370,57 @@ function renderPaymentDrillDownItem(item, compact = false) {
 
 function DashboardPage() {
   const { configError, isConfigured } = useAuth()
-  const [stats, setStats] = useState({
-    customers: null,
-    transfers: null,
-    activeTransfers: null,
-    openTransfers: null,
-    partialTransfers: null,
-    paidTransfers: null,
-    totalPayableRub: null,
-    totalRemainingRub: null,
-    totalPaidRub: null,
-    overpaidTransfers: null,
-    overpaidAmountRub: null,
-    todayPaidRub: null,
-    todayPaymentCount: null,
-    todayPaymentTransferCount: null,
-  })
+  const { isOffline } = useNetworkStatus()
+  const { clearSnapshotState, markCachedSnapshot, markLiveSnapshot, snapshotState } =
+    useOfflineSnapshot()
+  const [stats, setStats] = useState(emptyDashboardStats)
   const [recentTransfers, setRecentTransfers] = useState([])
   const [recentPayments, setRecentPayments] = useState([])
   const [attentionItems, setAttentionItems] = useState([])
-  const [queueItems, setQueueItems] = useState({ partial: [], open: [] })
-  const [drillDownData, setDrillDownData] = useState({
-    allTransfers: [],
-    remainingTransfers: [],
-    openTransfers: [],
-    partialTransfers: [],
-    paidTransfers: [],
-    overpaidTransfers: [],
-    urgentTransfers: [],
-    recentTransfers: [],
-    recentPayments: [],
-    todayPayments: [],
-  })
+  const [queueItems, setQueueItems] = useState(emptyDashboardQueueItems)
+  const [drillDownData, setDrillDownData] = useState(emptyDashboardDrillDownData)
   const [activeDrillDownKey, setActiveDrillDownKey] = useState('')
   const [loading, setLoading] = useState(Boolean(isConfigured))
   const [loadError, setLoadError] = useState(isConfigured ? '' : configError)
   const [lastUpdatedAt, setLastUpdatedAt] = useState('')
+
+  const hydrateFromSnapshot = useCallback(
+    async (options = {}) => {
+      const { fallbackErrorMessage = '' } = options
+
+      setLoading(true)
+      setLoadError('')
+
+      const snapshot = await loadReadSnapshot(DASHBOARD_SNAPSHOT_KEY)
+
+      if (!snapshot?.data) {
+        clearSnapshotState()
+        setStats(emptyDashboardStats)
+        setRecentTransfers([])
+        setRecentPayments([])
+        setAttentionItems([])
+        setQueueItems(emptyDashboardQueueItems)
+        setDrillDownData(emptyDashboardDrillDownData)
+        setLastUpdatedAt('')
+        setLoadError(fallbackErrorMessage || getOfflineSnapshotMissingMessage('للوحة التشغيل المالية'))
+        setLoading(false)
+        return false
+      }
+
+      setStats(snapshot.data.stats || emptyDashboardStats)
+      setRecentTransfers(snapshot.data.recentTransfers || [])
+      setRecentPayments(snapshot.data.recentPayments || [])
+      setAttentionItems(snapshot.data.attentionItems || [])
+      setQueueItems(snapshot.data.queueItems || emptyDashboardQueueItems)
+      setDrillDownData(snapshot.data.drillDownData || emptyDashboardDrillDownData)
+      setLastUpdatedAt(snapshot.data.lastUpdatedAt || '')
+      setLoadError('')
+      setLoading(false)
+      markCachedSnapshot(snapshot.savedAt)
+      return true
+    },
+    [clearSnapshotState, markCachedSnapshot]
+  )
 
   const loadDashboard = useCallback(async () => {
     if (!isConfigured || !supabase) {
@@ -373,13 +429,19 @@ function DashboardPage() {
       return
     }
 
+    if (isOffline) {
+      await hydrateFromSnapshot()
+      return
+    }
+
     try {
+      clearSnapshotState()
       setLoading(true)
       setLoadError('')
 
       const now = new Date()
 
-      const [customersResult, transfersResult, paymentsResult] = await Promise.all([
+      const [customersResult, transfersResult, paymentsResult] = await withLiveReadTimeout(Promise.all([
         supabase.schema('public').from('customers').select('*', { count: 'exact', head: true }),
         supabase
           .schema('public')
@@ -391,9 +453,23 @@ function DashboardPage() {
           .from('transfer_payments')
           .select('id, transfer_id, amount_rub, payment_method, note, paid_at, created_at')
           .order('created_at', { ascending: false }),
-      ])
+      ]), {
+        timeoutMessage: 'تعذر إكمال تحميل لوحة التشغيل المالية في الوقت المتوقع.',
+      })
 
       if (customersResult.error || transfersResult.error || paymentsResult.error) {
+        const dashboardError =
+          customersResult.error ||
+          transfersResult.error ||
+          paymentsResult.error ||
+          new Error('ØªØ¹Ø°Ø± ØªØ­Ù…ÙŠÙ„ Ø¨ÙŠØ§Ù†Ø§Øª Ù„ÙˆØ­Ø© Ø§Ù„ØªØ­ÙƒÙ….')
+        const preferSnapshot = isOffline || isBrowserOffline() || isLikelyOfflineReadFailure(dashboardError)
+
+        if (preferSnapshot) {
+          await hydrateFromSnapshot()
+          return
+        }
+
         setLoadError(
           customersResult.error?.message ||
             transfersResult.error?.message ||
@@ -482,13 +558,26 @@ function DashboardPage() {
       let customerNames = {}
 
       if (relevantCustomerIds.length > 0) {
-        const { data: customersData, error: customersDataError } = await supabase
-          .schema('public')
-          .from('customers')
-          .select('id, full_name')
-          .in('id', relevantCustomerIds)
+        const { data: customersData, error: customersDataError } = await withLiveReadTimeout(
+          supabase
+            .schema('public')
+            .from('customers')
+            .select('id, full_name')
+            .in('id', relevantCustomerIds),
+          {
+            timeoutMessage: 'تعذر إكمال تحميل أسماء العملاء للوحة التشغيل في الوقت المتوقع.',
+          }
+        )
 
         if (customersDataError) {
+          const preferSnapshot =
+            isOffline || isBrowserOffline() || isLikelyOfflineReadFailure(customersDataError)
+
+          if (preferSnapshot) {
+            await hydrateFromSnapshot()
+            return
+          }
+
           setLoadError(customersDataError.message)
           setLoading(false)
           return
@@ -597,7 +686,7 @@ function DashboardPage() {
         )
       )
 
-      setStats({
+      const nextStats = {
         customers: customersResult.count ?? 0,
         transfers: transferRecords.length,
         activeTransfers: transferRecords.filter((transfer) => transfer.isActive).length,
@@ -616,10 +705,9 @@ function DashboardPage() {
         todayPaidRub: totalPaidTodayRub,
         todayPaymentCount: paymentsToday.length,
         todayPaymentTransferCount,
-      })
+      }
 
-      setAttentionItems(
-        urgentTransfers.slice(0, 6).map((transfer) => ({
+      const nextAttentionItems = urgentTransfers.slice(0, 6).map((transfer) => ({
           id: transfer.id,
           transferTo: transfer.to,
           customerTo: transfer.customer_id ? `/customers/${transfer.customer_id}` : '',
@@ -644,9 +732,8 @@ function DashboardPage() {
               ? `هذه الحوالة ما زالت تحتاج ${formatNumber(transfer.remainingRub, 2)} RUB بعد ${transfer.ageLabel} من إنشائها.`
               : `الحوالة ما زالت مفتوحة دون إغلاق، وما زال المطلوب ${formatNumber(transfer.remainingRub, 2)} RUB.`,
         }))
-      )
 
-      setQueueItems({
+      const nextQueueItems = {
         partial: partialQueueSource.slice(0, 5).map((transfer) => ({
           id: transfer.id,
           transferTo: transfer.to,
@@ -679,10 +766,9 @@ function DashboardPage() {
           eyebrow: 'قائمة العمل',
           note: `لم تبدأ حركة التحصيل على هذه الحوالة بعد. المطلوب الحالي ${formatNumber(transfer.remainingRub, 2)} RUB.`,
         })),
-      })
+      }
 
-      setRecentTransfers(
-        recentTransfersSource.slice(0, 5).map((transfer) => ({
+      const nextRecentTransfers = recentTransfersSource.slice(0, 5).map((transfer) => ({
           id: transfer.id,
           transferTo: transfer.to,
           customerTo: transfer.customer_id ? `/customers/${transfer.customer_id}` : '',
@@ -694,11 +780,10 @@ function DashboardPage() {
           remainingLabel: transfer.remainingRubLabel,
           remainingClassName: getRemainingClassName(transfer.remainingRub),
         }))
-      )
+      
+      const nextRecentPayments = recentPaymentsSource.slice(0, 5)
 
-      setRecentPayments(recentPaymentsSource.slice(0, 5))
-
-      setDrillDownData({
+      const nextDrillDownData = {
         allTransfers: transferQueueItems,
         remainingTransfers,
         openTransfers: openTransferItems,
@@ -711,25 +796,68 @@ function DashboardPage() {
         todayPayments: recentPaymentsSource.filter((payment) =>
           paymentsToday.some((sourcePayment) => sourcePayment.id === payment.id)
         ),
+      }
+
+      const nextLastUpdatedAt = new Date().toISOString()
+
+      setStats(nextStats)
+      setAttentionItems(nextAttentionItems)
+      setQueueItems(nextQueueItems)
+      setRecentTransfers(nextRecentTransfers)
+      setRecentPayments(nextRecentPayments)
+      setDrillDownData(nextDrillDownData)
+      setLastUpdatedAt(nextLastUpdatedAt)
+      setLoading(false)
+
+      const savedSnapshot = await saveReadSnapshot({
+        key: DASHBOARD_SNAPSHOT_KEY,
+        scope: 'dashboard-main',
+        type: 'dashboard_main',
+        data: {
+          stats: nextStats,
+          attentionItems: nextAttentionItems,
+          queueItems: nextQueueItems,
+          recentTransfers: nextRecentTransfers,
+          recentPayments: nextRecentPayments,
+          drillDownData: nextDrillDownData,
+          lastUpdatedAt: nextLastUpdatedAt,
+        },
       })
 
-      setLastUpdatedAt(new Date().toISOString())
-      setLoading(false)
+      markLiveSnapshot(savedSnapshot?.savedAt || '')
     } catch (error) {
+      const preferSnapshot = isOffline || isBrowserOffline() || isLikelyOfflineReadFailure(error)
+
+      if (preferSnapshot) {
+        await hydrateFromSnapshot()
+        return
+      }
+
       setLoadError(error?.message || 'حدث خطأ غير متوقع أثناء تحميل لوحة التحكم.')
       setLoading(false)
     }
-  }, [configError, isConfigured])
+  }, [
+    clearSnapshotState,
+    configError,
+    hydrateFromSnapshot,
+    isConfigured,
+    isOffline,
+    markLiveSnapshot,
+  ])
 
   useEffect(() => {
     const timeoutId = window.setTimeout(() => {
-      loadDashboard()
+      if (isOffline) {
+        hydrateFromSnapshot()
+      } else {
+        loadDashboard()
+      }
     }, 0)
 
     return () => {
       window.clearTimeout(timeoutId)
     }
-  }, [loadDashboard])
+  }, [hydrateFromSnapshot, isOffline, loadDashboard])
 
   const openDrillDown = (key) => {
     setActiveDrillDownKey(key)
@@ -1033,6 +1161,8 @@ function DashboardPage() {
         >
           {lastUpdatedAt ? <p className="support-text">آخر تحديث: {formatDate(lastUpdatedAt)}</p> : null}
         </PageHeader>
+
+        <OfflineSnapshotNotice snapshotState={snapshotState} />
 
         {!isConfigured ? <InlineMessage kind="error">{loadError}</InlineMessage> : null}
         {isConfigured && loadError ? <RetryBlock message={loadError} onRetry={loadDashboard} /> : null}

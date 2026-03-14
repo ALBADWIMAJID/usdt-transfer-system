@@ -30,13 +30,16 @@ Implemented:
 - iPhone QA pass + deployment readiness hardening (Phase 8)
 - iPhone/Safari offline fallback loading bugfix pass for snapshot-backed pages
   (Phase 9)
+- Expanded offline read coverage for remaining major read-only operator
+  surfaces, including the dashboard (Phase 10)
 
 ## Active Phase
 
 Offline / PWA work is currently at:
-- Phase 9 complete: shell + status UI + snapshot reads + payment queue +
+- Phase 10 complete: shell + status UI + snapshot reads + payment queue +
   transfer queue + dependency-aware replay refinement + QA/deployment hardening
-  + Safari/iPhone offline fallback loading bugfixes for snapshot-backed pages
+  + Safari/iPhone offline fallback bugfixes + expanded offline-read coverage
+  for remaining major read-only operator surfaces
 
 What that means:
 - Manifest is linked
@@ -98,6 +101,11 @@ What that means:
     final error state is shown
   - supported pages now exit loading deterministically into live data, cached
     snapshot data, explicit offline/no-snapshot state, or explicit real error
+- `DashboardPage` is now snapshot-backed for offline reads:
+  - top summary metrics
+  - urgent attention and work-queue sections
+  - recent activity sections
+  - dashboard drill-down sheet inputs derived from the saved dashboard snapshot
 - Real iPhone validation is still pending and must be executed manually on a
   physical device
 
@@ -110,6 +118,8 @@ What is not implemented yet:
   dependency rules
 
 Current cached offline-read coverage:
+- `DashboardPage`
+- Dashboard drill-down sheet data derived from `DashboardPage`
 - `CustomersPage`
 - `TransfersPage`
 - `CustomerDetailsPage`

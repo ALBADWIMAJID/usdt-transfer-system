@@ -1,3 +1,4 @@
+export const DASHBOARD_SNAPSHOT_KEY = 'dashboard:main'
 export const CUSTOMERS_LIST_SNAPSHOT_KEY = 'customers:list'
 export const NEW_TRANSFER_CUSTOMERS_SNAPSHOT_KEY = 'customers:new-transfer-options'
 export const TRANSFERS_LIST_SNAPSHOT_KEY = 'transfers:list'

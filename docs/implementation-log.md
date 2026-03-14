@@ -630,3 +630,65 @@ Risks / notes:
 Suggested next step:
 - Re-run the updated offline-read scenarios from `docs/iphone-qa-checklist.md`
   and `docs/manual-test-matrix.md` on a real iPhone Safari deployment
+
+## 2026-03-15T02:34:03.5181653+03:00 - Phase 10 expanded offline read coverage for remaining major read-only operator surfaces
+
+Requested scope:
+- Implement only the next approved step
+- Expand snapshot-backed offline reads to the remaining major read-only
+  operator surfaces
+- Focus first on `DashboardPage` and dashboard drill-down support
+- Preserve business logic, schema, routes, print flow, and offline mutation
+  scope
+
+Files changed:
+- `src/lib/offline/cacheKeys.js`
+- `src/pages/DashboardPage.jsx`
+- `docs/offline-pwa-execution-plan.md`
+- `docs/project-current-state.md`
+- `docs/implementation-log.md`
+- `docs/code-map.md`
+- `docs/last-change-summary.md`
+- `docs/iphone-qa-checklist.md`
+- `docs/manual-test-matrix.md`
+- `docs/deployment-readiness-checklist.md`
+
+What was added:
+- A dedicated dashboard snapshot key
+- Snapshot save/load behavior for `DashboardPage`
+- Offline fallback for dashboard summary cards, attention/work queue sections,
+  recent activity sections, and dashboard drill-down inputs
+- Shared cached-data notice visibility on the dashboard
+- Documentation updates so manual QA now includes dashboard and dashboard
+  drill-down offline scenarios
+
+What was not changed:
+- Business logic
+- Database schema
+- Supabase tables/contracts
+- Routes/navigation
+- Print flow
+- Offline customer creation
+- Offline customer edit/delete
+- Offline transfer edit/delete
+- Offline payment edit/delete
+- Broader conflict resolution
+
+Verification:
+- `npm run lint` - passed
+- `npm run build` - passed
+- Preview HTTP smoke - passed (`PREVIEW_ROOT_STATUS=200`,
+  `PREVIEW_DASHBOARD_STATUS=200`)
+- Build warning only: client chunk exceeded 500 kB after minification
+
+Risks / notes:
+- Physical iPhone retesting was not possible from this environment and remains
+  required
+- Dashboard drill-down offline support depends on a previously saved dashboard
+  snapshot; no fake metrics are generated offline
+- This phase intentionally did not broaden offline writes or edit/delete
+  behavior
+
+Suggested next step:
+- Re-run the updated iPhone and manual offline-read scenarios for the dashboard
+  and its drill-down sheets on the staging deployment

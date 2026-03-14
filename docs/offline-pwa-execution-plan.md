@@ -302,6 +302,35 @@ Current behavior:
 - Real iPhone retesting is still required; this phase hardens the code path but
   does not claim physical device validation
 
+## Phase 10 - Expanded Offline Read Coverage for Remaining Major Read-Only Surfaces
+
+Status: Implemented
+
+Implemented scope:
+- Added conservative snapshot-backed offline reads for `DashboardPage`
+- Saved successful online dashboard snapshots for:
+  - top financial summary metrics
+  - attention and work-queue sections
+  - recent transfer/payment activity blocks
+  - current dashboard drill-down inputs
+- Reused the existing snapshot notice/freshness messaging on the dashboard
+- Kept drill-down behavior read-only and snapshot-derived without inventing new
+  metrics or fake data
+
+Current behavior:
+- `DashboardPage` now supports the same four read outcomes used by the approved
+  snapshot-backed pages:
+  - live data
+  - locally saved snapshot data
+  - explicit offline/no-snapshot state
+  - explicit real error state
+- Dashboard drill-down sheets can now open offline when a valid dashboard
+  snapshot already exists locally
+- If no dashboard snapshot exists, the page exits loading and shows an explicit
+  offline/no-snapshot message instead of hanging
+- Real iPhone retesting is still required; this phase expands offline-read
+  coverage but does not claim physical device validation
+
 ## Guardrails
 
 - Do not change database schema as part of offline work unless explicitly

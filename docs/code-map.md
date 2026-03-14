@@ -65,7 +65,9 @@ Protected shell:
 - `src/pages/DashboardPage.jsx`
   - Operations dashboard
   - Financial snapshot
+  - Snapshot-backed offline read fallback for main dashboard data
   - Drill-down entry points into transfer queue data
+  - Offline-capable drill-down inputs derived from the saved dashboard snapshot
 - `src/pages/CustomersPage.jsx`
   - Customer creation
   - Portfolio follow-up overview
@@ -92,6 +94,7 @@ Protected shell:
 ## Data Access Points
 
 Direct Supabase reads remain page-level and live-online first:
+- `src/pages/DashboardPage.jsx`
 - `src/pages/CustomersPage.jsx`
 - `src/pages/CustomerDetailsPage.jsx`
 - `src/pages/TransfersPage.jsx`
@@ -100,11 +103,13 @@ Direct Supabase reads remain page-level and live-online first:
 - `src/pages/LoginPage.jsx` through auth context
 
 Snapshot-based offline fallback exists for:
+- `src/pages/DashboardPage.jsx`
 - `src/pages/CustomersPage.jsx`
 - `src/pages/TransfersPage.jsx`
 - `src/pages/CustomerDetailsPage.jsx`
 - `src/pages/TransferDetailsPage.jsx`
 - `src/pages/NewTransferPage.jsx` for customer-options lookup only
+- Dashboard drill-down sheet inputs when a saved dashboard snapshot exists
 
 Approved snapshot-backed pages now use deterministic fallback hardening:
 - IndexedDB snapshot access times out safely instead of hanging indefinitely
@@ -158,6 +163,7 @@ Approved snapshot-backed pages now use deterministic fallback hardening:
   - IndexedDB store metadata
 - `src/lib/offline/cacheKeys.js`
   - Stable read-snapshot keys by surface/scope
+  - Includes the `dashboard:main` snapshot key for dashboard offline reads
 - `src/lib/offline/db.js`
   - Thin IndexedDB access wrapper
   - Adds timeout protection for IndexedDB open/read operations used by
