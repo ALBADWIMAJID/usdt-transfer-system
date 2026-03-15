@@ -72,7 +72,13 @@ Protected shell:
   - Offline-capable drill-down inputs derived from the saved dashboard snapshot
 - `src/pages/CustomersPage.jsx`
   - Customer creation
-  - Portfolio follow-up overview
+  - Internal sectioned workspace for:
+    - Customers
+    - Portfolio Summary
+    - Needs Attention
+    - Recent Activity
+  - Page-level section navigation inside `/customers`
+  - Short-label mobile tab bar plus desktop segmented row
   - Customer drill-down sheet entry points
   - Offline customer capture and pending/failed local customer visibility
 - `src/pages/CustomerDetailsPage.jsx`
@@ -88,6 +94,14 @@ Protected shell:
   - Pending local transfer visibility and manual replay surface
 - `src/pages/TransferDetailsPage.jsx`
   - One-transfer follow-up workspace
+  - Internal sectioned navigation for:
+    - Summary
+    - Payments
+    - Payment History
+    - Print
+  - Short-label mobile tab bar plus desktop segmented row
+  - Arabic section labels and operator copy restored after the sectioned-layout
+    reorganization bugfix pass
   - Payment entry
   - Payment history
   - Snapshot-backed offline restore for both transfer details and payment history

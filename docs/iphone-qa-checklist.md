@@ -56,6 +56,8 @@ Status fields:
 | --- | --- | --- | --- | --- | --- |
 | Top shell and banners on iPhone | App open on iPhone portrait | Review top bar, connection badge, sync banner | Shell remains compact, readable, and RTL-correct | Not Run |  |
 | Bottom navigation on iPhone | Logged into app | Navigate across main sections | Bottom navigation remains tappable and not visually oversized | Not Run |  |
+| Customers page section bar on iPhone | Open `CustomersPage` in portrait mode | Switch between `العملاء` / `المحفظة` / `متابعة` / `النشاط` | The mobile tab bar is readable, thumb-friendly, visually obvious, and does not hide pending local-customer visibility ambiguously | Not Run |  |
+| Transfer details section bar on iPhone | Open `TransferDetailsPage` for a valid transfer in portrait mode | Switch between `الملخص` / `الدفعات` / `السجل` / `الطباعة` | The mobile tab bar is readable, thumb-friendly, and keeps payment entry, payment history, and print access easy to reach without feeling like a compressed desktop layout | Not Run |  |
 | Drill-down sheet on iPhone | Open any dashboard/customer drill-down | Inspect layout in portrait mode | Sheet remains compact and operational, without excessive vertical waste | Not Run |  |
 
 ## Sign-off Notes

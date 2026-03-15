@@ -14,6 +14,8 @@ Status fields:
 | Area | Scenario | Preconditions | Expected Result | Status | Notes |
 | --- | --- | --- | --- | --- | --- |
 | Browser shell | Fresh online load | Valid deployment and env vars | App loads and routes normally | Not Run |  |
+| UI organization | Customers page section navigation | Logged into app on desktop and mobile widths | `CustomersPage` uses a short-label mobile tab bar and switches cleanly between the four sections without breaking form, list, queue visibility, or drill-down behavior | Not Run |  |
+| UI organization | Transfer details page section navigation | Logged into app on desktop and mobile widths and opened a valid transfer | `TransferDetailsPage` switches cleanly between Summary / Payments / Payment History / Print without hiding payment queue attention states ambiguously or weakening print access | Not Run |  |
 | PWA shell | Service worker registration | Production build over HTTPS | Service worker registers without breaking the app | Not Run |  |
 | PWA shell | Manifest / install metadata | Built app deployed | Manifest resolves and install metadata is visible | Not Run |  |
 | Offline read | Cached dashboard/customers/transfers/details | Relevant supported screen visited online first | Offline snapshot fallback works with clear locally-saved messaging and does not remain stuck on `جار التحميل...` | Not Run |  |

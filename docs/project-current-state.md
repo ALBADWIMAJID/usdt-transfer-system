@@ -16,8 +16,18 @@ Implemented:
 - Dashboard upgraded into an operations and financial control center
 - Transfers page upgraded into an operational follow-up queue
 - Transfer details page upgraded into a financial follow-up workspace
+- Transfer details page reorganized into an internal sectioned workspace for:
+  - Summary
+  - Payments
+  - Payment History
+  - Print
 - Customer details page upgraded into a customer-level follow-up workspace
-- Customers page upgraded into a customer portfolio follow-up screen
+- Customers page upgraded into a customer portfolio follow-up screen with
+  internal section navigation for:
+  - Customers
+  - Portfolio Summary
+  - Needs Attention
+  - Recent Activity
 - Shared UI architecture for headers, cards, list states, filters, actions,
   metadata, form primitives, and drill-down sheets
 - PWA shell foundation (Phase 1)
@@ -35,6 +45,33 @@ Implemented:
 - Controlled offline customer creation support (Phase 11)
 - TransferDetails offline snapshot completeness/reliability bugfix pass
   (Phase 12)
+
+## Current UI Organization Notes
+
+- This latest pass was a TransferDetailsPage Arabic copy restoration bugfix only
+- Route remains `/transfers/:transferId`
+- `TransferDetailsPage` now uses four internal sections:
+  - Summary
+  - Payments
+  - Payment History
+  - Print
+- Mobile now uses a compact page-level tab bar with short labels:
+  - `الملخص`
+  - `الدفعات`
+  - `السجل`
+  - `الطباعة`
+- Mobile shows one primary section at a time by default
+- Desktop keeps a clear page-level segmented section row inside the page
+- The sectioned layout was preserved intentionally, along with:
+  - online payment recording
+  - offline payment recording
+  - pending / blocked / failed local payment visibility
+  - manual replay / retry controls
+  - partial offline snapshot behavior
+  - print statement access and print flow
+- Existing financial calculations, follow-up cues, and queue behavior remain
+  intentionally unchanged
+- Dashboard and other page reorganizations remain deferred for later passes
 
 ## Active Phase
 
@@ -170,6 +207,7 @@ Current cached offline-read coverage:
 - Existing routes and navigation contracts
 - Print statement flow
 - Current operational status derivation behavior
+- Existing offline customer queue/replay behavior
 
 ## Current Architectural Decisions
 
@@ -191,6 +229,8 @@ Current cached offline-read coverage:
 - Offline fallback is localized to approved read surfaces, not global
 - Snapshot-backed read pages now use timeout-based fallback hardening to avoid
   indefinite loading during Safari/iPhone offline conditions
+- `CustomersPage` section navigation uses local page state only; it does not
+  add new routes or split the screen into new route contracts
 - `TransferDetailsPage` uses per-piece snapshot availability markers so
   transfer context and payment history can be restored independently when only
   part of the local snapshot exists

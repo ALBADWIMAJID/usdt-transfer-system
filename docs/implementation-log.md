@@ -835,3 +835,232 @@ Suggested next step:
   prior online visit -> offline reopen, missing payment-history snapshot,
   partial offline restore, and pending local payments remaining visually
   separate from confirmed payment history
+
+## 2026-03-15T04:23:44.9523142+03:00 - CustomersPage sectioned navigation reorganization
+
+Requested scope:
+- Implement only the first page-organization phase
+- Reorganize `CustomersPage` into clearer internal sections without changing
+  business logic, routes, print flow, or offline queue behavior
+- Preserve customer creation, offline customer capture, pending/failed local
+  customer visibility, manual replay, search/list behavior, and drill-down
+  entry points
+
+Files changed:
+- `src/pages/CustomersPage.jsx`
+- `src/index.css`
+- `docs/project-current-state.md`
+- `docs/implementation-log.md`
+- `docs/code-map.md`
+- `docs/last-change-summary.md`
+- `docs/manual-test-matrix.md`
+- `docs/iphone-qa-checklist.md`
+
+What was added:
+- Page-internal section navigation for `CustomersPage`
+- Four sections inside the existing `/customers` route:
+  - Customers
+  - Portfolio Summary
+  - Needs Attention
+  - Recent Activity
+- A compact sticky section bar for mobile and a clear segmented section row for
+  desktop within the page itself
+- A small cross-section notice that keeps pending/failed local customer state
+  visible even when the operator is viewing another section
+
+What was not changed:
+- Business logic
+- Database schema
+- Supabase tables/contracts
+- Routes/navigation contracts
+- Print flow
+- Offline customer queue/replay behavior
+- Offline transfer/payment behavior
+- Dashboard organization
+
+Verification:
+- `npm run lint` - passed
+- `npm run build` - passed
+- Preview HTTP smoke - passed (`PREVIEW_CUSTOMERS_STATUS=200`)
+- Build warning only: client chunk exceeded 500 kB after minification
+
+Risks / notes:
+- Physical iPhone retesting was not possible from this environment and remains
+  required
+- `CustomersPage` now shows one primary section at a time, which reduces crowding
+  but leaves wider dashboard-level page organization work for later
+- Dashboard reorganization remains deferred for a future page-organization pass
+
+Suggested next step:
+- If page organization continues, apply the next scoped reorganization pass to
+  the dashboard without changing its business logic or offline-read behavior
+
+## 2026-03-15T04:34:37.0490047+03:00 - CustomersPage mobile section navigation UX correction
+
+Requested scope:
+- Implement only a tightly scoped bugfix / UX correction pass
+- Keep the existing CustomersPage internal section model
+- Correct the mobile section navigation so it is clear, thumb-friendly, and
+  genuinely mobile-usable
+- Preserve customer business logic, offline customer creation, pending/failed
+  local visibility, manual replay, and drill-down behavior
+
+Files changed:
+- `src/pages/CustomersPage.jsx`
+- `src/index.css`
+- `docs/project-current-state.md`
+- `docs/implementation-log.md`
+- `docs/code-map.md`
+- `docs/last-change-summary.md`
+- `docs/manual-test-matrix.md`
+- `docs/iphone-qa-checklist.md`
+
+What was changed:
+- CustomersPage mobile section labels were shortened to:
+  - `العملاء`
+  - `المحفظة`
+  - `متابعة`
+  - `النشاط`
+- Mobile navigation was corrected from a scrollable card-like row into a
+  clearer four-tab bar with larger tap targets
+- Desktop section navigation remained a page-level segmented row
+- One primary section at a time is still shown on mobile
+
+What was not changed:
+- Business logic
+- Database schema
+- Supabase tables/contracts
+- Routes/navigation contracts
+- Print flow
+- Offline customer queue/replay behavior
+- Offline transfer/payment behavior
+- Other page reorganizations
+
+Verification:
+- `npm run lint` - passed
+- `npm run build` - passed
+- Preview HTTP smoke - passed (`PREVIEW_CUSTOMERS_STATUS=200`)
+- Build warning only: client chunk exceeded 500 kB after minification
+
+Risks / notes:
+- Physical iPhone retesting was not possible from this environment and remains
+  required
+- This pass corrects navigation usability only; it does not broaden product
+  scope or reorganize other pages
+
+Suggested next step:
+- Re-test `CustomersPage` on mobile/iPhone specifically for fast section
+  switching and pending local-customer visibility before moving to another page
+
+
+## 2026-03-15T04:56:45.7367011+03:00 - TransferDetailsPage sectioned navigation reorganization
+
+Requested scope:
+- Implement only the next page-organization phase
+- Reorganize `TransferDetailsPage` into clearer internal sections without changing
+  business logic, routes, print flow, or offline payment queue behavior
+- Preserve online/offline payment capture, pending/blocked/failed local payment
+  visibility, manual replay, partial offline snapshot behavior, and print
+  statement access
+
+Files changed:
+- `src/pages/TransferDetailsPage.jsx`
+- `src/components/transfer-details/PrintStatement.jsx`
+- `src/index.css`
+- `docs/project-current-state.md`
+- `docs/implementation-log.md`
+- `docs/code-map.md`
+- `docs/last-change-summary.md`
+- `docs/manual-test-matrix.md`
+- `docs/iphone-qa-checklist.md`
+
+What was added:
+- Page-internal section navigation for `TransferDetailsPage`
+- Four sections inside the existing `/transfers/:transferId` route:
+  - Summary
+  - Payments
+  - Payment History
+  - Print
+- A compact sticky mobile tab bar with short Arabic labels and a desktop
+  segmented row inside the page
+- Screen-only section visibility so the print statement remains in the DOM for
+  printing while other sections stay easier to operate on mobile
+- A small cross-section status notice so hidden local payment attention states
+  are not easy to miss when the operator is viewing Summary or Print
+
+What was not changed:
+- Business logic
+- Database schema
+- Supabase tables/contracts
+- Routes/navigation contracts
+- Print flow
+- Offline payment queue/replay behavior
+- Offline snapshot behavior
+- Other page reorganizations
+
+Verification:
+- `npm run lint` - passed
+- `npm run build` - passed
+- Preview HTTP smoke - not run from this environment (background preview process was blocked by command policy)
+
+Risks / notes:
+- Physical iPhone retesting was not possible from this environment and remains
+  required
+- This pass reorganizes `TransferDetailsPage` only; it does not change dashboard
+  or customer-detail organization
+
+Suggested next step:
+- Re-test `TransferDetailsPage` on mobile/iPhone for section switching comfort,
+  payment-entry accessibility, history readability, and print-section clarity
+  before reorganizing another page
+
+## 2026-03-15T05:08:35.8552157+03:00 - TransferDetailsPage Arabic copy restoration bugfix
+
+Requested scope:
+- Implement only a tightly scoped bugfix pass
+- Restore corrupted Arabic UI copy inside `TransferDetailsPage` after the recent
+  sectioned-navigation reorganization
+- Preserve business logic, section layout, offline payment behavior, replay
+  behavior, snapshot behavior, and print flow
+
+Files changed:
+- `src/pages/TransferDetailsPage.jsx`
+- `docs/project-current-state.md`
+- `docs/implementation-log.md`
+- `docs/code-map.md`
+- `docs/last-change-summary.md`
+- `docs/iphone-qa-checklist.md`
+
+What was fixed:
+- Restored all question-mark placeholder strings in the sectioned
+  `TransferDetailsPage` workspace
+- Recovered original Arabic titles and descriptions for the summary, balance,
+  payment entry, history, secondary details, and lock sections
+- Restored proper Arabic inline warning/help copy for partial snapshot and lock
+  state messages
+- Preserved the current sectioned layout and page-level navigation behavior
+
+What was not changed:
+- Business logic
+- Database schema
+- Supabase tables/contracts
+- Routes/navigation contracts
+- Print flow
+- Offline payment queue/replay behavior
+- Offline snapshot behavior
+- Other page reorganizations
+
+Verification:
+- `npm run lint` - passed
+- `npm run build` - passed
+- Preview HTTP smoke - not run from this environment
+
+Risks / notes:
+- Physical iPhone retesting was not possible from this environment and remains
+  required
+- This pass restores Arabic copy only; it does not broaden or roll back the
+  sectioned `TransferDetailsPage` layout
+
+Suggested next step:
+- Re-test `TransferDetailsPage` on staging/iPhone specifically for Arabic copy
+  correctness, section switching, and preserved payment/print behavior

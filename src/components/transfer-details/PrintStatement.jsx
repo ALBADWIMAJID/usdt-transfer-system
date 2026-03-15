@@ -5,6 +5,7 @@ import InlineMessage from '../ui/InlineMessage.jsx'
 import StatusBadge from '../ui/StatusBadge.jsx'
 
 function PrintStatement({
+  className = '',
   errorMessage,
   loading,
   hasTransfer,
@@ -23,9 +24,11 @@ function PrintStatement({
   remainingClassName,
   finalAmountValue,
 }) {
+  const rootClassName = ['page-card', 'print-statement-card', className].filter(Boolean).join(' ')
+
   if (errorMessage) {
     return (
-      <section className="page-card print-statement-card">
+      <section className={rootClassName}>
         <InlineMessage kind="error">{errorMessage}</InlineMessage>
       </section>
     )
@@ -33,14 +36,14 @@ function PrintStatement({
 
   if (loading || !hasTransfer) {
     return (
-      <section className="page-card print-statement-card">
+      <section className={rootClassName}>
         <p>جار تحميل كشف الحوالة للطباعة...</p>
       </section>
     )
   }
 
   return (
-    <section className="page-card print-statement-card">
+    <section className={rootClassName}>
       <div className="statement-sheet">
         <div className="statement-header">
           <div className="statement-branding">

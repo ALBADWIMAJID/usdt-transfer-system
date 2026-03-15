@@ -120,6 +120,13 @@ function hasSavedPaymentsSnapshot(snapshotData) {
   return Array.isArray(snapshotData?.payments) || snapshotData?.hasPaymentsSnapshot === true
 }
 
+const TRANSFER_DETAILS_SECTIONS = [
+  { key: 'summary', label: 'الملخص', description: 'الحوالة والرصيد' },
+  { key: 'payments', label: 'الدفعات', description: 'إدخال ومزامنة' },
+  { key: 'history', label: 'السجل', description: 'المؤكد والمحلي' },
+  { key: 'print', label: 'الطباعة', description: 'كشف الحوالة' },
+]
+
 function TransferDetailsPage() {
   const { transferId } = useParams()
   const location = useLocation()
@@ -127,6 +134,7 @@ function TransferDetailsPage() {
   const { isOffline } = useNetworkStatus()
   const { clearSnapshotState, markCachedSnapshot, markLiveSnapshot, snapshotState } =
     useOfflineSnapshot()
+  const [activeSections, setActiveSections] = useState({})
   const [transfer, setTransfer] = useState(null)
   const [transferLoading, setTransferLoading] = useState(Boolean(isConfigured))
   const [transferError, setTransferError] = useState(isConfigured ? '' : configError)
@@ -151,6 +159,20 @@ function TransferDetailsPage() {
     totalAmountRub: localPendingAmountRub,
   } = usePendingPayments(transferId)
   const { isSyncing: queueSyncing, replayPaymentsNow } = useReplayQueue()
+  const activeSection = activeSections[transferId] || 'summary'
+
+  const handleSectionChange = (nextSection) => {
+    setActiveSections((current) => {
+      if (current[transferId] === nextSection) {
+        return current
+      }
+
+      return {
+        ...current,
+        [transferId]: nextSection,
+      }
+    })
+  }
 
   useEffect(() => {
     if (!isConfigured || !supabase || !transferId) {
@@ -1148,6 +1170,22 @@ function TransferDetailsPage() {
       ? 'تسجيل أول دفعة'
       : 'تسجيل دفعة متابعة'
 
+  const hiddenPaymentStateNotice =
+    activeSection !== 'payments' && activeSection !== 'history'
+      ? failedLocalPaymentCount > 0
+        ? `توجد ${failedLocalPaymentCount} دفعة محلية تحتاج إلى إعادة محاولة. افتح قسم الدفعات للمزامنة أو قسم السجل للمراجعة.`
+        : blockedLocalPaymentCount > 0
+          ? `توجد ${blockedLocalPaymentCount} دفعة محلية ما زالت بانتظار اعتماد حوالة مرتبطة. افتح قسم الدفعات أو السجل للمراجعة قبل اعتماد النتيجة المالية.`
+          : hasLocalPendingPayments
+            ? `توجد ${localPaymentCount} دفعة محلية محفوظة بانتظار الإرسال. افتح قسم الدفعات للمزامنة أو قسم السجل لمراجعة العناصر المحلية.`
+            : hasPartialTransferOnlyOfflineState
+              ? 'سجل الدفعات المؤكد غير مكتمل محليًا حاليًا. افتح قسم السجل لمراجعة المتاح أو قسم الدفعات لتسجيل الحركات المحلية الجديدة.'
+              : ''
+      : ''
+
+  const hiddenPaymentStateKind =
+    failedLocalPaymentCount > 0 ? 'error' : hiddenPaymentStateNotice ? 'warning' : 'info'
+
   return (
     <div className="stack transfer-details-page">
       <PageHeader
@@ -1181,168 +1219,243 @@ function TransferDetailsPage() {
 
       <OfflineSnapshotNotice className="no-print" snapshotState={snapshotState} />
 
-      <SectionCard
-        title="لوحة المتابعة المالية"
-        description="افهم وضع الحوالة خلال ثوان: المرجع، العميل، الرصيد الحالي، وما الخطوة التشغيلية التالية."
-        className="no-print transfer-details-summary-section"
-      >
-        <TransferSummary
-          errorMessage={transferError}
-          loading={transferLoading}
-          hasTransfer={Boolean(transfer)}
-          customerId={transfer?.customer_id || ''}
-          customerName={displayCustomerName}
-          status={transfer?.status || ''}
-          metaItems={[]}
-          asideChildren={
-            <RecordMeta
-              label="تاريخ الإنشاء"
-              value={transferCreatedAtLabel}
-              className="detail-mobile-secondary"
-            />
-          }
-          highlightItems={highlightItems}
-          items={[]}
-        />
+      <div className="transfer-details-section-nav-shell no-print">
+        <nav className="transfer-details-section-nav" aria-label="أقسام صفحة الحوالة">
+          {TRANSFER_DETAILS_SECTIONS.map((section) => {
+            const isActiveSection = activeSection === section.key
 
-        {!transferError && !transferLoading && transfer ? (
-          <TransferFollowUpPanel
-            title={followUpTitle}
-            description={followUpDescription}
-            status={transfer.status}
-            tone={followUpState}
-            chips={followUpChips}
-            items={followUpItems}
-          />
-        ) : null}
-      </SectionCard>
-
-      <SectionCard
-        title="الوضع المالي الحالي"
-        description="يتم احتساب الرصيد من مبلغ التسوية وجميع المدفوعات الجزئية المسجلة على الحوالة."
-        className="no-print transfer-details-balance-section"
-      >
-        {hasPartialTransferOnlyOfflineState ? (
-          <InlineMessage kind="warning" className="transfer-details-partial-offline-notice">
-            {paymentsError} لذلك تُعرض تفاصيل الحوالة الأساسية فقط، بينما تبقى إجماليات التحصيل والرصيد الحالي غير مكتملة حتى يعود سجل المدفوعات المؤكد.
-          </InlineMessage>
-        ) : null}
-        <BalanceSummary
-          settlementValue={formatNumber(valueAfterPercentage, 2)}
-          totalPaidValue={
-            paymentsLoading && payments.length === 0
-              ? 'جار تحميل المدفوعات...'
-              : formatNumber(totalPaidRub, 2)
-          }
-          remainingTitle={isOverpaid ? 'رصيد سالب' : isSettled ? 'حالة التسوية' : 'المتبقي بالروبل'}
-          remainingValue={remainingMessage}
-          remainingCardClass={balanceCardClass}
-          remainingValueClass={balanceValueClass}
-          remainingNote={isOverpaid ? 'المبلغ المدفوع تجاوز بالفعل القيمة النهائية للحوالة.' : ''}
-        />
-      </SectionCard>
-
-      <SectionCard
-        title="إجراء التحصيل"
-        description="هذه هي منطقة الإجراء الأساسية لتسجيل الحركة المالية التالية على الحوالة."
-        className="no-print transfer-details-action-section"
-      >
-        <PaymentForm
-          actionTitle={paymentActionTitle}
-          actionDescription={paymentActionDescription}
-          actionTone={followUpState}
-          actionMeta={paymentActionMeta}
-          errorMessage={paymentSubmitError}
-          successMessage={paymentSubmitSuccess}
-          values={paymentForm}
-          paymentMethodOptions={PAYMENT_METHOD_OPTIONS}
-          onChange={handlePaymentChange}
-          onSubmit={handlePaymentSubmit}
-          remainingHelpText={remainingHelpText}
-          remainingHelpClassName={remainingSupportClass}
-          submitting={paymentSubmitting}
-          disabled={paymentSubmitting || Boolean(transferError) || !transfer || !isConfigured}
-          submitLabel={paymentSubmitLabel}
-        />
-      </SectionCard>
-
-      <SectionCard
-        title="سجل التحصيل والحركة المالية"
-        description="يعرض الحركات من الأحدث إلى الأقدم مع إبراز آخر دفعة مسجلة لتسهيل المتابعة اليومية."
-        className="no-print transfer-details-history-section"
-      >
-        <PendingMutationNotice
-          activeCount={localPaymentCount}
-          blockedCount={blockedLocalPaymentCount}
-          failedCount={failedLocalPaymentCount}
-          isOffline={isOffline}
-          syncing={queueSyncing}
-          totalAmountLabel={localPendingAmountLabel}
-          onSyncNow={handleSyncPendingPayments}
-        />
-        <PaymentList
-          errorMessage={paymentsError}
-          loading={paymentsLoading}
-          payments={paymentEntries}
-          pendingPayments={pendingPaymentEntries}
-          onRetry={handlePaymentsRefresh}
-        />
-      </SectionCard>
-
-      {transfer ? (
-        <SectionCard
-          title="تفاصيل الحوالة والتسعير"
-          description="مرجع الحوالة وبيانات التسعير والملاحظات الداخلية عند الحاجة إلى مراجعة أعمق."
-          className="no-print transfer-details-secondary-section"
-        >
-          <InfoGrid className="transfer-details-secondary-grid">
-            <InfoCard title="رقم المرجع" value={referenceNumber} />
-            <InfoCard title="المعرّف الداخلي" value={displayTransferId} />
-            <InfoCard title="تاريخ إنشاء الحوالة" value={transferCreatedAtLabel} />
-            {summaryItems.map((item) => (
-              <InfoCard
-                key={item.title}
-                title={item.title}
-                value={item.value}
-                className={item.className}
-                valueClassName={item.valueClassName}
+            return (
+              <button
+                key={section.key}
+                type="button"
+                className={['transfer-details-section-button', isActiveSection ? 'active' : '']
+                  .filter(Boolean)
+                  .join(' ')}
+                aria-pressed={isActiveSection}
+                onClick={() => handleSectionChange(section.key)}
               >
-                {item.children}
-              </InfoCard>
-            ))}
-          </InfoGrid>
-        </SectionCard>
+                <strong>{section.label}</strong>
+                <small>{section.description}</small>
+              </button>
+            )
+          })}
+        </nav>
+      </div>
+
+      {hiddenPaymentStateNotice ? (
+        <InlineMessage
+          kind={hiddenPaymentStateKind}
+          className="no-print transfer-details-section-inline-status"
+        >
+          {hiddenPaymentStateNotice}
+        </InlineMessage>
       ) : null}
 
-      <SectionCard
-        title="قفل البيانات الأساسية"
-        description="يجب اعتبار القيم الأساسية للحوالة مقفلة بعد تسجيل أي دفعات عليها."
-        className="no-print transfer-details-lock-section"
-      >
-        {paymentsLoading && payments.length === 0 ? (
-          <p>جار التحقق من حالة قفل الحوالة...</p>
+      <div className="transfer-details-section-workspace no-print">
+        <SectionCard
+          title="لوحة المتابعة المالية"
+          description="افهم وضع الحوالة خلال ثوان: المرجع، العميل، الرصيد الحالي، وما الخطوة التشغيلية التالية."
+          className={[
+            'transfer-details-section-panel',
+            'transfer-details-summary-section',
+            activeSection === 'summary' ? 'is-active' : '',
+          ]
+            .filter(Boolean)
+            .join(' ')}
+        >
+          <TransferSummary
+            errorMessage={transferError}
+            loading={transferLoading}
+            hasTransfer={Boolean(transfer)}
+            customerId={transfer?.customer_id || ''}
+            customerName={displayCustomerName}
+            status={transfer?.status || ''}
+            metaItems={[]}
+            asideChildren={
+              <RecordMeta
+                label="تاريخ الإنشاء"
+                value={transferCreatedAtLabel}
+                className="detail-mobile-secondary"
+              />
+            }
+            highlightItems={highlightItems}
+            items={[]}
+          />
+
+          {!transferError && !transferLoading && transfer ? (
+            <TransferFollowUpPanel
+              title={followUpTitle}
+              description={followUpDescription}
+              status={transfer.status}
+              tone={followUpState}
+              chips={followUpChips}
+              items={followUpItems}
+            />
+          ) : null}
+        </SectionCard>
+
+        <SectionCard
+          title="الوضع المالي الحالي"
+          description="يتم احتساب الرصيد من مبلغ التسوية وجميع المدفوعات الجزئية المسجلة على الحوالة."
+          className={[
+            'transfer-details-section-panel',
+            'transfer-details-balance-section',
+            activeSection === 'summary' ? 'is-active' : '',
+          ]
+            .filter(Boolean)
+            .join(' ')}
+        >
+          {hasPartialTransferOnlyOfflineState ? (
+            <InlineMessage kind="warning" className="transfer-details-partial-offline-notice">
+              {paymentsError} لذلك تُعرض تفاصيل الحوالة الأساسية فقط، بينما تبقى إجماليات التحصيل والرصيد الحالي غير مكتملة حتى يعود سجل المدفوعات المؤكد.
+            </InlineMessage>
+          ) : null}
+          <BalanceSummary
+            settlementValue={formatNumber(valueAfterPercentage, 2)}
+            totalPaidValue={
+              paymentsLoading && payments.length === 0
+                ? 'جار تحميل المدفوعات...'
+                : formatNumber(totalPaidRub, 2)
+            }
+            remainingTitle={isOverpaid ? 'رصيد سالب' : isSettled ? 'حالة التسوية' : 'المتبقي بالروبل'}
+            remainingValue={remainingMessage}
+            remainingCardClass={balanceCardClass}
+            remainingValueClass={balanceValueClass}
+            remainingNote={isOverpaid ? 'المبلغ المدفوع تجاوز بالفعل القيمة النهائية للحوالة.' : ''}
+          />
+        </SectionCard>
+
+        <SectionCard
+          title="إجراء التحصيل"
+          description="هذه هي منطقة الإجراء الأساسية لتسجيل الحركة المالية التالية على الحوالة."
+          className={[
+            'transfer-details-section-panel',
+            'transfer-details-action-section',
+            activeSection === 'payments' ? 'is-active' : '',
+          ]
+            .filter(Boolean)
+            .join(' ')}
+        >
+          <PendingMutationNotice
+            activeCount={localPaymentCount}
+            blockedCount={blockedLocalPaymentCount}
+            failedCount={failedLocalPaymentCount}
+            isOffline={isOffline}
+            syncing={queueSyncing}
+            totalAmountLabel={localPendingAmountLabel}
+            onSyncNow={handleSyncPendingPayments}
+          />
+          <PaymentForm
+            actionTitle={paymentActionTitle}
+            actionDescription={paymentActionDescription}
+            actionTone={followUpState}
+            actionMeta={paymentActionMeta}
+            errorMessage={paymentSubmitError}
+            successMessage={paymentSubmitSuccess}
+            values={paymentForm}
+            paymentMethodOptions={PAYMENT_METHOD_OPTIONS}
+            onChange={handlePaymentChange}
+            onSubmit={handlePaymentSubmit}
+            remainingHelpText={remainingHelpText}
+            remainingHelpClassName={remainingSupportClass}
+            submitting={paymentSubmitting}
+            disabled={paymentSubmitting || Boolean(transferError) || !transfer || !isConfigured}
+            submitLabel={paymentSubmitLabel}
+          />
+        </SectionCard>
+
+        <SectionCard
+          title="سجل التحصيل والحركة المالية"
+          description="يعرض الحركات من الأحدث إلى الأقدم مع إبراز آخر دفعة مسجلة لتسهيل المتابعة اليومية."
+          className={[
+            'transfer-details-section-panel',
+            'transfer-details-history-section',
+            activeSection === 'history' ? 'is-active' : '',
+          ]
+            .filter(Boolean)
+            .join(' ')}
+        >
+          {hasPartialTransferOnlyOfflineState ? (
+            <InlineMessage kind="warning" className="transfer-details-history-inline-status">
+              {paymentsError} سيظهر أدناه ما توفر فقط من السجل المؤكد والعناصر المحلية.
+            </InlineMessage>
+          ) : null}
+          <PaymentList
+            errorMessage={paymentsError}
+            loading={paymentsLoading}
+            payments={paymentEntries}
+            pendingPayments={pendingPaymentEntries}
+            onRetry={handlePaymentsRefresh}
+          />
+        </SectionCard>
+
+        {transfer ? (
+          <SectionCard
+            title="تفاصيل الحوالة والتسعير"
+            description="مرجع الحوالة وبيانات التسعير والملاحظات الداخلية عند الحاجة إلى مراجعة أعمق."
+            className={[
+              'transfer-details-section-panel',
+              'transfer-details-secondary-section',
+              activeSection === 'summary' ? 'is-active' : '',
+            ]
+              .filter(Boolean)
+              .join(' ')}
+          >
+            <InfoGrid className="transfer-details-secondary-grid">
+              <InfoCard title="رقم المرجع" value={referenceNumber} />
+              <InfoCard title="المعرّف الداخلي" value={displayTransferId} />
+              <InfoCard title="تاريخ إنشاء الحوالة" value={transferCreatedAtLabel} />
+              {summaryItems.map((item) => (
+                <InfoCard
+                  key={item.title}
+                  title={item.title}
+                  value={item.value}
+                  className={item.className}
+                  valueClassName={item.valueClassName}
+                >
+                  {item.children}
+                </InfoCard>
+              ))}
+            </InfoGrid>
+          </SectionCard>
         ) : null}
-        {!paymentsLoading && paymentsError ? (
-          <InlineMessage kind="warning">
-            {paymentsError} لذلك لا يمكن تأكيد حالة قفل الحوالة محليا بشكل كامل حتى يعود سجل المدفوعات المؤكد أو يُعاد تحميله من الخادم.
-          </InlineMessage>
-        ) : null}
-        {!paymentsLoading && hasPayments ? (
-          <InlineMessage kind="warning">
-            تحتوي هذه الحوالة بالفعل على {payments.length} دفعة. يجب اعتبار الحقول الأساسية مثل
-            العميل والكمية والأسعار ووضع التسعير والعمولة والإجمالي والمبلغ المستحق مقفلة. كما أن
-            قاعدة البيانات تمنع تعديل هذه القيم بعد وجود دفعات.
-          </InlineMessage>
-        ) : null}
-        {!paymentsLoading && !paymentsError && !hasPayments ? (
-          <p className="support-text">
-            لا توجد مدفوعات مسجلة بعد. إذا تمت إضافة واجهة تعديل لاحقا فيمكن إبقاء القيم الأساسية
-            قابلة للتعديل حتى أول دفعة.
-          </p>
-        ) : null}
-      </SectionCard>
+
+        <SectionCard
+          title="قفل البيانات الأساسية"
+          description="يجب اعتبار القيم الأساسية للحوالة مقفلة بعد تسجيل أي دفعات عليها."
+          className={[
+            'transfer-details-section-panel',
+            'transfer-details-lock-section',
+            activeSection === 'summary' ? 'is-active' : '',
+          ]
+            .filter(Boolean)
+            .join(' ')}
+        >
+          {paymentsLoading && payments.length === 0 ? (
+            <p>جار التحقق من حالة قفل الحوالة...</p>
+          ) : null}
+          {!paymentsLoading && paymentsError ? (
+            <InlineMessage kind="warning">
+              {paymentsError} لذلك لا يمكن تأكيد حالة قفل الحوالة محليًا بشكل كامل حتى يعود سجل المدفوعات المؤكد أو يُعاد تحميله من الخادم.
+            </InlineMessage>
+          ) : null}
+          {!paymentsLoading && hasPayments ? (
+            <InlineMessage kind="warning">
+              تحتوي هذه الحوالة بالفعل على {payments.length} دفعة. يجب اعتبار الحقول الأساسية مثل العميل والكمية والأسعار ووضع التسعير والعمولة والإجمالي والمبلغ المستحق مقفلة. كما أن قاعدة البيانات تمنع تعديل هذه القيم بعد وجود دفعات.
+            </InlineMessage>
+          ) : null}
+          {!paymentsLoading && !paymentsError && !hasPayments ? (
+            <p className="support-text">
+              لا توجد مدفوعات مسجلة بعد. إذا تمت إضافة واجهة تعديل لاحقًا فيمكن إبقاء القيم الأساسية قابلة للتعديل حتى أول دفعة.
+            </p>
+          ) : null}
+        </SectionCard>
+      </div>
 
       <PrintStatement
+        className={['transfer-details-print-section', activeSection === 'print' ? 'is-active' : '']
+          .filter(Boolean)
+          .join(' ')}
         errorMessage={transferError}
         loading={transferLoading}
         hasTransfer={Boolean(transfer)}

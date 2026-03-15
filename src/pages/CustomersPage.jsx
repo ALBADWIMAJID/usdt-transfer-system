@@ -56,6 +56,29 @@ const PORTFOLIO_FILTER_LABELS = {
   recent_activity: 'عملاء عليهم حركة اليوم وما زالوا يحتاجون متابعة',
 }
 
+const CUSTOMER_PAGE_SECTIONS = [
+  {
+    key: 'customers',
+    label: 'العملاء',
+    description: 'إنشاء العميل والبحث والقائمة',
+  },
+  {
+    key: 'portfolio',
+    label: 'المحفظة',
+    description: 'مؤشرات المحفظة والصورة العامة',
+  },
+  {
+    key: 'attention',
+    label: 'متابعة',
+    description: 'الحالات ذات الأولوية الأعلى',
+  },
+  {
+    key: 'activity',
+    label: 'النشاط',
+    description: 'آخر الحركة عبر العملاء',
+  },
+]
+
 function roundCurrency(value) {
   return Math.round((value + Number.EPSILON) * 100) / 100
 }
@@ -410,6 +433,7 @@ function CustomersPage() {
   const [portfolioStats, setPortfolioStats] = useState(emptyPortfolioStats)
   const [attentionCustomers, setAttentionCustomers] = useState([])
   const [recentActivityItems, setRecentActivityItems] = useState([])
+  const [activeSection, setActiveSection] = useState('customers')
   const [activeDrillDownKey, setActiveDrillDownKey] = useState('')
   const [formValues, setFormValues] = useState(emptyForm)
   const [submitting, setSubmitting] = useState(false)
@@ -974,6 +998,7 @@ function CustomersPage() {
 
   const applyPortfolioFilter = (nextFilter) => {
     setPortfolioFilter(nextFilter)
+    setActiveSection('customers')
     closeDrillDown()
   }
 
@@ -1067,6 +1092,16 @@ function CustomersPage() {
   const customerFormInfoMessage = isOffline
     ? 'سيحفظ هذا العميل داخل المتصفح فقط ولن يصبح متاحا كسجل مؤكد أو كعميل صالح لإنشاء حوالة محلية جديدة حتى تنجح المزامنة.'
     : ''
+
+  const customersSectionDescription =
+    failedPendingCustomerCount > 0
+      ? `يضم أيضا ${failedPendingCustomerCount} ملف عميل محلي يحتاج إعادة محاولة.`
+      : pendingCustomerCount > 0
+        ? `يضم أيضا ${pendingCustomerCount} ملف عميل محلي بانتظار الإرسال.`
+        : activePortfolioFilterLabel
+          ? `يتم التركيز الآن على ${activePortfolioFilterLabel}.`
+          : 'إنشاء العملاء والبحث وقائمة المتابعة في مساحة واحدة.'
+  const showCrossSectionQueueNotice = activeSection !== 'customers' && pendingCustomerCount > 0
 
   const summaryCards = [
     {
@@ -1163,6 +1198,44 @@ function CustomersPage() {
   summaryCards.forEach((card) => {
     if (compactCardCopyByKey[card.key]) {
       card.copy = compactCardCopyByKey[card.key]
+    }
+  })
+
+  const sectionNavItems = CUSTOMER_PAGE_SECTIONS.map((section) => {
+    if (section.key === 'customers') {
+      return {
+        ...section,
+        description: customersSectionDescription,
+        countLabel: loading ? '...' : pendingCustomerCount > 0 ? pendingCustomerCount : filteredCustomers.length,
+        tone:
+          failedPendingCustomerCount > 0
+            ? 'danger'
+            : pendingCustomerCount > 0
+              ? 'warning'
+              : 'neutral',
+      }
+    }
+
+    if (section.key === 'portfolio') {
+      return {
+        ...section,
+        countLabel: summaryCards.length,
+        tone: 'brand',
+      }
+    }
+
+    if (section.key === 'attention') {
+      return {
+        ...section,
+        countLabel: loading ? '...' : attentionCustomers.length,
+        tone: attentionCustomers.length > 0 ? 'warning' : 'neutral',
+      }
+    }
+
+    return {
+      ...section,
+      countLabel: loading ? '...' : recentActivityItems.length,
+      tone: recentActivityItems.length > 0 ? 'brand' : 'neutral',
     }
   })
 
@@ -1338,17 +1411,68 @@ function CustomersPage() {
         <OfflineSnapshotNotice snapshotState={snapshotState} />
         <InlineMessage kind="warning">{portfolioWarning}</InlineMessage>
 
+        <div className="customers-section-nav-shell">
+          <nav className="customers-section-nav" aria-label="أقسام صفحة العملاء">
+            {sectionNavItems.map((section) => {
+              const isActiveSection = activeSection === section.key
+
+              return (
+                <button
+                  key={section.key}
+                  type="button"
+                  className={['customers-section-button', isActiveSection ? 'active' : '']
+                    .filter(Boolean)
+                    .join(' ')}
+                  aria-pressed={isActiveSection}
+                  onClick={() => setActiveSection(section.key)}
+                >
+                  <span className="customers-section-button-copy">
+                    <strong>{section.label}</strong>
+                    <small>{section.description}</small>
+                  </span>
+                  <span
+                    className={[
+                      'customers-section-button-count',
+                      `customers-section-button-count--${section.tone}`,
+                    ].join(' ')}
+                  >
+                    {section.countLabel}
+                  </span>
+                </button>
+              )
+            })}
+          </nav>
+        </div>
+
+        <InlineMessage
+          kind={failedPendingCustomerCount > 0 ? 'warning' : 'info'}
+          className="customers-section-inline-status"
+        >
+          {showCrossSectionQueueNotice
+            ? failedPendingCustomerCount > 0
+              ? `يوجد ${failedPendingCustomerCount} ملف عميل محلي يحتاج إعادة محاولة. افتح قسم العملاء لمراجعته وتشغيل المزامنة يدويا عند الحاجة.`
+              : `يوجد ${pendingCustomerCount} ملف عميل محلي بانتظار الإرسال. افتح قسم العملاء لرؤيته ومتابعة المزامنة.`
+            : ''}
+        </InlineMessage>
+
+        <div className="customers-section-workspace">
+
+        {activeSection === 'portfolio' ? (
         <CustomersPortfolioSummary
           cards={summaryCards}
           note="يمكنك النقر على أي مؤشر لفتح تفصيله أولا، ثم تركيز محفظة العملاء على نفس الشريحة إذا أردت المتابعة من الصفحة نفسها."
         />
+        ) : null}
 
+        {activeSection === 'attention' ? (
         <CustomersAttentionSection
           loading={loading}
           customers={attentionCustomers}
           onOpenPortfolioDrillDown={portfolioWarning ? undefined : () => openDrillDown('followUp')}
         />
+        ) : null}
 
+        {activeSection === 'activity' ? (
         <CustomersRecentActivitySection
           loading={loading}
           errorMessage=""
@@ -1357,7 +1481,10 @@ function CustomersPage() {
           onRetry={handleRefresh}
           onOpenActivityDrillDown={portfolioWarning ? undefined : () => openDrillDown('recentActivity')}
         />
+        ) : null}
 
+        {activeSection === 'customers' ? (
+          <>
         <CustomersFormSection
           description={customerFormDescription}
           submitError={submitError}
@@ -1463,6 +1590,9 @@ function CustomersPage() {
           onClearPortfolioFilter={() => setPortfolioFilter('all')}
           onRetry={handleRefresh}
         />
+          </>
+        ) : null}
+        </div>
       </div>
 
       <OperationsDrillDownSheet
