@@ -30,6 +30,29 @@ import {
 } from '../lib/transfer-ui.js'
 import { supabase } from '../lib/supabase.js'
 
+const CUSTOMER_DETAILS_SECTIONS = [
+  {
+    key: 'overview',
+    label: 'النظرة',
+    description: 'ملف العميل والصورة المالية',
+  },
+  {
+    key: 'transfers',
+    label: 'الحوالات',
+    description: 'طابور حوالات العميل',
+  },
+  {
+    key: 'activity',
+    label: 'النشاط',
+    description: 'آخر الحركة عبر العميل',
+  },
+  {
+    key: 'actions',
+    label: 'الإجراءات',
+    description: 'اختصارات متابعة العميل',
+  },
+]
+
 function formatNumber(value, digits = 2) {
   if (value === null || value === undefined || value === '') {
     return '--'
@@ -142,6 +165,7 @@ function CustomerDetailsPage() {
   const [customerPayments, setCustomerPayments] = useState([])
   const [totalPaidRub, setTotalPaidRub] = useState(0)
   const customerSnapshotKey = getCustomerDetailsSnapshotKey(customerId)
+  const [activeSection, setActiveSection] = useState('overview')
 
   useEffect(() => {
     if (!isConfigured || !supabase || !customerId) {
@@ -949,6 +973,47 @@ function CustomerDetailsPage() {
     ? 'تعذر تحميل سجل المدفوعات؛ يتم عرض أحدث الحوالات فقط، وسيظهر سجل الحركة الكامل بعد نجاح تحميل المدفوعات.'
     : ''
 
+  const transfersSectionCount = customerNotFound ? 0 : totalTransfers
+  const activitySectionCount = customerNotFound ? 0 : recentActivityItems.length
+  const actionsSectionCount = customerNotFound ? 0 : 2
+
+  const sectionNavItems = CUSTOMER_DETAILS_SECTIONS.map((section) => {
+    if (section.key === 'overview') {
+      return {
+        ...section,
+        countLabel: customerNotFound ? '--' : totalTransfers,
+        tone:
+          customerStateTone === 'danger'
+            ? 'danger'
+            : customerStateTone === 'warning'
+              ? 'warning'
+              : 'brand',
+      }
+    }
+
+    if (section.key === 'transfers') {
+      return {
+        ...section,
+        countLabel: transfersSectionCount,
+        tone: transfersSectionCount > 0 ? 'brand' : 'neutral',
+      }
+    }
+
+    if (section.key === 'activity') {
+      return {
+        ...section,
+        countLabel: activitySectionCount,
+        tone: activitySectionCount > 0 ? 'brand' : 'neutral',
+      }
+    }
+
+    return {
+      ...section,
+      countLabel: actionsSectionCount,
+      tone: 'neutral',
+    }
+  })
+
   return (
     <div className="stack customer-details-page">
       <PageHeader
@@ -974,137 +1039,234 @@ function CustomerDetailsPage() {
 
       <OfflineSnapshotNotice snapshotState={snapshotState} />
 
-      <SectionCard
-        title="لوحة المتابعة المالية للعميل"
-        description="افهم وضع العميل المالي خلال ثوان: إجمالي المستحق، المدفوع، المتبقي، وما يحتاج متابعة الآن."
-        className="customer-details-summary-section"
-      >
-        <CustomerSummary
-          errorMessage={customerError}
-          loading={customerLoading}
-          notFound={customerNotFound}
-          hasCustomer={Boolean(customer)}
-          title={customer?.full_name || 'عميل بدون اسم'}
-          subtitle={customer?.phone || 'لا يوجد رقم هاتف مسجل'}
-          metaItems={[]}
-          aside={
-            <span className={['queue-chip', `queue-chip--${customerStateTone === 'accent' ? 'neutral' : customerStateTone}`].join(' ')}>
-              {customerStateLabel}
-            </span>
-          }
-          highlightItems={customerSummaryHighlightItems}
-          items={[]}
-        />
-      </SectionCard>
+      <div className="customer-details-section-nav-shell">
+        <nav className="customer-details-section-nav" aria-label="أقسام صفحة العميل">
+          {sectionNavItems.map((section) => {
+            const isActiveSection = activeSection === section.key
 
-      {!customerNotFound ? (
+            return (
+              <button
+                key={section.key}
+                type="button"
+                className={[
+                  'customer-details-section-button',
+                  isActiveSection ? 'active' : '',
+                ]
+                  .filter(Boolean)
+                  .join(' ')}
+                aria-pressed={isActiveSection}
+                onClick={() => setActiveSection(section.key)}
+              >
+                <span className="customer-details-section-button-copy">
+                  <strong>{section.label}</strong>
+                  <small>{section.description}</small>
+                </span>
+                <span
+                  className={[
+                    'customer-details-section-button-count',
+                    `customer-details-section-button-count--${section.tone}`,
+                  ].join(' ')}
+                >
+                  {section.countLabel}
+                </span>
+              </button>
+            )
+          })}
+        </nav>
+      </div>
+
+      <div className="customer-details-section-workspace">
         <SectionCard
-          title="ما الذي يحتاج متابعة لهذا العميل؟"
-          description="تلخيص تشغيلي سريع يساعدك على تحديد أول حركة متابعة على مستوى العميل بالكامل."
-          className="customer-details-followup-section"
+          title="لوحة المتابعة المالية للعميل"
+          description="افهم وضع العميل المالي خلال ثوان: إجمالي المستحق، المدفوع، المتبقي، وما يحتاج متابعة الآن."
+          className={[
+            'customer-details-section-panel',
+            'customer-details-summary-section',
+            activeSection === 'overview' ? 'is-active' : '',
+          ]
+            .filter(Boolean)
+            .join(' ')}
         >
-          <CustomerFollowUpPanel
-            title={followUpTitle}
-            description={followUpDescription}
-            tone={customerStateTone}
-            chips={followUpChips}
-            items={followUpItems}
+          <CustomerSummary
+            errorMessage={customerError}
+            loading={customerLoading}
+            notFound={customerNotFound}
+            hasCustomer={Boolean(customer)}
+            title={customer?.full_name || 'عميل بدون اسم'}
+            subtitle={customer?.phone || 'لا يوجد رقم هاتف مسجل'}
+            metaItems={[]}
+            aside={
+              <span
+                className={[
+                  'queue-chip',
+                  `queue-chip--${customerStateTone === 'accent' ? 'neutral' : customerStateTone}`,
+                ].join(' ')}
+              >
+                {customerStateLabel}
+              </span>
+            }
+            highlightItems={customerSummaryHighlightItems}
+            items={[]}
+          />
+
+          {!customerNotFound ? (
+            <CustomerFollowUpPanel
+              title={followUpTitle}
+              description={followUpDescription}
+              tone={customerStateTone}
+              chips={followUpChips}
+              items={followUpItems}
+            />
+          ) : null}
+
+          <CustomerTotals
+            metrics={totalMetrics}
+            remainingCard={{
+              title: 'إجمالي المتبقي بالروبل',
+              value: customerNotFound ? '--' : totalRemainingValue,
+              className: totalsAreOverpaid
+                ? 'info-card--danger'
+                : totalsAreSettled
+                  ? 'info-card--success'
+                  : 'info-card--accent',
+              valueClassName:
+                totalsAreOverpaid
+                  ? 'info-card-value--metric info-card-value--danger'
+                  : totalsAreSettled
+                    ? 'info-card-value--metric info-card-value--success'
+                    : 'info-card-value--metric',
+              children:
+                paymentTotalsError && !customerNotFound ? (
+                  <p className="support-text text-danger">{paymentTotalsError}</p>
+                ) : totalsAreOverpaid ? (
+                  <p className="support-text text-danger">
+                    يوجد رصيد سالب مجمّع على هذا العميل ويجب مراجعة الحوالات ذات الزيادة.
+                  </p>
+                ) : null,
+            }}
+            errorMessage=""
           />
         </SectionCard>
-      ) : null}
 
-      <SectionCard
-        title="مؤشرات المحفظة المالية"
-        description="تجميع تشغيلي يوضح عدد الحوالات وحالة التحصيل الحالية عبر كامل ملف هذا العميل."
-        className="customer-details-totals-section"
-      >
-        <CustomerTotals
-          metrics={totalMetrics}
-          remainingCard={{
-            title: 'إجمالي المتبقي بالروبل',
-            value: customerNotFound ? '--' : totalRemainingValue,
-            className: totalsAreOverpaid
-              ? 'info-card--danger'
-              : totalsAreSettled
-                ? 'info-card--success'
-                : 'info-card--accent',
-            valueClassName: totalsAreOverpaid
-              ? 'info-card-value--metric info-card-value--danger'
-              : totalsAreSettled
-                ? 'info-card-value--metric info-card-value--success'
-                : 'info-card-value--metric',
-            children:
-              paymentTotalsError && !customerNotFound ? (
-                <p className="support-text text-danger">{paymentTotalsError}</p>
-              ) : totalsAreOverpaid ? (
-                <p className="support-text text-danger">
-                  يوجد رصيد سالب مجمّع على هذا العميل ويجب مراجعة الحوالات ذات الزيادة.
-                </p>
-              ) : null,
-          }}
-          errorMessage=""
-        />
-      </SectionCard>
-
-      <SectionCard
-        title="طابور حوالات العميل"
-        description="ترتيب الحوالات حسب أولوية المتابعة: مراجعة مالية ثم تحصيل جزئي ثم الحوالات المفتوحة."
-        className="customer-details-queue-section"
-      >
-        <CustomerTransfersList
-          errorMessage={transfersError}
-          loading={transfersLoading}
-          customerNotFound={customerNotFound}
-          hasTransfers={transfers.length > 0}
-          hasFilteredTransfers={filteredTransfers.length > 0}
-          groups={transferGroups}
-          onRetry={handleTransfersRefresh}
-          filterValue={transferStatusFilter}
-          onFilterChange={setTransferStatusFilter}
-          filterOptions={TRANSFER_STATUS_FILTER_OPTIONS}
-          warningMessage={queueWarningMessage}
-        />
-      </SectionCard>
-
-      <SectionCard
-        title="الحركة الأخيرة لهذا العميل"
-        description="سجل سريع لأحدث الدفعات والحوالات المرتبطة بالعميل لتسهيل المتابعة اليومية."
-        className="customer-details-recent-section"
-      >
-        <CustomerRecentActivity
-          loading={transfersLoading || paymentTotalsLoading}
-          errorMessage={transfersError}
-          warningMessage={recentActivityWarningMessage}
-          hasItems={recentActivityItems.length > 0}
-          items={recentActivityItems}
-          onRetry={handleTransfersRefresh}
-        />
-      </SectionCard>
-
-      {customer ? (
         <SectionCard
-          title="تفاصيل ملف العميل"
-          description="ملاحظات الملف وبياناته الداخلية عند الحاجة إلى مراجعة أعمق."
-          className="customer-details-secondary-section"
+          title="طابور حوالات العميل"
+          description="ترتيب الحوالات حسب أولوية المتابعة: مراجعة مالية ثم تحصيل جزئي ثم الحوالات المفتوحة."
+          className={[
+            'customer-details-section-panel',
+            'customer-details-queue-section',
+            activeSection === 'transfers' ? 'is-active' : '',
+          ]
+            .filter(Boolean)
+            .join(' ')}
+        >
+          <CustomerTransfersList
+            errorMessage={transfersError}
+            loading={transfersLoading}
+            customerNotFound={customerNotFound}
+            hasTransfers={transfers.length > 0}
+            hasFilteredTransfers={filteredTransfers.length > 0}
+            groups={transferGroups}
+            onRetry={handleTransfersRefresh}
+            filterValue={transferStatusFilter}
+            onFilterChange={setTransferStatusFilter}
+            filterOptions={TRANSFER_STATUS_FILTER_OPTIONS}
+            warningMessage={queueWarningMessage}
+          />
+        </SectionCard>
+
+        <SectionCard
+          title="الحركة الأخيرة لهذا العميل"
+          description="سجل سريع لأحدث الدفعات والحوالات المرتبطة بالعميل لتسهيل المتابعة اليومية."
+          className={[
+            'customer-details-section-panel',
+            'customer-details-recent-section',
+            activeSection === 'activity' ? 'is-active' : '',
+          ]
+            .filter(Boolean)
+            .join(' ')}
+        >
+          <CustomerRecentActivity
+            loading={transfersLoading || paymentTotalsLoading}
+            errorMessage={transfersError}
+            warningMessage={recentActivityWarningMessage}
+            hasItems={recentActivityItems.length > 0}
+            items={recentActivityItems}
+            onRetry={handleTransfersRefresh}
+          />
+        </SectionCard>
+
+        <SectionCard
+          title="الإجراءات على ملف العميل"
+          description="اختصارات تشغيلية آمنة تسهل بدء الحركات ذات الصلة بهذا العميل."
+          className={[
+            'customer-details-section-panel',
+            'customer-details-actions-section',
+            activeSection === 'actions' ? 'is-active' : '',
+          ]
+            .filter(Boolean)
+            .join(' ')}
         >
           <InfoGrid className="customer-details-secondary-grid">
-            <InfoCard title="المعرّف الداخلي" value={customer.id || '--'} />
-            {customerSummaryItems
-              .filter((item) => item.title !== 'رقم الهاتف')
-              .map((item) => (
-                <InfoCard
-                  key={item.title}
-                  title={item.title}
-                  value={item.value}
-                  className={item.className}
-                  valueClassName={item.valueClassName}
-                >
-                  {item.children}
-                </InfoCard>
-              ))}
+            {customerId ? (
+              <InfoCard
+                title="إنشاء حوالة جديدة لهذا العميل"
+                value="استخدم هذا الاختصار للانتقال مباشرة إلى نموذج إنشاء حوالة جديدة مع اختيار هذا العميل مسبقا."
+                className="info-card--accent"
+              >
+                <p className="support-text">
+                  لن يتم إنشاء أي حركة فعلية إلا بعد حفظ الحوالة من الشاشة التالية.
+                </p>
+                <Link className="button primary" to={`/transfers/new?customerId=${customerId}`}>
+                  حوالة جديدة للعميل
+                </Link>
+              </InfoCard>
+            ) : null}
+
+            <InfoCard
+              title="عرض كل حوالات العميل"
+              value="يمكنك مراجعة الحوالات المرتبطة بهذا العميل من طابور الحوالات التشغيلي."
+            >
+              <p className="support-text">
+                يتم الحفاظ على نفس منطق الصف التشغيلي، ولا يتم تغيير طريقة المتابعة المالية الحالية.
+              </p>
+              <Link className="button secondary" to="/transfers">
+                فتح صف الحوالات
+              </Link>
+            </InfoCard>
           </InfoGrid>
         </SectionCard>
-      ) : null}
+
+        {customer ? (
+          <SectionCard
+            title="تفاصيل ملف العميل"
+            description="ملاحظات الملف وبياناته الداخلية عند الحاجة إلى مراجعة أعمق."
+            className={[
+              'customer-details-section-panel',
+              'customer-details-secondary-section',
+              activeSection === 'overview' ? 'is-active' : '',
+            ]
+              .filter(Boolean)
+              .join(' ')}
+          >
+            <InfoGrid className="customer-details-secondary-grid">
+              <InfoCard title="المعرّف الداخلي" value={customer.id || '--'} />
+              {customerSummaryItems
+                .filter((item) => item.title !== 'رقم الهاتف')
+                .map((item) => (
+                  <InfoCard
+                    key={item.title}
+                    title={item.title}
+                    value={item.value}
+                    className={item.className}
+                    valueClassName={item.valueClassName}
+                  >
+                    {item.children}
+                  </InfoCard>
+                ))}
+            </InfoGrid>
+          </SectionCard>
+        ) : null}
+      </div>
     </div>
   )
 }
