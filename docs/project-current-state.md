@@ -32,14 +32,16 @@ Implemented:
   (Phase 9)
 - Expanded offline read coverage for remaining major read-only operator
   surfaces, including the dashboard (Phase 10)
+- Controlled offline customer creation support (Phase 11)
 
 ## Active Phase
 
 Offline / PWA work is currently at:
-- Phase 10 complete: shell + status UI + snapshot reads + payment queue +
-  transfer queue + dependency-aware replay refinement + QA/deployment hardening
-  + Safari/iPhone offline fallback bugfixes + expanded offline-read coverage
-  for remaining major read-only operator surfaces
+- Phase 11 complete: shell + status UI + snapshot reads + customer queue +
+  transfer queue + payment queue + dependency-aware replay refinement +
+  QA/deployment hardening + Safari/iPhone offline fallback bugfixes +
+  expanded offline-read coverage for remaining major read-only operator
+  surfaces
 
 What that means:
 - Manifest is linked
@@ -59,7 +61,14 @@ What that means:
 - `NewTransferPage` now also saves a locally reusable customer-options snapshot
   for known-customer offline transfer capture
 - Offline payment capture is available on `TransferDetailsPage` only
+- Offline customer creation is available on `CustomersPage` only
 - Offline transfer creation is available on `NewTransferPage` only
+- Customer queue behavior includes:
+  - local browser persistence in IndexedDB
+  - explicit pending / syncing / failed states
+  - reconnect-triggered replay for pending items
+  - manual retry from the customers page
+  - conservative duplicate-safe replay using exact `full_name + phone` matches
 - Payment queue behavior includes:
   - local browser persistence in IndexedDB
   - explicit pending / blocked / syncing / failed states
@@ -80,12 +89,17 @@ What that means:
   - confirmed server totals
   - confirmed payment history calculations
   - print output
+- Pending local customers remain separate from:
+  - confirmed server customer files
+  - confirmed customer counts and portfolio metrics
+  - any server-backed customer detail screen until sync succeeds
 - Pending local transfers remain separate from:
   - confirmed server transfers
   - confirmed server queues/details
   - print output
-- Reconnect replay now processes pending transfers before pending payments and
-  keeps dependency-blocked payments visible instead of failing them prematurely
+- Reconnect replay now processes pending customers before pending transfers,
+  then pending payments, and keeps dependency-blocked payments visible instead
+  of failing them prematurely
 - Manifest and service-worker paths are now hardened to be relative/base-aware
   instead of root-only
 - PNG placeholder install icons now exist for iPhone Home Screen and general
@@ -110,7 +124,7 @@ What that means:
   physical device
 
 What is not implemented yet:
-- Offline customer creation
+- Offline customer edit/delete
 - Offline transfer edit/delete
 - Offline payment edit/delete
 - Broader conflict resolution
@@ -133,7 +147,7 @@ Current cached offline-read coverage:
 - New migrations
 - Repository-wide offline-first refactor
 - API/data caching strategies beyond shell/static assets
-- Offline customer creation
+- Offline customer edit/delete
 - Offline transfer edit/delete
 - Offline payment edit/delete
 - Print flow changes
@@ -157,6 +171,7 @@ Current cached offline-read coverage:
 - Offline shell loading is allowed after at least one successful online visit
 - Network and sync state are surfaced at the app-shell level, not per page
 - Sync state now reflects a browser queue that may contain:
+  - customer create mutations
   - payment create mutations
   - transfer create mutations
 - Payment queue items can be marked `blocked` when they depend on a local
@@ -168,10 +183,13 @@ Current cached offline-read coverage:
   indefinite loading during Safari/iPhone offline conditions
 - Offline payment capture is currently limited to queued payment creation on
   `TransferDetailsPage`
+- Offline customer capture is currently limited to queued customer creation on
+  `CustomersPage`
 - Offline transfer capture is currently limited to queued transfer creation on
   `NewTransferPage`
-- Offline transfer creation requires a customer already known locally from a
-  saved customer snapshot; there is no offline customer creation path
+- Offline transfer creation still requires a customer already known locally
+  from a saved server-backed customer snapshot; newly created local customers
+  are not yet valid for offline transfer creation until they sync successfully
 - Successful replay removes local queue items after server confirmation or
   conservative duplicate detection
 - Successful transfer replay also patches dependent queued payments with the
@@ -205,6 +223,10 @@ Current cached offline-read coverage:
 - Duplicate protection for queued payments is conservative only and relies on
   matching existing server payment fields, especially `transfer_id`,
   `amount_rub`, `payment_method`, `note`, and `paid_at`.
+- Duplicate protection for queued customers is conservative only and is
+  strongest when an exact `full_name + phone` match already exists on the
+  server; no broad fuzzy matching is attempted, especially when phone is
+  missing.
 - Duplicate protection for queued transfers is conservative only and relies on
   matching existing transfer fields, especially `customer_id`, the financial
   amounts/rates, `status`, `notes`, and locally saved `created_at`.
@@ -220,6 +242,9 @@ Current cached offline-read coverage:
 - Offline transfer capture still depends on locally saved customer options; if
   the required customer has never been cached locally, offline creation is
   blocked safely.
+- Offline-created local customers remain operationally separate until sync
+  succeeds; they do not yet unlock a new offline transfer creation dependency
+  path.
 - Local pending transfer references are temporary browser-side labels only and
   are not the final server `reference_number`.
 - Real iPhone QA has not been executed from this environment; only code-level

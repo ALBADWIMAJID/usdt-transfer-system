@@ -1,7 +1,15 @@
 import useSyncStatus from '../../hooks/useSyncStatus.js'
 
-function buildBreakdownLabel({ paymentQueueCount = 0, transferQueueCount = 0 }) {
+function buildBreakdownLabel({
+  customerQueueCount = 0,
+  paymentQueueCount = 0,
+  transferQueueCount = 0,
+}) {
   const parts = []
+
+  if (customerQueueCount > 0) {
+    parts.push(`${customerQueueCount} عميل`)
+  }
 
   if (transferQueueCount > 0) {
     parts.push(`${transferQueueCount} حوالة`)
@@ -16,6 +24,9 @@ function buildBreakdownLabel({ paymentQueueCount = 0, transferQueueCount = 0 }) 
 
 function getSyncBannerMeta({
   blockedCount,
+  customerBlockedCount,
+  customerFailedCount,
+  customerQueueCount,
   failedCount,
   message,
   paymentBlockedCount,
@@ -28,14 +39,17 @@ function getSyncBannerMeta({
   transferQueueCount,
 }) {
   const pendingBreakdown = buildBreakdownLabel({
+    customerQueueCount,
     paymentQueueCount,
     transferQueueCount,
   })
   const blockedBreakdown = buildBreakdownLabel({
+    customerQueueCount: customerBlockedCount,
     paymentQueueCount: paymentBlockedCount,
     transferQueueCount: transferBlockedCount,
   })
   const failedBreakdown = buildBreakdownLabel({
+    customerQueueCount: customerFailedCount,
     paymentQueueCount: paymentFailedCount,
     transferQueueCount: transferFailedCount,
   })

@@ -9,12 +9,17 @@ import CustomersRecentActivitySection from '../components/customers/CustomersRec
 import InlineMessage from '../components/ui/InlineMessage.jsx'
 import OfflineSnapshotNotice from '../components/ui/OfflineSnapshotNotice.jsx'
 import OperationsDrillDownSheet from '../components/ui/OperationsDrillDownSheet.jsx'
+import PendingMutationNotice from '../components/ui/PendingMutationNotice.jsx'
 import RecordCard from '../components/ui/RecordCard.jsx'
 import RecordHeader from '../components/ui/RecordHeader.jsx'
+import SectionCard from '../components/ui/SectionCard.jsx'
 import { useAuth } from '../context/auth-context.js'
 import useNetworkStatus from '../hooks/useNetworkStatus.js'
 import useOfflineSnapshot from '../hooks/useOfflineSnapshot.js'
+import usePendingCustomers from '../hooks/usePendingCustomers.js'
+import useReplayQueue from '../hooks/useReplayQueue.js'
 import { CUSTOMERS_LIST_SNAPSHOT_KEY } from '../lib/offline/cacheKeys.js'
+import { queueOfflineCustomer } from '../lib/offline/customerQueue.js'
 import { getOfflineSnapshotMissingMessage } from '../lib/offline/freshness.js'
 import {
   isBrowserOffline,
@@ -354,6 +359,42 @@ function renderCustomerActivityDrillDownCompactItem(item) {
   )
 }
 
+function getPendingCustomerStatusMeta(status) {
+  if (status === 'failed') {
+    return {
+      chipClassName: 'offline-snapshot-chip--warning',
+      label: 'فشل الإرسال',
+      note: 'يحتاج هذا العميل المحلي إلى إعادة محاولة عند توفر الاتصال.',
+    }
+  }
+
+  if (status === 'syncing') {
+    return {
+      chipClassName: 'offline-snapshot-chip--info',
+      label: 'جار الإرسال',
+      note: 'يجري الآن إرسال ملف العميل المحلي إلى الخادم.',
+    }
+  }
+
+  return {
+    chipClassName: 'offline-snapshot-chip--warning',
+    label: 'بانتظار الإرسال',
+    note: 'سيبقى هذا العميل محليا فقط حتى تنجح المزامنة ويصبح ملفه مؤكدا على الخادم.',
+  }
+}
+
+function buildPendingCustomerNote(record) {
+  if (record.status === 'failed' && record.lastError) {
+    return `آخر خطأ: ${record.lastError}`
+  }
+
+  if (record.payload?.notes) {
+    return record.payload.notes
+  }
+
+  return getPendingCustomerStatusMeta(record.status).note
+}
+
 function CustomersPage() {
   const { configError, isConfigured } = useAuth()
   const { isOffline } = useNetworkStatus()
@@ -374,6 +415,18 @@ function CustomersPage() {
   const [submitting, setSubmitting] = useState(false)
   const [submitError, setSubmitError] = useState('')
   const [submitSuccess, setSubmitSuccess] = useState('')
+  const {
+    activeCount: pendingCustomerCount,
+    failedCount: failedPendingCustomerCount,
+    pendingCustomers,
+    pendingCustomersLoading,
+    refreshPendingCustomers,
+  } = usePendingCustomers()
+  const {
+    customerQueueCount,
+    isSyncing,
+    replayCustomersNow,
+  } = useReplayQueue()
 
   useEffect(() => {
     if (!isConfigured || !supabase) {
@@ -878,6 +931,39 @@ function CustomersPage() {
     setRefreshKey((current) => current + 1)
   }
 
+  const handleSyncPendingCustomers = async () => {
+    setSubmitError('')
+    setSubmitSuccess('')
+
+    const result = await replayCustomersNow()
+
+    if (!result.started) {
+      setSubmitSuccess('لا توجد ملفات عملاء محلية جاهزة للمزامنة حاليا.')
+      return
+    }
+
+    if (result.failedCount > 0) {
+      setSubmitError(
+        `تعذر إرسال ${result.failedCount} ملف عميل محلي. راجع العناصر المحلية ثم أعد المحاولة.`
+      )
+      return
+    }
+
+    const messages = []
+
+    if (result.replayedCount > 0) {
+      messages.push(`تم إرسال ${result.replayedCount} ملف عميل محلي إلى الخادم`)
+    }
+
+    if (result.dedupedCount > 0) {
+      messages.push(`تمت تسوية ${result.dedupedCount} ملف عميل موجود مسبقا على الخادم`)
+    }
+
+    setSubmitSuccess(messages.join('، ') || 'اكتملت مزامنة ملفات العملاء المحلية.')
+    await refreshPendingCustomers()
+    handleRefresh()
+  }
+
   const openDrillDown = (key) => {
     setActiveDrillDownKey(key)
   }
@@ -966,12 +1052,21 @@ function CustomersPage() {
 
   const activePortfolioFilterLabel = PORTFOLIO_FILTER_LABELS[portfolioFilter] || ''
   const followUpCustomersInView = filteredCustomers.filter((customer) => customer.needsFollowUp).length
+  const pendingCustomerLabel =
+    pendingCustomerCount > 0 ? ` • ${pendingCustomerCount} محلي بانتظار الإرسال` : ''
+  const customerQueueSyncing = isSyncing && customerQueueCount > 0
   const customerCountLabel = loading
     ? 'جار تحميل محفظة العملاء...'
-    : `عرض ${filteredCustomers.length} من أصل ${customers.length} عميل • ${followUpCustomersInView} بحاجة متابعة`
+    : `عرض ${filteredCustomers.length} من أصل ${customers.length} عميل • ${followUpCustomersInView} بحاجة متابعة${pendingCustomerLabel}`
   const listScopeLabel = activePortfolioFilterLabel
     ? `يتم الآن التركيز على: ${activePortfolioFilterLabel}. ما زال بإمكانك استخدام البحث أو إلغاء التركيز للعودة إلى كل المحفظة.`
     : 'العملاء مرتبون هنا حسب أولوية المتابعة: فوق المطلوب، ثم التحصيل الجزئي، ثم الملفات المفتوحة.'
+  const customerFormDescription = isOffline
+    ? 'يمكنك حفظ ملف عميل محليا أثناء انقطاع الاتصال. سيبقى منفصلا عن ملفات العملاء المؤكدة حتى تنجح المزامنة.'
+    : 'أضف عميلا جديدا حتى يتمكن فريق التشغيل من إنشاء الحوالات ومتابعة التسويات له.'
+  const customerFormInfoMessage = isOffline
+    ? 'سيحفظ هذا العميل داخل المتصفح فقط ولن يصبح متاحا كسجل مؤكد أو كعميل صالح لإنشاء حوالة محلية جديدة حتى تنجح المزامنة.'
+    : ''
 
   const summaryCards = [
     {
@@ -1195,6 +1290,32 @@ function CustomersPage() {
 
     setSubmitting(true)
 
+    if (isOffline) {
+      try {
+        const queuedRecord = await queueOfflineCustomer({
+          payload,
+        })
+
+        if (!queuedRecord) {
+          throw new Error('تعذر حفظ ملف العميل المحلي داخل المتصفح.')
+        }
+
+        setFormValues(emptyForm)
+        setSubmitSuccess(
+          queuedRecord?.localMeta?.localReference
+            ? `تم حفظ ملف العميل محليا بمرجع مؤقت ${queuedRecord.localMeta.localReference}. سيبقى منفصلا عن ملفات العملاء المؤكدة حتى تنجح المزامنة.`
+            : 'تم حفظ ملف العميل محليا بانتظار المزامنة مع الخادم.'
+        )
+        await refreshPendingCustomers()
+      } catch (error) {
+        setSubmitError(error?.message || 'تعذر حفظ ملف العميل المحلي.')
+      } finally {
+        setSubmitting(false)
+      }
+
+      return
+    }
+
     const { error } = await supabase.schema('public').from('customers').insert([payload])
 
     if (error) {
@@ -1238,14 +1359,96 @@ function CustomersPage() {
         />
 
         <CustomersFormSection
+          description={customerFormDescription}
           submitError={submitError}
+          submitLabel={isOffline ? 'حفظ العميل محليا' : 'إنشاء العميل'}
           submitSuccess={submitSuccess}
+          submittingLabel={isOffline ? 'جار الحفظ المحلي...' : 'جار الحفظ...'}
           formValues={formValues}
+          infoMessage={customerFormInfoMessage}
           onChange={handleChange}
           onSubmit={handleSubmit}
           submitting={submitting}
           isConfigured={isConfigured}
         />
+
+        {pendingCustomersLoading || pendingCustomerCount > 0 ? (
+          <SectionCard
+            title="عملاء محليون بانتظار الإرسال"
+            description="هذه الملفات محفوظة داخل المتصفح فقط. لن تصبح ملفات عملاء مؤكدة أو صالحة للاعتماد الكامل أو لإنشاء حوالة محلية جديدة حتى تنجح المزامنة مع الخادم."
+            className="pending-transfer-section"
+          >
+            <PendingMutationNotice
+              activeCount={pendingCustomerCount}
+              failedCount={failedPendingCustomerCount}
+              isOffline={isOffline}
+              syncing={customerQueueSyncing}
+              onSyncNow={handleSyncPendingCustomers}
+              variant="customer"
+            />
+
+            {pendingCustomersLoading && pendingCustomerCount === 0 ? (
+              <p className="support-text">جار فحص ملفات العملاء المحلية المحفوظة...</p>
+            ) : (
+              <div className="pending-transfer-list">
+                {pendingCustomers.map((record) => {
+                  const statusMeta = getPendingCustomerStatusMeta(record.status)
+                  const phoneLabel = record.payload?.phone || 'بدون هاتف'
+
+                  return (
+                    <RecordCard
+                      key={record.id}
+                      className={[
+                        'pending-transfer-card',
+                        record.status === 'failed' ? 'pending-transfer-card--failed' : '',
+                      ]
+                        .filter(Boolean)
+                        .join(' ')}
+                    >
+                      <RecordHeader
+                        eyebrow="عميل محلي"
+                        title={record.payload?.full_name || 'عميل محفوظ محليا'}
+                        subtitle={phoneLabel}
+                        metaItems={[
+                          {
+                            label: 'وقت الحفظ',
+                            value: formatDate(record.createdAt),
+                          },
+                        ]}
+                        aside={
+                          <span
+                            className={[
+                              'offline-snapshot-chip',
+                              statusMeta.chipClassName,
+                              'pending-transfer-status-chip',
+                            ]
+                              .filter(Boolean)
+                              .join(' ')}
+                          >
+                            {statusMeta.label}
+                          </span>
+                        }
+                      />
+
+                      <dl className="pending-transfer-grid">
+                        <div>
+                          <dt>المرجع المحلي</dt>
+                          <dd>{record.localMeta?.localReference || 'مرجع محلي مؤقت'}</dd>
+                        </div>
+                        <div>
+                          <dt>الهاتف</dt>
+                          <dd>{phoneLabel}</dd>
+                        </div>
+                      </dl>
+
+                      <p className="record-note pending-transfer-note">{buildPendingCustomerNote(record)}</p>
+                    </RecordCard>
+                  )
+                })}
+              </div>
+            )}
+          </SectionCard>
+        ) : null}
 
         <CustomersList
           searchQuery={searchQuery}

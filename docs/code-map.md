@@ -30,12 +30,14 @@
   - Exposes a UI-safe sync model: `idle`, `offline`, `pending`, `blocked`,
     `syncing`, `error`
   - Aggregates both local queues:
+    - customer create queue
     - transfer create queue
     - payment create queue
-  - Replays transfers before payments in the combined sync path
+  - Replays customers before transfers before payments in the combined sync path
   - Surfaces dependency-blocked payment state without treating it as confirmed
     failure
-  - Exposes manual replay for transfer-only, payment-only, or combined sync
+  - Exposes manual replay for customer-only, transfer-only, payment-only, or
+    combined sync
 - `src/hooks/useNetworkStatus.js`
   - Shared access hook for connection state
 - `src/hooks/useSyncStatus.js`
@@ -72,6 +74,7 @@ Protected shell:
   - Customer creation
   - Portfolio follow-up overview
   - Customer drill-down sheet entry points
+  - Offline customer capture and pending/failed local customer visibility
 - `src/pages/CustomerDetailsPage.jsx`
   - One-customer follow-up workspace
   - Customer transfer queue and recent activity
@@ -123,6 +126,8 @@ Approved snapshot-backed pages now use deterministic fallback hardening:
 - Customer creation:
   - `src/pages/CustomersPage.jsx`
   - `src/components/customers/CustomersFormSection.jsx`
+  - Online insert to Supabase when connected
+  - Offline queue record creation when disconnected
 - Transfer creation:
   - `src/pages/NewTransferPage.jsx`
   - `src/components/new-transfer/TransferFormSection.jsx`
@@ -183,8 +188,12 @@ Approved snapshot-backed pages now use deterministic fallback hardening:
   - Local mutation IDs, local transfer references, and dedupe helpers
 - `src/lib/offline/mutationQueue.js`
   - Generic browser-side mutation queue persistence helpers
+- `src/lib/offline/customerQueue.js`
+  - Customer queue records, queue summaries, and queue state transitions
 - `src/lib/offline/dependencyResolution.js`
   - Conservative payment-on-transfer dependency checks for replay
+- `src/lib/offline/replayCustomers.js`
+  - Conservative customer replay and duplicate-safe server checks
 - `src/lib/offline/paymentQueue.js`
   - Payment queue records, queue summaries, queue state transitions, and
     transfer-to-payment relinking helpers
@@ -200,6 +209,8 @@ Approved snapshot-backed pages now use deterministic fallback hardening:
   - Per-page cached/live snapshot state helper
 - `src/hooks/usePendingPayments.js`
   - Transfer-scoped pending local payment list and summary hook
+- `src/hooks/usePendingCustomers.js`
+  - Customers-page pending local customer list and summary hook
 - `src/hooks/usePendingTransfers.js`
   - Pending local transfer list and summary hook
 - `src/components/ui/ConnectionBadge.jsx`

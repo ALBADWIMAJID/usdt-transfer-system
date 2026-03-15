@@ -5,6 +5,10 @@ function useReplayQueue() {
 
   return {
     blockedCount: syncStatus.blockedCount || 0,
+    customerBlockedCount: syncStatus.customerBlockedCount || 0,
+    customerFailedCount: syncStatus.customerFailedCount || 0,
+    customerPendingCount: syncStatus.customerPendingCount || 0,
+    customerQueueCount: syncStatus.customerQueueCount || 0,
     failedCount: syncStatus.failedCount || 0,
     hasPendingWork: Boolean(syncStatus.hasPendingWork),
     isOffline: Boolean(syncStatus.isOffline),
@@ -16,6 +20,7 @@ function useReplayQueue() {
     pendingCount: syncStatus.pendingCount || 0,
     refreshSyncState: syncStatus.refreshSyncState,
     replayAllNow: syncStatus.syncAllNow,
+    replayCustomersNow: syncStatus.syncCustomersNow,
     replayPaymentsNow: syncStatus.syncPaymentsNow,
     replayTransfersNow: syncStatus.syncTransfersNow,
     status: syncStatus.status,

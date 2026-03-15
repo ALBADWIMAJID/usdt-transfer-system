@@ -692,3 +692,78 @@ Risks / notes:
 Suggested next step:
 - Re-run the updated iPhone and manual offline-read scenarios for the dashboard
   and its drill-down sheets on the staging deployment
+
+## 2026-03-15T02:53:07.8441555+03:00 - Phase 11 controlled offline customer creation
+
+Requested scope:
+- Implement only the next approved step
+- Add controlled offline customer creation support
+- Keep scope limited to `CustomersPage` and the minimal shared queue/replay
+  surfaces required to support `customer_create`
+- Preserve business logic, schema, routes, print flow, and existing offline
+  read/payment/transfer behavior
+
+Files changed:
+- `src/lib/offline/mutationIds.js`
+- `src/lib/offline/customerQueue.js`
+- `src/lib/offline/replayCustomers.js`
+- `src/hooks/usePendingCustomers.js`
+- `src/context/SyncProvider.jsx`
+- `src/hooks/useReplayQueue.js`
+- `src/components/ui/SyncStatusBanner.jsx`
+- `src/components/ui/PendingMutationNotice.jsx`
+- `src/components/customers/CustomersFormSection.jsx`
+- `src/pages/CustomersPage.jsx`
+- `docs/offline-pwa-execution-plan.md`
+- `docs/project-current-state.md`
+- `docs/implementation-log.md`
+- `docs/code-map.md`
+- `docs/last-change-summary.md`
+- `docs/iphone-qa-checklist.md`
+- `docs/manual-test-matrix.md`
+- `docs/deployment-readiness-checklist.md`
+
+What was added:
+- A persistent IndexedDB customer mutation queue
+- Customer-only replay logic with conservative duplicate-safe checks
+- Shared sync-provider awareness of queued customer items
+- Pending local customer hook for `CustomersPage`
+- Manual sync / retry action for queued customers
+- Distinct UI for:
+  - locally saved pending customers
+  - syncing local customers
+  - failed customer replay items
+- Offline customer creation form messaging that clearly states local-only and
+  unsynced customer limits
+
+What was not changed:
+- Business logic
+- Database schema
+- Supabase tables/contracts
+- Routes/navigation
+- Print flow
+- Offline customer edit/delete
+- Offline transfer edit/delete
+- Offline payment edit/delete
+- Broader conflict resolution
+
+Verification:
+- `npm run lint` - passed
+- `npm run build` - passed
+- Preview HTTP smoke - passed (`PREVIEW_ROOT_STATUS=200`,
+  `PREVIEW_CUSTOMERS_STATUS=200`)
+- Build warning only: client chunk exceeded 500 kB after minification
+
+Risks / notes:
+- Physical iPhone retesting was not possible from this environment and remains
+  required
+- Customer duplicate protection is conservative only and is strongest when an
+  exact `full_name + phone` match exists on the server
+- Offline-created local customers remain separate from confirmed server
+  customer files until replay succeeds and the page refreshes live data
+- Offline-created local customers are not yet available as valid inputs for new
+  offline transfer creation before sync
+
+Suggested next step:
+- Re-run the updated staging/iPhone queue and replay scenarios for
+  `CustomersPage`, especially offline save + reconnect replay + manual retry

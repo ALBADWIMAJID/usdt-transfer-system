@@ -42,7 +42,9 @@ Status fields:
 | Scenario | Preconditions | Test Steps | Expected Result | Status | Notes |
 | --- | --- | --- | --- | --- | --- |
 | Offline payment capture | Visit a transfer details screen online first, then go offline | Save a payment locally | Local payment appears as pending local item and is not treated as confirmed/print-safe | Not Run |  |
+| Offline customer creation | Open `CustomersPage`, then go offline | Save a new customer locally from the customer form | Local customer appears clearly as a pending local file and is not treated as confirmed server data | Not Run |  |
 | Offline transfer creation | Customer options were cached online first, then go offline | Create a transfer from New Transfer | Local transfer is saved with clear pending/local-only labeling | Not Run |  |
+| Customer replay after reconnect | At least one pending local customer exists | Reconnect and trigger sync or wait for reconnect replay | Customer syncs or shows clear failed state; local-only customer does not remain ambiguous | Not Run |  |
 | Payment replay after reconnect | At least one pending local payment exists | Reconnect and trigger sync or wait for reconnect replay | Payment syncs or shows clear failed/blocked state | Not Run |  |
 | Transfer replay before payment replay | At least one pending local transfer and dependent payment scenario exists | Reconnect and trigger combined sync | Transfer is processed before dependent payment; payment does not replay prematurely | Not Run |  |
 | Failed replay remains visible | Force a replay failure safely if possible | Retry sync after failure | Item remains visible with retry/error state and is not silently dropped | Not Run |  |

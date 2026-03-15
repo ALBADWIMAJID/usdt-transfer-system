@@ -28,6 +28,12 @@ function createPaymentMutationDedupeKey(payload) {
   ].join('::')
 }
 
+function createCustomerMutationDedupeKey(payload) {
+  return [payload.full_name || '', payload.phone || '', payload.notes || '']
+    .map(normalizeMutationValue)
+    .join('::')
+}
+
 function createTransferMutationDedupeKey(payload) {
   return [
     payload.customer_id,
@@ -54,7 +60,16 @@ function createLocalPendingTransferReference() {
   return `LOCAL-${dateStamp}-${randomSuffix}`
 }
 
+function createLocalPendingCustomerReference() {
+  const dateStamp = new Date().toISOString().replace(/\D/g, '').slice(2, 14)
+  const randomSuffix = Math.random().toString(36).slice(2, 6).toUpperCase()
+
+  return `LOCAL-CUST-${dateStamp}-${randomSuffix}`
+}
+
 export {
+  createCustomerMutationDedupeKey,
+  createLocalPendingCustomerReference,
   createLocalPendingTransferReference,
   createOfflineMutationId,
   createPaymentMutationDedupeKey,

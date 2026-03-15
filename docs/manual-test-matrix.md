@@ -20,8 +20,10 @@ Status fields:
 | Offline read | Dashboard drill-down sheet from cached snapshot | `DashboardPage` visited online first and dashboard snapshot saved locally | Offline dashboard drill-down opens from cached snapshot data or shows an explicit offline/no-snapshot state | Not Run |  |
 | Offline read | No snapshot available | Go offline before first visit to a supported snapshot-backed screen | Safe missing-data message is shown and loading exits deterministically | Not Run |  |
 | Offline read | New Transfer cached customer options | Customer options cached online first, then network offline | Customer selector uses local snapshot or shows explicit no-snapshot/offline requirement state | Not Run |  |
+| Offline mutation | Offline customer creation | Customers page open, network offline | Local customer is queued and clearly marked local-only | Not Run |  |
 | Offline mutation | Offline payment capture | Transfer details available, network offline | Local payment is queued and clearly marked local-only | Not Run |  |
 | Offline mutation | Offline transfer capture | Customer options cached, network offline | Local transfer is queued with local-only reference | Not Run |  |
+| Replay | Customer replay | Pending local customer exists, network restored | Customer syncs or remains visible with explicit failure state | Not Run |  |
 | Replay | Transfer replay | Pending transfer exists, network restored | Transfer syncs or remains visible with explicit failure state | Not Run |  |
 | Replay | Payment replay | Pending payment exists, network restored | Payment syncs or remains visible with explicit failure/blocked state | Not Run |  |
 | Replay | Dependency-aware ordering | Mixed pending transfer/payment scenario | Transfer replays before dependent payment; payment is not sent prematurely | Not Run |  |

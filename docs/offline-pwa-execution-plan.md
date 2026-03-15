@@ -331,6 +331,42 @@ Current behavior:
 - Real iPhone retesting is still required; this phase expands offline-read
   coverage but does not claim physical device validation
 
+## Phase 11 - Controlled Offline Customer Creation
+
+Status: Implemented
+
+Implemented scope:
+- Added a persistent browser-side customer mutation queue in IndexedDB
+- Limited new offline mutation support to `customer_create` records only
+- Added offline customer capture on `CustomersPage` only
+- Added controlled replay for queued customers:
+  - automatically on reconnect for pending items
+  - manually from `CustomersPage` for pending and failed items
+- Added distinct UI states for:
+  - locally saved pending customers
+  - customers currently syncing
+  - customers that failed replay and need operator review
+- Kept local-only pending customers separate from confirmed server customer
+  records until replay succeeds
+
+Current behavior:
+- Offline customer creation is available only on `CustomersPage`
+- Queued customers persist in IndexedDB until replay succeeds or the operator
+  retries failed items
+- Successful replay resolves the queued item and the customer page can refresh
+  live data from the server
+- Reconnect-triggered combined replay now processes:
+  - pending local customers first
+  - then pending local transfers
+  - then pending local payments
+- Duplicate-safe customer replay is conservative:
+  - strongest when an exact `full_name + phone` match already exists
+  - no broad fuzzy matching or full conflict resolution is attempted
+- Offline-created local customers are not yet usable for new offline transfer
+  creation until they are confirmed by the server after sync
+- Real iPhone retesting is still required; this phase adds customer queue
+  support but does not claim physical device validation
+
 ## Guardrails
 
 - Do not change database schema as part of offline work unless explicitly

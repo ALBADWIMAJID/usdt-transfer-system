@@ -1,5 +1,10 @@
 import { createContext, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
+  getCustomerQueueSummary,
+  normalizeQueuedCustomersState,
+} from '../lib/offline/customerQueue.js'
+import { replayCustomerQueue } from '../lib/offline/replayCustomers.js'
+import {
   getPaymentQueueSummary,
   normalizeQueuedPaymentsState,
   subscribeToMutationQueue,
@@ -28,20 +33,25 @@ function createEmptyQueueSummary() {
   }
 }
 
-function createCombinedQueueSummary({ payments, transfers }) {
+function createCombinedQueueSummary({ customers, payments, transfers }) {
   return {
-    activeCount: payments.activeCount + transfers.activeCount,
-    blockedCount: payments.blockedCount + transfers.blockedCount,
-    failedCount: payments.failedCount + transfers.failedCount,
+    activeCount: customers.activeCount + payments.activeCount + transfers.activeCount,
+    blockedCount: customers.blockedCount + payments.blockedCount + transfers.blockedCount,
+    customers,
+    failedCount: customers.failedCount + payments.failedCount + transfers.failedCount,
     payments,
-    pendingCount: payments.pendingCount + transfers.pendingCount,
-    syncingCount: payments.syncingCount + transfers.syncingCount,
+    pendingCount: customers.pendingCount + payments.pendingCount + transfers.pendingCount,
+    syncingCount: customers.syncingCount + payments.syncingCount + transfers.syncingCount,
     transfers,
   }
 }
 
-function buildQueueBreakdown({ payments, transfers }, fieldName = 'activeCount') {
+function buildQueueBreakdown({ customers, payments, transfers }, fieldName = 'activeCount') {
   const parts = []
+
+  if (customers[fieldName] > 0) {
+    parts.push(`${customers[fieldName]} عميل محلي`)
+  }
 
   if (transfers[fieldName] > 0) {
     parts.push(`${transfers[fieldName]} حوالة محلية`)
@@ -93,8 +103,12 @@ function buildErrorMessage(queueSummary) {
   return `تعذر إرسال ${breakdown}. راجع العناصر المحلية ثم أعد المحاولة عند توفر الاتصال.`
 }
 
-function buildSyncingMessage({ paymentCount = 0, transferCount = 0 }) {
+function buildSyncingMessage({ customerCount = 0, paymentCount = 0, transferCount = 0 }) {
   const parts = []
+
+  if (customerCount > 0) {
+    parts.push(`${customerCount} عميل`)
+  }
 
   if (transferCount > 0) {
     parts.push(`${transferCount} حوالة`)
@@ -127,6 +141,7 @@ function SyncProvider({ children }) {
   const [manualState, setManualState] = useState(initialManualState)
   const [queueSummary, setQueueSummary] = useState(() =>
     createCombinedQueueSummary({
+      customers: createEmptyQueueSummary(),
       payments: createEmptyQueueSummary(),
       transfers: createEmptyQueueSummary(),
     })
@@ -134,14 +149,20 @@ function SyncProvider({ children }) {
   const syncPromiseRef = useRef(null)
 
   const refreshSyncState = useCallback(async () => {
-    await Promise.all([normalizeQueuedPaymentsState(), normalizeQueuedTransfersState()])
+    await Promise.all([
+      normalizeQueuedCustomersState(),
+      normalizeQueuedPaymentsState(),
+      normalizeQueuedTransfersState(),
+    ])
 
-    const [payments, transfers] = await Promise.all([
+    const [customers, payments, transfers] = await Promise.all([
+      getCustomerQueueSummary(),
       getPaymentQueueSummary(),
       getTransferQueueSummary(),
     ])
 
     const nextSummary = createCombinedQueueSummary({
+      customers,
       payments,
       transfers,
     })
@@ -161,10 +182,16 @@ function SyncProvider({ children }) {
   }, [refreshSyncState])
 
   const runSyncNow = useCallback(
-    async ({ automatic = false, includePayments = true, includeTransfers = true } = {}) => {
+    async ({
+      automatic = false,
+      includeCustomers = true,
+      includePayments = true,
+      includeTransfers = true,
+    } = {}) => {
       if (isOffline) {
         return {
           blockedCount: 0,
+          customerResult: emptyReplayResult,
           dedupedCount: 0,
           failedCount: 0,
           paymentResult: emptyReplayResult,
@@ -180,6 +207,11 @@ function SyncProvider({ children }) {
       }
 
       const currentSummary = await refreshSyncState()
+      const customerCount = includeCustomers
+        ? automatic
+          ? currentSummary.customers.pendingCount
+          : currentSummary.customers.activeCount
+        : 0
       const transferCount = includeTransfers
         ? automatic
           ? currentSummary.transfers.pendingCount
@@ -190,12 +222,13 @@ function SyncProvider({ children }) {
           ? currentSummary.payments.pendingCount + currentSummary.payments.blockedCount
           : currentSummary.payments.activeCount
         : 0
-      const totalItems = transferCount + paymentCount
+      const totalItems = customerCount + transferCount + paymentCount
 
       if (totalItems <= 0) {
         setManualState(initialManualState)
         return {
           blockedCount: currentSummary.blockedCount,
+          customerResult: emptyReplayResult,
           dedupedCount: 0,
           failedCount: currentSummary.failedCount,
           paymentResult: emptyReplayResult,
@@ -207,12 +240,16 @@ function SyncProvider({ children }) {
       }
 
       setManualState({
-        message: buildSyncingMessage({ paymentCount, transferCount }),
+        message: buildSyncingMessage({ customerCount, paymentCount, transferCount }),
         pendingCount: totalItems,
         status: 'syncing',
       })
 
       const syncPromise = (async () => {
+        const customerResult =
+          includeCustomers && customerCount > 0
+            ? await replayCustomerQueue({ includeFailed: !automatic })
+            : emptyReplayResult
         const transferResult =
           includeTransfers && transferCount > 0
             ? await replayTransferQueue({ includeFailed: !automatic })
@@ -250,13 +287,19 @@ function SyncProvider({ children }) {
         }
 
         return {
-          blockedCount: transferResult.blockedCount + paymentResult.blockedCount,
-          dedupedCount: transferResult.dedupedCount + paymentResult.dedupedCount,
-          failedCount: transferResult.failedCount + paymentResult.failedCount,
+          blockedCount:
+            customerResult.blockedCount + transferResult.blockedCount + paymentResult.blockedCount,
+          customerResult,
+          dedupedCount:
+            customerResult.dedupedCount + transferResult.dedupedCount + paymentResult.dedupedCount,
+          failedCount:
+            customerResult.failedCount + transferResult.failedCount + paymentResult.failedCount,
           paymentResult,
-          replayedCount: transferResult.replayedCount + paymentResult.replayedCount,
+          replayedCount:
+            customerResult.replayedCount + transferResult.replayedCount + paymentResult.replayedCount,
           started: true,
-          totalProcessed: transferResult.totalProcessed + paymentResult.totalProcessed,
+          totalProcessed:
+            customerResult.totalProcessed + transferResult.totalProcessed + paymentResult.totalProcessed,
           transferResult,
         }
       })()
@@ -271,6 +314,12 @@ function SyncProvider({ children }) {
 
           return {
             blockedCount: nextSummary.blockedCount || 0,
+            customerResult: {
+              ...emptyReplayResult,
+              blockedCount: nextSummary.customers.blockedCount || 0,
+              failedCount: nextSummary.customers.failedCount || 0,
+              totalProcessed: customerCount,
+            },
             dedupedCount: 0,
             failedCount: nextSummary.failedCount || totalItems,
             paymentResult: {
@@ -305,7 +354,19 @@ function SyncProvider({ children }) {
     (options = {}) =>
       runSyncNow({
         ...options,
+        includeCustomers: false,
         includePayments: true,
+        includeTransfers: false,
+      }),
+    [runSyncNow]
+  )
+
+  const syncCustomersNow = useCallback(
+    (options = {}) =>
+      runSyncNow({
+        ...options,
+        includeCustomers: true,
+        includePayments: false,
         includeTransfers: false,
       }),
     [runSyncNow]
@@ -315,6 +376,7 @@ function SyncProvider({ children }) {
     (options = {}) =>
       runSyncNow({
         ...options,
+        includeCustomers: false,
         includePayments: false,
         includeTransfers: true,
       }),
@@ -395,6 +457,10 @@ function SyncProvider({ children }) {
   const contextValue = {
     blockedCount: queueSummary.blockedCount,
     clearSyncState: () => setManualState(initialManualState),
+    customerBlockedCount: queueSummary.customers.blockedCount,
+    customerFailedCount: queueSummary.customers.failedCount,
+    customerPendingCount: queueSummary.customers.pendingCount,
+    customerQueueCount: queueSummary.customers.activeCount,
     failedCount: queueSummary.failedCount,
     hasPendingWork: queueSummary.activeCount > 0,
     isOffline: status === 'offline',
@@ -434,6 +500,7 @@ function SyncProvider({ children }) {
       }),
     status,
     syncAllNow,
+    syncCustomersNow,
     syncPaymentsNow,
     syncTransfersNow,
     transferBlockedCount: queueSummary.transfers.blockedCount,

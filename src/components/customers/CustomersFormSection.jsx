@@ -3,9 +3,13 @@ import FormMessages from '../ui/FormMessages.jsx'
 import SectionCard from '../ui/SectionCard.jsx'
 
 function CustomersFormSection({
+  description = 'أضف عميلا جديدا حتى يتمكن فريق التشغيل من إنشاء الحوالات ومتابعة التسويات له.',
   submitError,
+  submitLabel = 'إنشاء العميل',
   submitSuccess,
+  submittingLabel = 'جار الحفظ...',
   formValues,
+  infoMessage = '',
   onChange,
   onSubmit,
   submitting,
@@ -14,11 +18,12 @@ function CustomersFormSection({
   return (
     <SectionCard
       title="إنشاء ملف عميل"
-      description="أضف عميلا جديدا حتى يتمكن فريق التشغيل من إنشاء الحوالات ومتابعة التسويات له."
+      description={description}
     >
       <FormMessages
         items={[
           { kind: 'error', text: submitError },
+          { kind: 'info', text: infoMessage },
           { kind: 'success', text: submitSuccess },
         ]}
       />
@@ -58,7 +63,7 @@ function CustomersFormSection({
         </FieldShell>
 
         <button type="submit" className="button primary" disabled={submitting || !isConfigured}>
-          {submitting ? 'جار الحفظ...' : 'إنشاء العميل'}
+          {submitting ? submittingLabel : submitLabel}
         </button>
       </form>
     </SectionCard>
