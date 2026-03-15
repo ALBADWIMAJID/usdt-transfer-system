@@ -33,15 +33,17 @@ Implemented:
 - Expanded offline read coverage for remaining major read-only operator
   surfaces, including the dashboard (Phase 10)
 - Controlled offline customer creation support (Phase 11)
+- TransferDetails offline snapshot completeness/reliability bugfix pass
+  (Phase 12)
 
 ## Active Phase
 
 Offline / PWA work is currently at:
-- Phase 11 complete: shell + status UI + snapshot reads + customer queue +
+- Phase 12 complete: shell + status UI + snapshot reads + customer queue +
   transfer queue + payment queue + dependency-aware replay refinement +
   QA/deployment hardening + Safari/iPhone offline fallback bugfixes +
   expanded offline-read coverage for remaining major read-only operator
-  surfaces
+  surfaces + TransferDetails snapshot completeness hardening
 
 What that means:
 - Manifest is linked
@@ -120,6 +122,14 @@ What that means:
   - urgent attention and work-queue sections
   - recent activity sections
   - dashboard drill-down sheet inputs derived from the saved dashboard snapshot
+- `TransferDetailsPage` now persists its offline snapshot more reliably:
+  - transfer details/context and payment history are saved independently within
+    the same snapshot record
+  - offline restore can use whichever approved part is actually available
+  - confirmed paid/remaining totals are not treated as zero when local payment
+    history is missing
+  - partial offline states are surfaced explicitly instead of degrading the
+    whole page into a fake empty financial state
 - Real iPhone validation is still pending and must be executed manually on a
   physical device
 
@@ -181,6 +191,9 @@ Current cached offline-read coverage:
 - Offline fallback is localized to approved read surfaces, not global
 - Snapshot-backed read pages now use timeout-based fallback hardening to avoid
   indefinite loading during Safari/iPhone offline conditions
+- `TransferDetailsPage` uses per-piece snapshot availability markers so
+  transfer context and payment history can be restored independently when only
+  part of the local snapshot exists
 - Offline payment capture is currently limited to queued payment creation on
   `TransferDetailsPage`
 - Offline customer capture is currently limited to queued customer creation on
@@ -252,3 +265,7 @@ Current cached offline-read coverage:
 - Safari/iPhone offline fallback is now hardened for the approved
   snapshot-backed pages, but physical retesting is still required to confirm
   the original stuck-loading bug is resolved on device.
+- `TransferDetailsPage` offline support is more trustworthy after Phase 12, but
+  real iPhone retesting is still required to confirm:
+  - prior online visit saves both transfer details and payment history
+  - partial offline restore behaves clearly when one saved piece is missing

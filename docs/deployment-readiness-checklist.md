@@ -24,6 +24,7 @@ Status fields:
 | Auth domain/session behavior | Auth redirect/session behavior must match deployment origin | Login persists correctly across reloads/backgrounding | Not Run |  |
 | IndexedDB allowed | Browser storage must not be blocked by host/browser policy | Offline snapshots and local queue can persist | Not Run |  |
 | Snapshot-backed offline fallback | Supported cached read pages, including the dashboard, must exit loading deterministically when offline | Approved pages show cached data or explicit offline/no-snapshot state instead of hanging on loading | Not Run |  |
+| TransferDetails snapshot completeness | After a prior online visit to a transfer details screen, the saved transfer snapshot and saved payment-history snapshot must both restore reliably when available | `TransferDetailsPage` shows saved transfer data, saved payment history, or an explicit partial/no-snapshot state without fake zero-payment totals | Not Run |  |
 | Dashboard drill-down offline fallback | Dashboard snapshot saved locally before going offline | Dashboard drill-down sheets can open from cached snapshot inputs or fail with a clear offline/no-snapshot state | Not Run |  |
 | Queue replay after reconnect | Pending local customer/transfer/payment items can replay when network returns | Replay results are visible and trustworthy | Not Run |  |
 | Print flow unchanged | Transfer print statement must still work in production | Print view excludes local-only unsynced records | Not Run |  |

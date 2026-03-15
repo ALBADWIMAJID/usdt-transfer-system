@@ -367,6 +367,51 @@ Current behavior:
 - Real iPhone retesting is still required; this phase adds customer queue
   support but does not claim physical device validation
 
+## Phase 12 - TransferDetails Offline Snapshot Completeness Bugfix
+
+Status: Implemented
+
+Implemented scope:
+- Hardened `TransferDetailsPage` snapshot persistence so a successful online
+  visit no longer depends on transfer details and payment history finishing as
+  one all-or-nothing save
+- Split the save path logically within the same snapshot record so the page now
+  persists:
+  - core transfer details/context
+  - customer name context
+  - payment history
+  - per-piece availability markers for transfer vs payment-history coverage
+- Added deterministic merge-style snapshot writes for `TransferDetailsPage` so
+  later payment-history saves do not erase an already-saved transfer snapshot,
+  and vice versa
+- Hardened offline restore so `TransferDetailsPage` now supports partial local
+  fallback:
+  - transfer snapshot available + payment history missing
+  - payment history available + transfer missing
+  - both available
+  - neither available
+- Prevented misleading financial summaries when only the transfer snapshot is
+  available locally by treating confirmed payment totals as incomplete instead
+  of assuming zero
+
+Current behavior:
+- After a successful online visit, `TransferDetailsPage` now saves the transfer
+  detail snapshot and payment-history snapshot independently inside the same
+  offline record
+- Offline restore now uses explicit availability checks instead of assuming the
+  presence of one piece implies the other
+- If transfer details are available locally but payment history is not, the
+  page now:
+  - shows the saved transfer details
+  - keeps payment history in an explicit missing-local-data state
+  - avoids presenting confirmed paid/remaining totals as if payment history
+    were empty
+- If payment history is available locally but transfer details are not, the
+  page can still keep the locally saved payment-history state visible instead
+  of silently clearing all cached context
+- Real iPhone retesting is still required; this phase hardens the known device
+  bug path but does not claim physical-device validation
+
 ## Guardrails
 
 - Do not change database schema as part of offline work unless explicitly

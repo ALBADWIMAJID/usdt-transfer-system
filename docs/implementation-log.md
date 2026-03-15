@@ -767,3 +767,71 @@ Risks / notes:
 Suggested next step:
 - Re-run the updated staging/iPhone queue and replay scenarios for
   `CustomersPage`, especially offline save + reconnect replay + manual retry
+
+## 2026-03-15T03:35:01.7815914+03:00 - Phase 12 TransferDetails offline snapshot completeness bugfix
+
+Requested scope:
+- Implement only a tightly scoped bugfix pass for `TransferDetailsPage`
+- Fix incomplete/unreliable offline snapshot behavior for transfer details and
+  payment history after prior online usage
+- Preserve business logic, schema, routes, print flow, queue behavior, and
+  current offline feature scope
+
+Files changed:
+- `src/pages/TransferDetailsPage.jsx`
+- `docs/offline-pwa-execution-plan.md`
+- `docs/project-current-state.md`
+- `docs/implementation-log.md`
+- `docs/code-map.md`
+- `docs/last-change-summary.md`
+- `docs/iphone-qa-checklist.md`
+- `docs/manual-test-matrix.md`
+- `docs/deployment-readiness-checklist.md`
+
+What was added:
+- Independent snapshot persistence for:
+  - transfer details/context
+  - customer name context
+  - payment history
+- Merge-style snapshot writes so later payment-history saves do not erase an
+  already-saved transfer snapshot, and vice versa
+- Explicit availability markers inside the transfer-details snapshot record so
+  offline restore no longer assumes transfer and payments are always saved
+  together
+- Partial offline-state handling for `TransferDetailsPage` so transfer context
+  can still render when payment history is missing locally
+- Conservative UI copy that avoids treating missing confirmed payment history as
+  if zero payments existed
+
+What was not changed:
+- Business logic
+- Database schema
+- Supabase tables/contracts
+- Routes/navigation
+- Print flow
+- Offline customer edit/delete
+- Offline transfer edit/delete
+- Offline payment edit/delete
+- Broader conflict resolution
+
+Verification:
+- `npm run lint` - passed
+- `npm run build` - passed
+- Preview HTTP smoke - passed (`PREVIEW_ROOT_STATUS=200`,
+  `PREVIEW_TRANSFER_DETAILS_STATUS=200`)
+- Build warning only: client chunk exceeded 500 kB after minification
+
+Risks / notes:
+- Physical iPhone retesting was not possible from this environment and remains
+  required
+- Existing older transfer-details snapshots without the new per-piece markers
+  still fall back conservatively using the presence of saved `transfer` and/or
+  `payments` data
+- If only the transfer snapshot is available locally, confirmed paid/remaining
+  totals now stay incomplete instead of faking a zero-payment state
+
+Suggested next step:
+- Re-run the staging/iPhone `TransferDetailsPage` scenarios specifically for:
+  prior online visit -> offline reopen, missing payment-history snapshot,
+  partial offline restore, and pending local payments remaining visually
+  separate from confirmed payment history

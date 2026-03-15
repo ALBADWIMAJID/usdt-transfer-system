@@ -90,6 +90,9 @@ Protected shell:
   - One-transfer follow-up workspace
   - Payment entry
   - Payment history
+  - Snapshot-backed offline restore for both transfer details and payment history
+  - Partial offline state handling when transfer context is available locally
+    but payment history is missing, or vice versa
   - Payment-only offline capture and replay surface
   - Pending / blocked / failed local payment visibility
   - Print statement surface
@@ -113,6 +116,12 @@ Snapshot-based offline fallback exists for:
 - `src/pages/TransferDetailsPage.jsx`
 - `src/pages/NewTransferPage.jsx` for customer-options lookup only
 - Dashboard drill-down sheet inputs when a saved dashboard snapshot exists
+
+`TransferDetailsPage` snapshot notes:
+- Transfer details and payment history are now persisted independently inside
+  the same snapshot record
+- Offline restore can show transfer context even when payment-history snapshot
+  is missing, with explicit partial-state messaging instead of fake zero totals
 
 Approved snapshot-backed pages now use deterministic fallback hardening:
 - IndexedDB snapshot access times out safely instead of hanging indefinitely

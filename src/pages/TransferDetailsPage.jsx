@@ -104,6 +104,22 @@ function extractPaymentNote(payment) {
   return note
 }
 
+function getTransferDetailsSnapshotData(snapshot) {
+  if (!snapshot?.data || typeof snapshot.data !== 'object') {
+    return {}
+  }
+
+  return snapshot.data
+}
+
+function hasSavedTransferSnapshot(snapshotData) {
+  return Boolean(snapshotData?.transfer) || snapshotData?.hasTransferSnapshot === true
+}
+
+function hasSavedPaymentsSnapshot(snapshotData) {
+  return Array.isArray(snapshotData?.payments) || snapshotData?.hasPaymentsSnapshot === true
+}
+
 function TransferDetailsPage() {
   const { transferId } = useParams()
   const location = useLocation()
@@ -124,6 +140,7 @@ function TransferDetailsPage() {
   const [paymentSubmitError, setPaymentSubmitError] = useState('')
   const [paymentSubmitSuccess, setPaymentSubmitSuccess] = useState('')
   const previousPendingCountRef = useRef(0)
+  const snapshotPersistQueueRef = useRef(Promise.resolve(null))
   const transferSnapshotKey = getTransferDetailsSnapshotKey(transferId)
   const {
     activeCount: localPaymentCount,
@@ -149,13 +166,20 @@ function TransferDetailsPage() {
       setTransferError('')
 
       const snapshot = await loadReadSnapshot(transferSnapshotKey)
+      const snapshotData = getTransferDetailsSnapshotData(snapshot)
+      const hasTransferSnapshot = hasSavedTransferSnapshot(snapshotData)
+      const hasPaymentsSnapshot = hasSavedPaymentsSnapshot(snapshotData)
 
       if (!isMounted) {
         return
       }
 
-      if (!snapshot?.data?.transfer) {
-        clearSnapshotState()
+      if (!hasTransferSnapshot) {
+        if (hasPaymentsSnapshot) {
+          markCachedSnapshot(snapshot?.savedAt || '')
+        } else {
+          clearSnapshotState()
+        }
         setTransfer(null)
         setCustomerName('')
         setTransferError(fallbackErrorMessage || getOfflineSnapshotMissingMessage('لهذه الحوالة'))
@@ -163,8 +187,8 @@ function TransferDetailsPage() {
         return false
       }
 
-      setTransfer(snapshot.data.transfer)
-      setCustomerName(snapshot.data.customerName || '')
+      setTransfer(snapshotData.transfer)
+      setCustomerName(snapshotData.customerName || '')
       setTransferError('')
       setTransferLoading(false)
       markCachedSnapshot(snapshot.savedAt)
@@ -283,21 +307,28 @@ function TransferDetailsPage() {
       setPaymentsError('')
 
       const snapshot = await loadReadSnapshot(transferSnapshotKey)
+      const snapshotData = getTransferDetailsSnapshotData(snapshot)
+      const hasTransferSnapshot = hasSavedTransferSnapshot(snapshotData)
+      const hasPaymentsSnapshot = hasSavedPaymentsSnapshot(snapshotData)
 
       if (!isMounted) {
         return
       }
 
-      if (!snapshot?.data) {
+      if (!hasPaymentsSnapshot) {
+        if (hasTransferSnapshot) {
+          markCachedSnapshot(snapshot?.savedAt || '')
+        }
         setPayments([])
         setPaymentsError(fallbackErrorMessage || getOfflineSnapshotMissingMessage('لمدفوعات هذه الحوالة'))
         setPaymentsLoading(false)
         return false
       }
 
-      setPayments(snapshot.data.payments || [])
+      setPayments(Array.isArray(snapshotData.payments) ? snapshotData.payments : [])
       setPaymentsError('')
       setPaymentsLoading(false)
+      markCachedSnapshot(snapshot.savedAt)
       return true
     }
 
@@ -355,7 +386,7 @@ function TransferDetailsPage() {
     return () => {
       isMounted = false
     }
-  }, [isConfigured, isOffline, paymentsRefreshKey, transferId, transferSnapshotKey])
+  }, [isConfigured, isOffline, markCachedSnapshot, paymentsRefreshKey, transferId, transferSnapshotKey])
 
   const handlePaymentsRefresh = () => {
     setPaymentsRefreshKey((current) => current + 1)
@@ -380,31 +411,36 @@ function TransferDetailsPage() {
   }, [isOffline, localPaymentCount])
 
   useEffect(() => {
-    if (
-      isOffline ||
-      !transferId ||
-      transferLoading ||
-      paymentsLoading ||
-      !transfer ||
-      transferError ||
-      paymentsError
-    ) {
+    if (isOffline || !transferId || transferLoading || !transfer || transferError) {
       return
     }
 
     let isMounted = true
 
-    const persistSnapshot = async () => {
-      const savedSnapshot = await saveReadSnapshot({
-        key: transferSnapshotKey,
-        scope: `transfer-details:${transferId}`,
-        type: 'transfer_details',
-        data: {
-          customerName,
-          payments,
-          transfer,
-        },
-      })
+    const persistTransferSnapshot = async () => {
+      const nextTransferSavedAt = new Date().toISOString()
+
+      snapshotPersistQueueRef.current = snapshotPersistQueueRef.current
+        .catch(() => null)
+        .then(async () => {
+          const currentSnapshot = await loadReadSnapshot(transferSnapshotKey)
+          const currentData = getTransferDetailsSnapshotData(currentSnapshot)
+
+          return saveReadSnapshot({
+            key: transferSnapshotKey,
+            scope: `transfer-details:${transferId}`,
+            type: 'transfer_details',
+            data: {
+              ...currentData,
+              ...(customerName ? { customerName } : {}),
+              hasTransferSnapshot: true,
+              transfer,
+              transferSavedAt: nextTransferSavedAt,
+            },
+          })
+        })
+
+      const savedSnapshot = await snapshotPersistQueueRef.current
 
       if (!isMounted) {
         return
@@ -413,7 +449,7 @@ function TransferDetailsPage() {
       markLiveSnapshot(savedSnapshot?.savedAt || '')
     }
 
-    persistSnapshot()
+    persistTransferSnapshot()
 
     return () => {
       isMounted = false
@@ -422,13 +458,63 @@ function TransferDetailsPage() {
     customerName,
     isOffline,
     markLiveSnapshot,
-    payments,
-    paymentsError,
-    paymentsLoading,
     transfer,
     transferError,
     transferId,
     transferLoading,
+    transferSnapshotKey,
+  ])
+
+  useEffect(() => {
+    if (isOffline || !transferId || paymentsLoading || paymentsError) {
+      return
+    }
+
+    let isMounted = true
+
+    const persistPaymentsSnapshot = async () => {
+      const nextPaymentsSavedAt = new Date().toISOString()
+
+      snapshotPersistQueueRef.current = snapshotPersistQueueRef.current
+        .catch(() => null)
+        .then(async () => {
+          const currentSnapshot = await loadReadSnapshot(transferSnapshotKey)
+          const currentData = getTransferDetailsSnapshotData(currentSnapshot)
+
+          return saveReadSnapshot({
+            key: transferSnapshotKey,
+            scope: `transfer-details:${transferId}`,
+            type: 'transfer_details',
+            data: {
+              ...currentData,
+              hasPaymentsSnapshot: true,
+              payments,
+              paymentsSavedAt: nextPaymentsSavedAt,
+            },
+          })
+        })
+
+      const savedSnapshot = await snapshotPersistQueueRef.current
+
+      if (!isMounted) {
+        return
+      }
+
+      markLiveSnapshot(savedSnapshot?.savedAt || '')
+    }
+
+    persistPaymentsSnapshot()
+
+    return () => {
+      isMounted = false
+    }
+  }, [
+    isOffline,
+    markLiveSnapshot,
+    payments,
+    paymentsError,
+    paymentsLoading,
+    transferId,
     transferSnapshotKey,
   ])
 
@@ -441,11 +527,15 @@ function TransferDetailsPage() {
     }))
   }
 
-  const totalPaidRub = roundCurrency(
-    payments.reduce((total, payment) => total + (Number(payment.amount_rub) || 0), 0)
-  )
+  const hasResolvedPayments = !paymentsLoading && !paymentsError
+  const totalPaidRub = hasResolvedPayments
+    ? roundCurrency(payments.reduce((total, payment) => total + (Number(payment.amount_rub) || 0), 0))
+    : null
   const remainingRub =
-    transfer && transfer.payable_rub !== null && transfer.payable_rub !== undefined
+    hasResolvedPayments &&
+    transfer &&
+    transfer.payable_rub !== null &&
+    transfer.payable_rub !== undefined
       ? roundCurrency(Number(transfer.payable_rub) - totalPaidRub)
       : null
   const valueBeforePercentage =
@@ -474,7 +564,7 @@ function TransferDetailsPage() {
   const isSettled = remainingRub !== null && Math.abs(remainingRub) <= 0.009
   const isOverpaid = remainingRub !== null && remainingRub < -0.009
   const overpaidAmountRub = isOverpaid ? roundCurrency(Math.abs(remainingRub)) : 0
-  const hasPayments = payments.length > 0
+  const hasPayments = hasResolvedPayments && payments.length > 0
   const normalizedStatus = String(transfer?.status || '').toLowerCase()
   const isCancelled = normalizedStatus === 'cancelled' || normalizedStatus === 'canceled'
   const remainingMessage =
@@ -650,21 +740,25 @@ function TransferDetailsPage() {
   const displayCustomerName = customerName || 'عميل غير معروف'
   const transferCreatedAtLabel = formatDate(transfer?.created_at)
   const statusLabel = getTransferStatusMeta(transfer?.status).label
-  const latestPayment = payments[0] || null
+  const latestPayment = hasResolvedPayments ? payments[0] || null : null
   const latestPaymentLabel = latestPayment ? formatDate(latestPayment.paid_at || latestPayment.created_at) : ''
   const latestPaymentMethod = latestPayment ? extractPaymentMethod(latestPayment) : ''
   const latestPaymentAmountValue = latestPayment
     ? `${formatNumber(latestPayment.amount_rub, 2)} RUB`
     : 'لا توجد حركة مالية مسجلة'
-  const paymentCountLabel = `${payments.length} دفعة مسجلة`
+  const paymentCountLabel = hasResolvedPayments ? `${payments.length} دفعة مسجلة` : 'سجل الدفعات غير مكتمل'
   const hasLocalPendingPayments = localPaymentCount > 0
   const localPendingAmountLabel =
     localPendingAmountRub > 0 ? `${formatNumber(localPendingAmountRub, 2)} RUB محلي` : ''
   const latestLocalPayment = pendingPayments[0] || null
+  const hasPartialTransferOnlyOfflineState =
+    Boolean(transfer) && !paymentsLoading && Boolean(paymentsError)
   const followUpState = isOverpaid
     ? 'danger'
     : isCancelled
       ? 'neutral'
+      : hasPartialTransferOnlyOfflineState
+        ? 'warning'
       : isSettled
         ? 'success'
         : hasPayments
@@ -673,6 +767,8 @@ function TransferDetailsPage() {
 
   const pageDescription = !transfer
     ? 'راجع بيانات الحوالة والمدفوعات والرصيد الحالي من شاشة تشغيل واحدة واضحة.'
+    : hasPartialTransferOnlyOfflineState
+      ? 'تفاصيل الحوالة الأساسية متاحة محليا، لكن سجل المدفوعات المؤكد غير متوفر حاليا. قد تكون الأرصدة والإجماليات غير مكتملة إلى أن يعود الاتصال أو يتوفر سجل محفوظ محليا.'
     : hasLocalPendingPayments && !hasPayments
       ? `توجد ${localPaymentCount} دفعة محفوظة محليا بانتظار الإرسال إلى الخادم. ستبقى منفصلة عن الإجماليات المؤكدة الحالية حتى تنجح المزامنة.`
     : isOverpaid
@@ -741,6 +837,8 @@ function TransferDetailsPage() {
 
   const followUpTitle = !transfer
     ? 'جاري تجهيز المتابعة'
+    : hasPartialTransferOnlyOfflineState
+      ? 'تفاصيل الحوالة متاحة لكن سجل الدفعات غير مكتمل'
     : isOverpaid
       ? 'مراجعة مالية مطلوبة فورا'
       : isCancelled
@@ -755,6 +853,8 @@ function TransferDetailsPage() {
 
   const followUpDescription = !transfer
     ? 'يتم تجهيز حالة المتابعة الحالية للحوالة.'
+    : hasPartialTransferOnlyOfflineState
+      ? 'تم استرجاع تفاصيل الحوالة، لكن سجل الدفعات المؤكد غير متوفر محليا حاليا. استخدم الشاشة كمرجع للحوالة نفسها، ثم حدّث سجل الدفعات عند عودة الاتصال أو بعد توفر نسخة محلية محفوظة.'
     : isOverpaid
       ? `الرصيد الحالي سالب وهناك زيادة دفع بمقدار ${formatNumber(overpaidAmountRub, 2)} RUB. راجع التسويات والدفعات المسجلة قبل إضافة أي حركة جديدة.`
       : isCancelled
@@ -774,6 +874,8 @@ function TransferDetailsPage() {
         ? 'مراجعة فورية'
         : isCancelled
           ? 'ملف ملغى'
+          : hasPartialTransferOnlyOfflineState
+            ? 'سجل دفعات غير مكتمل'
           : isSettled
             ? 'تمت التسوية'
             : hasPayments
@@ -783,6 +885,8 @@ function TransferDetailsPage() {
         ? 'queue-chip--danger'
         : isSettled
           ? 'queue-chip--success'
+          : hasPartialTransferOnlyOfflineState
+            ? 'queue-chip--warning'
           : hasPayments
             ? 'queue-chip--warning'
             : 'queue-chip--neutral',
@@ -794,7 +898,11 @@ function TransferDetailsPage() {
     },
     {
       label: 'آخر حركة',
-      value: latestPayment ? latestPaymentLabel : 'لا توجد',
+      value: hasPartialTransferOnlyOfflineState
+        ? 'غير متاح محليا'
+        : latestPayment
+          ? latestPaymentLabel
+          : 'لا توجد',
       className: latestPayment ? '' : 'queue-chip--neutral',
     },
     ...(hasLocalPendingPayments
@@ -818,6 +926,8 @@ function TransferDetailsPage() {
         ? 'أوقف التحصيل وراجع الملف'
         : isCancelled
           ? 'لا تضف حركة جديدة قبل المراجعة'
+          : hasPartialTransferOnlyOfflineState
+            ? 'حدّث سجل الدفعات المؤكد قبل الاعتماد على الرصيد'
           : isSettled
             ? 'يمكن طباعة الكشف أو إغلاق المتابعة'
             : hasLocalPendingPayments && !hasPayments
@@ -830,6 +940,8 @@ function TransferDetailsPage() {
         <p className={['support-text', isOverpaid ? 'text-danger' : ''].filter(Boolean).join(' ')}>
           {isOverpaid
             ? 'يوصى بمراجعة قيمة الحوالة وسجل الدفعات قبل أي إضافة جديدة.'
+            : hasPartialTransferOnlyOfflineState
+              ? 'تفاصيل الحوالة نفسها محفوظة، لكن سجل الدفعات المؤكد غير متوفر حاليا. لا تعتمد على الرصيد أو حالة القفل حتى يعود سجل الدفعات.'
             : isSettled
               ? 'لا توجد متابعة مالية عاجلة حاليا.'
               : hasLocalPendingPayments && !hasPayments
@@ -844,6 +956,8 @@ function TransferDetailsPage() {
       title: 'آخر حركة مالية',
       value: latestPayment
         ? latestPaymentAmountValue
+        : hasPartialTransferOnlyOfflineState
+          ? 'سجل الدفعات غير متوفر محليا'
         : latestLocalPayment
           ? `${formatNumber(latestLocalPayment.payload.amount_rub, 2)} RUB`
           : latestPaymentAmountValue,
@@ -851,6 +965,8 @@ function TransferDetailsPage() {
         <p className="support-text">
           {latestPayment
             ? `${latestPaymentMethod} • ${latestPaymentLabel}`
+            : hasPartialTransferOnlyOfflineState
+              ? 'لا توجد نسخة محلية مؤكدة لسجل الدفعات حاليا. قد تظهر فقط الدفعات المحلية المعلقة إن وجدت.'
             : latestLocalPayment
               ? `دفعة محلية ${getPaymentMethodLabel(latestLocalPayment.payload.payment_method)} بانتظار الإرسال منذ ${formatDate(latestLocalPayment.payload.paid_at || latestLocalPayment.createdAt)}.`
               : 'لا توجد دفعات مسجلة على الحوالة حتى الآن.'}
@@ -980,6 +1096,8 @@ function TransferDetailsPage() {
     ? 'راجع الملف قبل تسجيل أي دفعة جديدة'
     : isCancelled
       ? 'الحوالة ملغاة حاليا'
+      : hasPartialTransferOnlyOfflineState
+        ? 'سجّل دفعة جديدة مع بقاء سجل الدفعات المؤكد غير مكتمل'
       : isSettled
         ? 'الحوالة مسددة حاليا'
         : hasLocalPendingPayments && !hasPayments
@@ -992,6 +1110,8 @@ function TransferDetailsPage() {
     ? 'توجد زيادة دفع مسجلة. استخدم هذه المنطقة فقط بعد مراجعة سبب الزيادة والحاجة الفعلية لأي حركة جديدة.'
     : isCancelled
       ? 'لا يوصى بإضافة حركة جديدة قبل مراجعة حالة الإلغاء وسجل الدفعات.'
+      : hasPartialTransferOnlyOfflineState
+        ? 'تفاصيل الحوالة نفسها متاحة، لكن سجل الدفعات المؤكد غير محفوظ محليا بالكامل حاليا. يمكنك حفظ دفعة جديدة محليا عند الحاجة، مع بقاء الإجماليات المؤكدة بحاجة إلى تحديث لاحق.'
     : isSettled
       ? 'استخدم هذه المنطقة فقط إذا كانت هناك حركة مالية إضافية فعلية يجب تسجيلها على الحوالة.'
       : hasLocalPendingPayments && !hasPayments
@@ -1004,9 +1124,15 @@ function TransferDetailsPage() {
     { label: 'مبلغ التسوية', value: `${formatNumber(valueAfterPercentage, 2)} RUB` },
     { label: 'الرصيد الحالي', value: remainingMessage },
     {
-      label: hasLocalPendingPayments ? 'محلي بانتظار الإرسال' : 'آخر حركة',
+      label: hasPartialTransferOnlyOfflineState
+        ? 'سجل الدفعات المؤكد'
+        : hasLocalPendingPayments
+          ? 'محلي بانتظار الإرسال'
+          : 'آخر حركة',
       value: hasLocalPendingPayments
         ? `${localPaymentCount} دفعة • ${localPendingAmountLabel || '--'}`
+        : hasPartialTransferOnlyOfflineState
+          ? 'غير متاح محليا حاليا'
         : latestPayment
           ? `${latestPaymentMethod} • ${latestPaymentLabel}`
           : 'لا توجد دفعات بعد',
@@ -1014,7 +1140,11 @@ function TransferDetailsPage() {
   ]
 
   const paymentSubmitLabel =
-    !hasPayments && !hasLocalPendingPayments && !isOverpaid && !isSettled
+    !hasPartialTransferOnlyOfflineState &&
+    !hasPayments &&
+    !hasLocalPendingPayments &&
+    !isOverpaid &&
+    !isSettled
       ? 'تسجيل أول دفعة'
       : 'تسجيل دفعة متابعة'
 
@@ -1092,6 +1222,11 @@ function TransferDetailsPage() {
         description="يتم احتساب الرصيد من مبلغ التسوية وجميع المدفوعات الجزئية المسجلة على الحوالة."
         className="no-print transfer-details-balance-section"
       >
+        {hasPartialTransferOnlyOfflineState ? (
+          <InlineMessage kind="warning" className="transfer-details-partial-offline-notice">
+            {paymentsError} لذلك تُعرض تفاصيل الحوالة الأساسية فقط، بينما تبقى إجماليات التحصيل والرصيد الحالي غير مكتملة حتى يعود سجل المدفوعات المؤكد.
+          </InlineMessage>
+        ) : null}
         <BalanceSummary
           settlementValue={formatNumber(valueAfterPercentage, 2)}
           totalPaidValue={
@@ -1187,6 +1322,11 @@ function TransferDetailsPage() {
         {paymentsLoading && payments.length === 0 ? (
           <p>جار التحقق من حالة قفل الحوالة...</p>
         ) : null}
+        {!paymentsLoading && paymentsError ? (
+          <InlineMessage kind="warning">
+            {paymentsError} لذلك لا يمكن تأكيد حالة قفل الحوالة محليا بشكل كامل حتى يعود سجل المدفوعات المؤكد أو يُعاد تحميله من الخادم.
+          </InlineMessage>
+        ) : null}
         {!paymentsLoading && hasPayments ? (
           <InlineMessage kind="warning">
             تحتوي هذه الحوالة بالفعل على {payments.length} دفعة. يجب اعتبار الحقول الأساسية مثل
@@ -1194,7 +1334,7 @@ function TransferDetailsPage() {
             قاعدة البيانات تمنع تعديل هذه القيم بعد وجود دفعات.
           </InlineMessage>
         ) : null}
-        {!paymentsLoading && !hasPayments ? (
+        {!paymentsLoading && !paymentsError && !hasPayments ? (
           <p className="support-text">
             لا توجد مدفوعات مسجلة بعد. إذا تمت إضافة واجهة تعديل لاحقا فيمكن إبقاء القيم الأساسية
             قابلة للتعديل حتى أول دفعة.

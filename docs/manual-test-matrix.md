@@ -17,6 +17,7 @@ Status fields:
 | PWA shell | Service worker registration | Production build over HTTPS | Service worker registers without breaking the app | Not Run |  |
 | PWA shell | Manifest / install metadata | Built app deployed | Manifest resolves and install metadata is visible | Not Run |  |
 | Offline read | Cached dashboard/customers/transfers/details | Relevant supported screen visited online first | Offline snapshot fallback works with clear locally-saved messaging and does not remain stuck on `جار التحميل...` | Not Run |  |
+| Offline read | TransferDetails partial snapshot restore | `TransferDetailsPage` visited online first, then reopened later while only part of the local snapshot is available | Transfer details still render, payment-history absence is explicit, and confirmed paid/remaining totals are not faked as zero | Not Run |  |
 | Offline read | Dashboard drill-down sheet from cached snapshot | `DashboardPage` visited online first and dashboard snapshot saved locally | Offline dashboard drill-down opens from cached snapshot data or shows an explicit offline/no-snapshot state | Not Run |  |
 | Offline read | No snapshot available | Go offline before first visit to a supported snapshot-backed screen | Safe missing-data message is shown and loading exits deterministically | Not Run |  |
 | Offline read | New Transfer cached customer options | Customer options cached online first, then network offline | Customer selector uses local snapshot or shows explicit no-snapshot/offline requirement state | Not Run |  |
