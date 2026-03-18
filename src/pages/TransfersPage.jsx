@@ -44,6 +44,11 @@ const DASHBOARD_FOCUS_LABELS = {
   recent_transfers: 'أحدث الحوالات',
 }
 
+const TRANSFERS_PAGE_SECTIONS = [
+  { key: 'summary', label: 'مؤشرات الصف', description: 'ملخص الأداء العام للصف' },
+  { key: 'queue', label: 'صف المتابعة', description: 'بحث، تصفية، وقائمة الحوالات' },
+]
+
 function getValidFilterValue(rawValue, options, fallback = 'all') {
   const normalizedValue = String(rawValue || '').trim()
 
@@ -293,6 +298,7 @@ function TransfersPage() {
     getValidFilterValue(searchParams.get('queueFilter'), QUEUE_FILTER_OPTIONS)
   )
   const [createdAfter, setCreatedAfter] = useState(() => searchParams.get('createdAfter') || '')
+  const [activeSection, setActiveSection] = useState('queue')
 
   useEffect(() => {
     const timeoutId = window.setTimeout(() => {
@@ -709,6 +715,22 @@ function TransfersPage() {
     ? 'الأولوية الحالية مبنية على نتائج البحث والتصفية المعروضة أمامك.'
     : 'الحوالات مرتبة هنا حسب أولوية المتابعة اليومية: فوق المطلوب، ثم الجزئية، ثم المفتوحة.'
 
+  const sectionNavItems = TRANSFERS_PAGE_SECTIONS.map((section) => {
+    if (section.key === 'summary') {
+      return {
+        ...section,
+        countLabel: loading ? '...' : prioritizedTransfers.length,
+        tone: 'brand',
+      }
+    }
+
+    return {
+      ...section,
+      countLabel: loading ? '...' : filteredTransfers.length,
+      tone: filteredTransfers.length > 0 ? 'brand' : 'neutral',
+    }
+  })
+
   return (
     <div className="stack transfers-queue-page">
       <TransfersHeader transferCountLabel={transferCountLabel} onRefresh={handleRefresh} />
@@ -717,37 +739,93 @@ function TransfersPage() {
       <InlineMessage kind="info">{dashboardContextMessage}</InlineMessage>
       <OfflineSnapshotNotice snapshotState={snapshotState} />
 
-      <TransfersQueueSummary cards={summaryCards} />
+      <div className="customer-details-section-nav-shell">
+        <nav className="customer-details-section-nav" aria-label="أقسام صفحة الحوالات">
+          {sectionNavItems.map((section) => {
+            const isActiveSection = activeSection === section.key
 
-      <SectionCard
-        title="صف المتابعة"
-        description="استخدم البحث والتصفية والعرض التشغيلي للوصول بسرعة إلى الحوالات التي تحتاج حركة اليوم."
-        className="transfers-queue-panel"
-      >
-        <TransfersFilterBar
-          searchQuery={searchQuery}
-          onSearchChange={setSearchQuery}
-          statusFilter={statusFilter}
-          onStatusFilterChange={setStatusFilter}
-          queueFilter={queueFilter}
-          onQueueFilterChange={setQueueFilter}
-          createdAfter={createdAfter}
-          onCreatedAfterChange={setCreatedAfter}
-          statusOptions={TRANSFER_STATUS_FILTER_OPTIONS}
-          queueOptions={QUEUE_FILTER_OPTIONS}
-        />
+            return (
+              <button
+                key={section.key}
+                type="button"
+                className={[
+                  'customer-details-section-button',
+                  isActiveSection ? 'active' : '',
+                ]
+                  .filter(Boolean)
+                  .join(' ')}
+                aria-pressed={isActiveSection}
+                onClick={() => setActiveSection(section.key)}
+              >
+                <span className="customer-details-section-button-copy">
+                  <strong>{section.label}</strong>
+                  <small>{section.description}</small>
+                </span>
+                <span
+                  className={[
+                    'customer-details-section-button-count',
+                    `customer-details-section-button-count--${section.tone}`,
+                  ].join(' ')}
+                >
+                  {section.countLabel}
+                </span>
+              </button>
+            )
+          })}
+        </nav>
+      </div>
 
-        <p className="support-text transfers-queue-note">{queueScopeLabel}</p>
+      <div className="transfer-details-section-workspace">
+        <SectionCard
+          title="مؤشرات صف الحوالات"
+          description="أرقام وأداء صف الحوالات في نظرة واحدة."
+          className={[
+            'transfer-details-section-panel',
+            activeSection === 'summary' ? 'is-active' : '',
+          ]
+            .filter(Boolean)
+            .join(' ')}
+        >
+          <TransfersQueueSummary cards={summaryCards} />
+          <p className="support-text transfers-queue-note">{queueScopeLabel}</p>
+        </SectionCard>
 
-        <TransfersList
-          errorMessage={loadError}
-          loading={loading}
-          hasTransfers={transfers.length > 0}
-          hasFilteredTransfers={filteredTransfers.length > 0}
-          groups={queueGroups}
-          onRetry={handleRefresh}
-        />
-      </SectionCard>
+        <SectionCard
+          title="صف المتابعة"
+          description="استخدم البحث والتصفية والعرض التشغيلي للوصول بسرعة إلى الحوالات التي تحتاج حركة اليوم."
+          className={[
+            'transfer-details-section-panel',
+            'transfers-queue-panel',
+            activeSection === 'queue' ? 'is-active' : '',
+          ]
+            .filter(Boolean)
+            .join(' ')}
+        >
+          <TransfersFilterBar
+            searchQuery={searchQuery}
+            onSearchChange={setSearchQuery}
+            statusFilter={statusFilter}
+            onStatusFilterChange={setStatusFilter}
+            queueFilter={queueFilter}
+            onQueueFilterChange={setQueueFilter}
+            createdAfter={createdAfter}
+            onCreatedAfterChange={setCreatedAfter}
+            statusOptions={TRANSFER_STATUS_FILTER_OPTIONS}
+            queueOptions={QUEUE_FILTER_OPTIONS}
+          />
+
+          <p className="support-text transfers-queue-note">{queueScopeLabel}</p>
+
+          <TransfersList
+            errorMessage={loadError}
+            loading={loading}
+            hasTransfers={transfers.length > 0}
+            hasFilteredTransfers={filteredTransfers.length > 0}
+            groups={queueGroups}
+            onRetry={handleRefresh}
+          />
+        </SectionCard>
+      </div>
     </div>
   )
 }

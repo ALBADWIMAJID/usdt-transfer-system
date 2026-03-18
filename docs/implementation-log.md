@@ -1064,3 +1064,60 @@ Risks / notes:
 Suggested next step:
 - Re-test `TransferDetailsPage` on staging/iPhone specifically for Arabic copy
   correctness, section switching, and preserved payment/print behavior
+
+## 2026-03-15T05:20:00+03:00 - Phase 1 AppShell mobile transformation
+
+Requested scope:
+- Implement only the first phase of the mobile app-like UI shell transformation
+- Make the global shell feel more like a focused mobile app on iPhone
+- Keep changes conservative, CSS/layout-focused, and shell-only
+- Preserve business logic, schema, routes, offline behavior, and page internals
+
+Files changed:
+- `src/index.css`
+- `docs/implementation-log.md`
+- `docs/last-change-summary.md`
+
+What was changed:
+- Tightened the mobile top bar spacing:
+  - Reduced vertical padding and gap on `.topbar` for small widths
+  - Kept the same content (page title, system name, connection badge, user info) but with less vertical bulk
+- Improved mobile global frame and safe-area handling:
+  - Updated `.page-content` mobile padding to include `env(safe-area-inset-bottom)` so the main content sits visually above the bottom nav and iPhone home indicator
+- Refined bottom navigation for a more app-like feel:
+  - Kept the same four destinations and icons
+  - Increased bottom-safe-area padding and overall bottom-nav padding for thumb comfort
+  - Slightly increased label size and spacing between icon and label
+  - Strengthened the active state to use a full brand gradient background and white text, making the current section clearer
+  - Adjusted box shadow and blur on `.bottom-nav` to feel more like a mobile dock
+- Added minor mobile-only refinements for small screens so the shell feels tighter and more intentional without touching page content
+
+What was not changed:
+- Business logic
+- Database schema
+- Supabase queries/inserts
+- Routes/navigation contracts (including bottom-nav destinations)
+- Auth/session behavior
+- Print flow
+- Offline snapshot behavior and queue/replay semantics
+- Any page-level business logic or calculations
+
+Verification:
+- `npm run lint` - passed
+- `npm run build` - passed
+- Existing build-size warning remains: main client bundle exceeds 500 kB after minification
+
+Risks / notes:
+- Changes are layout-only and scoped to the shell/topbar/bottom-nav CSS; no JS logic was altered
+- Real iPhone testing is still required to validate:
+  - visual comfort of the new top bar
+  - safe-area padding around the bottom navigation
+  - perceived “app-like” feel for bottom nav interactions
+- Desktop styles were intentionally left functionally unchanged except for inheriting the slightly leaner topbar on narrow widths
+
+Suggested next step:
+- Execute a focused iPhone/mobile QA pass for:
+  - top bar readability and compactness
+  - bottom navigation thumb reach and active-state clarity
+  - safe-area behavior around the home indicator
+  - preservation of connection/sync banner meaning and visibility
