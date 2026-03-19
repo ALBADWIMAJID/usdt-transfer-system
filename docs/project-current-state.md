@@ -46,15 +46,41 @@ Implemented:
 - TransferDetails offline snapshot completeness/reliability bugfix pass
   (Phase 12)
 
+## Mobile app-like UI — Phase 0 baseline (frozen)
+
+Recorded as the documented starting point before further visual transformation
+work (per `docs/usdt-mobile-app-like-ui-plan.md`).
+
+- **Branch at freeze:** `main` (confirm locally with `git branch --show-current`)
+- **Working tree:** should be clean before starting Phase 2+ (`git status`)
+- **Latest validated UI pass in repo:** **Phase 1 AppShell mobile transformation**
+  (shell-only CSS in `src/index.css`; see `docs/implementation-log.md` entries
+  `2026-03-15T05:20:00+03:00` and **`2026-03-21T12:00:00+03:00`** refresh pass)
+- **App shell source:** `src/components/AppShell.jsx` (shared UI:
+  `ConnectionBadge.jsx`, `SyncStatusBanner.jsx`, `BrandLockup.jsx`, etc.)
+- **Pages with internal section navigation (route unchanged):**
+  - `CustomersPage` — Customers, Portfolio Summary, Needs Attention, Recent Activity
+  - `CustomerDetailsPage` — overview-style sections (overview, transfers, activity, actions, etc.)
+  - `TransferDetailsPage` — Summary, Payments, Payment History, Print
+  - `TransfersPage` — **مؤشرات الصف** (summary) and **صف المتابعة** (queue); uses the
+    same shared section-nav / panel CSS patterns as other long pages (e.g.
+    `customer-details-section-nav`, `transfer-details-section-panel`) — this is
+    **stable shipped layout**, not a partial Phase 3 polish pass
+- **Not using internal section tabs:** `DashboardPage`, `NewTransferPage`, `LoginPage`
+  (and other routes) — organization is via cards/sections without the shared
+  sticky section-bar pattern
+- **Next implementation step (plan order):** **Phase 2 — Unified mobile section
+  navigation system** (`docs/usdt-mobile-app-like-ui-plan.md` §12)
+
 ## Current UI Organization Notes
 
-- Latest completed pass is **Phase 1 AppShell mobile transformation**
-- Scope was shell-level mobile refinement only:
-  - mobile top bar
-  - global page frame
-  - safe-area handling
-  - bottom navigation
-  - global sync/connection status presentation
+- Latest completed pass is **Phase 1 AppShell mobile transformation** (refreshed
+  2026-03-21): shell-level mobile refinement only:
+  - mobile top bar (title-first, safe-area padding, lighter chrome)
+  - global page frame and `content-shell` grid (`auto auto 1fr` + `min-height: 0`)
+  - safe-area handling (top, horizontal, bottom + floating bottom nav clearance)
+  - bottom navigation (inset dock / tab-bar feel)
+  - global sync/connection status presentation (lighter strip + topbar badge)
   - mobile spacing rhythm
 - `TransfersPage` redesign/polish was intentionally excluded from this pass
 - Existing page-level business behavior and offline semantics remain unchanged

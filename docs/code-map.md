@@ -58,9 +58,11 @@
 
 Protected shell:
 - `src/components/ProtectedRoute.jsx`
-- `src/components/AppShell.jsx`
+- `src/components/AppShell.jsx` (not under `src/layout/`)
   - Hosts shared connection badge and sync status banner
   - Keeps the sync banner focused on non-idle attention states
+  - Mobile shell chrome is styled primarily in `src/index.css` (Phase 1 mobile
+    transformation)
 
 ## Important Page Responsibilities
 
@@ -87,6 +89,9 @@ Protected shell:
 - `src/pages/TransfersPage.jsx`
   - Transfer follow-up queue
   - Queue-focused filters and summaries
+  - Internal section navigation inside `/transfers` (two sections: summary
+    indicators vs follow-up queue), reusing the shared section-nav / panel CSS
+    patterns used on other long pages
 - `src/pages/NewTransferPage.jsx`
   - Transfer creation form and computed settlement preview
   - Online-first transfer creation path

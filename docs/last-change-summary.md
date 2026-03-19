@@ -1,44 +1,57 @@
 # Last Change Summary
 
 Task completed:
-- Phase 1 AppShell mobile transformation
+- Phase 1 AppShell mobile transformation (refresh pass)
 
 Scope implemented:
-- Mobile shell-level UI refinement only:
-  - mobile top bar spacing and density
-  - global page frame rhythm on small screens
-  - iPhone safe-area handling around content and bottom controls
-  - bottom navigation spacing and active-state clarity
-  - global connection/sync status presentation spacing
-- Kept the work scoped to shell framing and CSS behavior only
-- Explicitly excluded TransfersPage redesign/polish from this completed pass
+- **Shell-only CSS** in `src/index.css` — stronger mobile app frame:
+  - **Top bar:** safe-area-aware padding; lighter visual treatment; title-first
+    (hide long per-route description + system eyebrow in the top bar on mobile)
+  - **Connection badge:** compact, flatter chip in the top bar on small screens
+  - **Sync banner strip:** tighter, lighter presentation when non-idle states show
+  - **Page frame:** horizontal safe-area padding; bottom padding tuned for a
+    **floating dock** bottom nav + home indicator
+  - **Bottom nav:** inset rounded dock, improved blur/shadow, clearer active
+    state, `:active` feedback
+- **Layout:** `content-shell` grid rows set to `auto auto 1fr` so top bar, sync
+  strip, and main stack correctly; `min-height: 0` on shell and main content
+  for predictable grid behavior
 
 Files changed:
 - `src/index.css`
+- `docs/code-map.md`
 - `docs/implementation-log.md`
 - `docs/last-change-summary.md`
+- `docs/project-current-state.md`
 
 What did NOT change:
-- Business logic
-- Database schema
-- Supabase tables/contracts and query contracts
-- Routes/navigation destinations
-- Offline snapshot / queue / replay semantics
+- React shell code (`AppShell.jsx` — lives under `src/components/`, not `src/layout/`)
+- Routes, navigation destinations, or label semantics
+- Auth, Supabase usage, business logic
+- Offline snapshots, queues, replay, sync provider behavior
 - Print flow
-- TransfersPage business/layout internals
+- Page-level components (including `TransfersPage`)
 
 Verification results:
 - `npm run lint` - passed
 - `npm run build` - passed
 - Existing build-size warning remains (main client chunk exceeds 500 kB after minification)
 
-Known limitations:
-- Real iPhone retesting is still required and was not performed from this
-  environment
-- This pass is shell-focused only; it does not start Phase 2/3 page-level
-  transformation work
+Manual mobile QA suggested:
+- **Notch / status bar:** top bar clears `safe-area-inset-top` in portrait and
+  landscape
+- **Top bar:** route title readable; no clipped menu button; connection badge
+  still understandable (label-only on smallest widths where detail is hidden)
+- **Sync:** trigger pending/offline/error states — banner remains readable and
+  not heavier than before when idle (still hidden when idle)
+- **Scroll:** long pages scroll without content trapped under the floating bottom
+  nav; last lines clear above dock + home indicator
+- **Bottom nav:** four destinations unchanged; active state obvious; tap targets
+  feel comfortable
+- **RTL:** layout and nav order still feel correct
 
 Recommended next step:
-- Continue with the approved next phase after shell QA:
-  - unified mobile section navigation system (Phase 2), then
-  - TransfersPage mobile-first polish (Phase 3)
+- **Phase 2 — Unified mobile section navigation system** when explicitly requested
+
+Suggested commit message:
+- `Phase 1 AppShell mobile transformation`

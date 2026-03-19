@@ -1121,3 +1121,89 @@ Suggested next step:
   - bottom navigation thumb reach and active-state clarity
   - safe-area behavior around the home indicator
   - preservation of connection/sync banner meaning and visibility
+
+## 2026-03-20T00:00:00+03:00 - Phase 0 mobile UI transformation baseline freeze
+
+Requested scope:
+- Baseline freeze and current-state confirmation only (per
+  `docs/usdt-mobile-app-like-ui-plan.md` Phase 0)
+- No UI, route, logic, or refactor changes
+
+Files changed:
+- `docs/project-current-state.md`
+- `docs/code-map.md`
+- `docs/implementation-log.md`
+- `docs/last-change-summary.md`
+
+What was added:
+- Documented frozen baseline: branch expectation, clean working tree before next
+  work, list of pages that already use internal section navigation
+- Clarified `TransfersPage` ships a stable two-section in-page model (summary vs
+  queue) using shared section CSS patterns — not treated as in-progress Phase 3
+- Recorded that **mobile shell Phase 1** is already present in `src/index.css`
+  (top bar, page frame, safe areas, bottom nav, status strip spacing)
+- Stated next planned implementation step: **Phase 2 unified mobile section
+  navigation system**
+
+What was not changed:
+- Application source (`src/**`), routes, business logic, offline behavior, or
+  print flow
+
+Verification:
+- `git status` / `git diff --name-only` - docs-only changes for this Phase 0 pass
+  (no `src/**` edits)
+- `npm run lint` - passed
+- `npm run build` - passed
+
+Suggested next step:
+- Begin **Phase 2** only when explicitly approved: unify section navigation
+  presentation across sectioned pages without changing route contracts
+
+## 2026-03-21T12:00:00+03:00 - Phase 1 AppShell mobile transformation (refresh pass)
+
+Requested scope:
+- Mobile app-like shell only: top bar, page frame, safe areas, bottom nav, global
+  sync/connection presentation, mobile rhythm
+- CSS-first; preserve routes, nav meaning, auth, data/offline/print semantics
+
+Files changed:
+- `src/index.css`
+- `docs/code-map.md`
+- `docs/implementation-log.md`
+- `docs/last-change-summary.md`
+- `docs/project-current-state.md`
+
+What was changed:
+- **Content shell grid:** `content-shell` now uses `grid-template-rows: auto auto 1fr`
+  so the top bar, sync strip, and main column stack predictably (main absorbs
+  remaining height; `min-height: 0` on shell + main for safer grid overflow)
+- **Mobile top bar (≤960px):** safe-area padding on top and horizontal edges;
+  slightly cleaner background/border; **title-first** — hide topbar page eyebrow
+  and long route description on phone to reduce “web dashboard” framing
+- **Connection badge (in topbar, mobile):** flatter, lighter chip (no drop shadow,
+  softer border/background)
+- **Sync strip (mobile):** tighter spacing, no banner shadow, softer border when
+  the shell sync banner is visible
+- **Page frame:** horizontal padding respects safe-area insets; increased bottom
+  padding to clear the **floating** bottom nav + home indicator
+- **Bottom navigation (≤960px):** inset “dock” bar with rounded container,
+  stronger blur, subtle inner highlight, active tab shadow; safe-area handled on
+  `bottom` + `inset-inline`; slight active press feedback (`:active`)
+- **≤540px:** restored bottom **content** padding to include
+  `env(safe-area-inset-bottom)` (was a fixed `4.8rem` only); dock tightened to
+  match smaller widths
+
+What was not changed:
+- `src/components/AppShell.jsx` and other React shell markup (paths remain under
+  `src/components/`)
+- Route definitions, `navigation` targets/labels, auth, business logic, print,
+  offline snapshot/queue/replay behavior, page components (e.g. `TransfersPage`)
+
+Verification:
+- `npm run lint` - passed
+- `npm run build` - passed
+- Build chunk-size warning unchanged (>500 kB main bundle)
+
+Suggested next step:
+- Manual iPhone QA (see `docs/last-change-summary.md`), then proceed to **Phase 2**
+  when approved
