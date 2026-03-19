@@ -48,34 +48,25 @@ Implemented:
 
 ## Current UI Organization Notes
 
-- This latest pass was a TransferDetailsPage Arabic copy restoration bugfix only
-- Route remains `/transfers/:transferId`
-- `TransferDetailsPage` now uses four internal sections:
-  - Summary
-  - Payments
-  - Payment History
-  - Print
-- Mobile now uses a compact page-level tab bar with short labels:
-  - `الملخص`
-  - `الدفعات`
-  - `السجل`
-  - `الطباعة`
-- Mobile shows one primary section at a time by default
-- Desktop keeps a clear page-level segmented section row inside the page
-- The sectioned layout was preserved intentionally, along with:
-  - online payment recording
-  - offline payment recording
-  - pending / blocked / failed local payment visibility
-  - manual replay / retry controls
-  - partial offline snapshot behavior
-  - print statement access and print flow
-- Existing financial calculations, follow-up cues, and queue behavior remain
-  intentionally unchanged
-- Dashboard and other page reorganizations remain deferred for later passes
+- Latest completed pass is **Phase 1 AppShell mobile transformation**
+- Scope was shell-level mobile refinement only:
+  - mobile top bar
+  - global page frame
+  - safe-area handling
+  - bottom navigation
+  - global sync/connection status presentation
+  - mobile spacing rhythm
+- `TransfersPage` redesign/polish was intentionally excluded from this pass
+- Existing page-level business behavior and offline semantics remain unchanged
+- Internal sectioned page organizations (including `TransferDetailsPage`) remain
+  as previously implemented; this pass did not alter them
 
 ## Active Phase
 
-Offline / PWA work is currently at:
+Latest mobile UI transformation progress:
+- Phase 1 complete: AppShell mobile transformation
+
+Offline / PWA baseline remains at:
 - Phase 12 complete: shell + status UI + snapshot reads + customer queue +
   transfer queue + payment queue + dependency-aware replay refinement +
   QA/deployment hardening + Safari/iPhone offline fallback bugfixes +

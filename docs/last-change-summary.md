@@ -1,52 +1,44 @@
 # Last Change Summary
 
 Task completed:
-- TransferDetailsPage Arabic copy restoration bugfix
+- Phase 1 AppShell mobile transformation
 
 Scope implemented:
-- Restored corrupted Arabic UI copy inside the recently reorganized
-  `TransferDetailsPage`
-- Preserved the current four-section layout:
-  - Summary
-  - Payments
-  - Payment History
-  - Print
-- Restored proper Arabic labels and explanatory copy for:
-  - section cards
-  - balance/partial-snapshot notes
-  - history inline note
-  - secondary transfer detail labels
-  - lock-state messaging
+- Mobile shell-level UI refinement only:
+  - mobile top bar spacing and density
+  - global page frame rhythm on small screens
+  - iPhone safe-area handling around content and bottom controls
+  - bottom navigation spacing and active-state clarity
+  - global connection/sync status presentation spacing
+- Kept the work scoped to shell framing and CSS behavior only
+- Explicitly excluded TransfersPage redesign/polish from this completed pass
 
 Files changed:
-- `src/pages/TransferDetailsPage.jsx`
-- `docs/project-current-state.md`
+- `src/index.css`
 - `docs/implementation-log.md`
-- `docs/code-map.md`
 - `docs/last-change-summary.md`
-- `docs/iphone-qa-checklist.md`
 
 What did NOT change:
 - Business logic
 - Database schema
-- Supabase tables/contracts
-- Routes/navigation
+- Supabase tables/contracts and query contracts
+- Routes/navigation destinations
+- Offline snapshot / queue / replay semantics
 - Print flow
-- Offline payment queue/replay behavior
-- Offline snapshot behavior
-- Other page reorganizations
+- TransfersPage business/layout internals
 
 Verification results:
 - `npm run lint` - passed
 - `npm run build` - passed
-- Preview HTTP smoke - not run from this environment
+- Existing build-size warning remains (main client chunk exceeds 500 kB after minification)
 
 Known limitations:
 - Real iPhone retesting is still required and was not performed from this
   environment
-- This pass restores Arabic copy only; it does not redesign the sectioned
-  layout or broaden product scope
+- This pass is shell-focused only; it does not start Phase 2/3 page-level
+  transformation work
 
 Recommended next step:
-- Re-test `TransferDetailsPage` on iPhone/mobile for Arabic copy correctness,
-  section switching clarity, and preserved payment/print behavior
+- Continue with the approved next phase after shell QA:
+  - unified mobile section navigation system (Phase 2), then
+  - TransfersPage mobile-first polish (Phase 3)
