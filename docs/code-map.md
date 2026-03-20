@@ -31,6 +31,9 @@
 - `docs/mobile-qa-final-checklist.md`
   - **Phase 10 record:** plan §20 scenario matrix (static vs device), issues/fixes, deferrals; companion to
     **`docs/iphone-qa-checklist.md`**
+- `docs/mobile-ui-signoff.md`
+  - Final **mobile UI/theme sign-off** record for repo/browser scope: checked areas, status, tiny fixes, deferred
+    external limitations, and completion statement
 - `src/index.css`
   - **`:root[data-theme='light']` / `:not([data-theme])`** and **`:root[data-theme='dark']`** define
     semantic tokens + legacy aliases; mobile `@media` scopes light/dark **`:root`** overrides
@@ -378,6 +381,8 @@ Approved snapshot-backed pages now use deterministic fallback hardening:
 
 - `docs/iphone-qa-checklist.md`
   - Manual device checklist for Safari and Add to Home Screen validation
+- `docs/mobile-ui-signoff.md`
+  - Final repository/browser sign-off document for the mobile UI/theme scope
 - `docs/deployment-readiness-checklist.md`
   - Launch/deployment requirements and readiness tracking
 - `docs/manual-test-matrix.md`

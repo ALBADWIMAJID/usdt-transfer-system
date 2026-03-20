@@ -26,7 +26,22 @@ function TransferFormSection({
   valueBeforePercentageLabel,
   amountDisplayLabel = '',
   globalRateDisplayLabel = '',
+  rateAssist = null,
 }) {
+  const rateAssistTone =
+    rateAssist?.error && !rateAssist?.fetchedRateLabel
+      ? 'new-transfer-rate-assist--error'
+      : rateAssist?.fetchedRateLabel
+        ? 'new-transfer-rate-assist--success'
+        : ''
+  const rateAssistButtonLabel = rateAssist?.isOffline
+    ? 'يتطلب اتصالًا'
+    : rateAssist?.isLoading
+      ? 'جارٍ التحديث...'
+      : rateAssist?.fetchedRateLabel
+        ? 'تحديث السعر'
+        : 'جلب السعر الحالي'
+
   return (
     <SectionCard
       className="new-transfer-form-section"
@@ -107,17 +122,84 @@ function TransferFormSection({
             helpText="السعر الأساسي قبل تطبيق النسبة على الحوالة."
             className="new-transfer-field-rate"
           >
-            <input
-              id="global_rate"
-              name="global_rate"
-              type="number"
-              step="any"
-              min="0"
-              value={formValues.global_rate}
-              onChange={onChange}
-              placeholder="95.10"
-              required
-            />
+            <>
+              <input
+                id="global_rate"
+                name="global_rate"
+                type="number"
+                step="any"
+                min="0"
+                value={formValues.global_rate}
+                onChange={onChange}
+                placeholder="95.10"
+                required
+              />
+
+              {rateAssist ? (
+                <div
+                  className={['new-transfer-rate-assist', rateAssistTone].filter(Boolean).join(' ')}
+                  aria-live="polite"
+                >
+                  <div className="new-transfer-rate-assist-head">
+                    <div className="new-transfer-rate-assist-copy">
+                      <span className="new-transfer-rate-assist-label">مساعدة سعر USD/RUB</span>
+                      <p className="new-transfer-rate-assist-value">
+                        {rateAssist.fetchedRateLabel
+                          ? `${rateAssist.fetchedRateLabel} RUB`
+                          : 'لم يتم جلب سعر بعد'}
+                      </p>
+                      <p className="new-transfer-rate-assist-hint">
+                        {rateAssist.isOffline
+                          ? 'أنت تعمل دون اتصال. يظل الإدخال اليدوي متاحًا بالكامل.'
+                          : 'السعر المجلوب اختياري للمساعدة فقط، ويمكنك تعديل الحقل يدويًا قبل الحفظ.'}
+                      </p>
+                    </div>
+
+                    <button
+                      type="button"
+                      className="button secondary new-transfer-rate-assist-button"
+                      onClick={rateAssist.onFetchRate}
+                      disabled={rateAssist.isLoading || rateAssist.isOffline}
+                    >
+                      {rateAssistButtonLabel}
+                    </button>
+                  </div>
+
+                  {rateAssist.sourceLabel ||
+                  rateAssist.publishedAtLabel ||
+                  rateAssist.sourceUpdatedAtLabel ||
+                  rateAssist.fetchedAtLabel ? (
+                    <p className="new-transfer-rate-assist-meta">
+                      {rateAssist.sourceLabel ? (
+                        <>
+                          <span>المصدر: </span>
+                          {rateAssist.sourceUrl ? (
+                            <a href={rateAssist.sourceUrl} target="_blank" rel="noreferrer">
+                              {rateAssist.sourceLabel}
+                            </a>
+                          ) : (
+                            <span>{rateAssist.sourceLabel}</span>
+                          )}
+                        </>
+                      ) : null}
+                      {rateAssist.publishedAtLabel ? (
+                        <span> · نشرة السعر: {rateAssist.publishedAtLabel}</span>
+                      ) : null}
+                      {rateAssist.sourceUpdatedAtLabel ? (
+                        <span> · تحديث المصدر: {rateAssist.sourceUpdatedAtLabel}</span>
+                      ) : null}
+                      {rateAssist.fetchedAtLabel ? (
+                        <span> · تم الجلب: {rateAssist.fetchedAtLabel}</span>
+                      ) : null}
+                    </p>
+                  ) : null}
+
+                  {rateAssist.error ? (
+                    <p className="new-transfer-rate-assist-error">{rateAssist.error}</p>
+                  ) : null}
+                </div>
+              ) : null}
+            </>
           </FieldShell>
 
           <ReadonlyField

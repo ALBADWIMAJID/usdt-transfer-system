@@ -5,16 +5,25 @@ import CustomerRecentActivity from '../components/customer-details/CustomerRecen
 import CustomerSummary from '../components/customer-details/CustomerSummary.jsx'
 import CustomerTotals from '../components/customer-details/CustomerTotals.jsx'
 import CustomerTransfersList from '../components/customer-details/CustomerTransfersList.jsx'
+import CustomersFormSection from '../components/customers/CustomersFormSection.jsx'
 import InfoCard from '../components/ui/InfoCard.jsx'
 import InfoGrid from '../components/ui/InfoGrid.jsx'
+import InlineMessage from '../components/ui/InlineMessage.jsx'
 import OfflineSnapshotNotice from '../components/ui/OfflineSnapshotNotice.jsx'
 import PageHeader from '../components/ui/PageHeader.jsx'
 import SectionCard from '../components/ui/SectionCard.jsx'
 import { useAuth } from '../context/auth-context.js'
 import useNetworkStatus from '../hooks/useNetworkStatus.js'
 import useOfflineSnapshot from '../hooks/useOfflineSnapshot.js'
+import {
+  createCustomerFormValues,
+  createEmptyCustomerForm,
+  normalizeCustomerProfilePayload,
+  validateCustomerProfilePayload,
+} from '../lib/customerProfile.js'
 import { getCustomerDetailsSnapshotKey } from '../lib/offline/cacheKeys.js'
 import { getOfflineSnapshotMissingMessage } from '../lib/offline/freshness.js'
+import { syncEditedCustomerSnapshots } from '../lib/offline/customerSnapshots.js'
 import {
   isBrowserOffline,
   isLikelyOfflineReadFailure,
@@ -166,6 +175,11 @@ function CustomerDetailsPage() {
   const [totalPaidRub, setTotalPaidRub] = useState(0)
   const customerSnapshotKey = getCustomerDetailsSnapshotKey(customerId)
   const [activeSection, setActiveSection] = useState('overview')
+  const [isEditingCustomer, setIsEditingCustomer] = useState(false)
+  const [editFormValues, setEditFormValues] = useState(() => createEmptyCustomerForm())
+  const [editSubmitting, setEditSubmitting] = useState(false)
+  const [editSubmitError, setEditSubmitError] = useState('')
+  const [editSubmitSuccess, setEditSubmitSuccess] = useState('')
 
   useEffect(() => {
     if (!isConfigured || !supabase || !customerId) {
@@ -503,6 +517,133 @@ function CustomerDetailsPage() {
 
   const totalsReady = !paymentTotalsLoading && !paymentTotalsError
   const customerUnavailable = customerNotFound || Boolean(customerError)
+  const editDisabled = !isEditingCustomer && (isOffline || customerUnavailable || !customer)
+
+  useEffect(() => {
+    setIsEditingCustomer(false)
+    setEditFormValues(createEmptyCustomerForm())
+    setEditSubmitting(false)
+    setEditSubmitError('')
+    setEditSubmitSuccess('')
+  }, [customerId])
+
+  useEffect(() => {
+    if (isEditingCustomer) {
+      return
+    }
+
+    setEditFormValues(customer ? createCustomerFormValues(customer) : createEmptyCustomerForm())
+  }, [customer, isEditingCustomer])
+
+  const handleEditFormChange = (event) => {
+    const { name, value } = event.target
+
+    setEditFormValues((current) => ({
+      ...current,
+      [name]: value,
+    }))
+
+    if (editSubmitError) {
+      setEditSubmitError('')
+    }
+
+    if (editSubmitSuccess) {
+      setEditSubmitSuccess('')
+    }
+  }
+
+  const handleCloseEditCustomer = () => {
+    setIsEditingCustomer(false)
+    setEditSubmitting(false)
+    setEditSubmitError('')
+    setEditSubmitSuccess('')
+    setEditFormValues(customer ? createCustomerFormValues(customer) : createEmptyCustomerForm())
+  }
+
+  const handleToggleEditCustomer = () => {
+    if (isEditingCustomer) {
+      handleCloseEditCustomer()
+      return
+    }
+
+    setActiveSection('actions')
+    setIsEditingCustomer(true)
+    setEditSubmitError('')
+    setEditSubmitSuccess('')
+    setEditFormValues(customer ? createCustomerFormValues(customer) : createEmptyCustomerForm())
+  }
+
+  const handleEditCustomerSubmit = async (event) => {
+    event.preventDefault()
+
+    if (isOffline) {
+      setEditSubmitError('تعديل بيانات العميل متاح أثناء الاتصال فقط حاليا.')
+      setEditSubmitSuccess('')
+      return
+    }
+
+    if (!isConfigured || !supabase) {
+      setEditSubmitError(configError || 'تعذر الاتصال بقاعدة البيانات حاليا.')
+      setEditSubmitSuccess('')
+      return
+    }
+
+    if (!customerId || !customer) {
+      setEditSubmitError('تعذر تحديد ملف العميل المطلوب تحديثه.')
+      setEditSubmitSuccess('')
+      return
+    }
+
+    const payload = normalizeCustomerProfilePayload(editFormValues)
+    const validationError = validateCustomerProfilePayload(payload)
+
+    if (validationError) {
+      setEditSubmitError(validationError)
+      setEditSubmitSuccess('')
+      return
+    }
+
+    setEditSubmitting(true)
+    setEditSubmitError('')
+    setEditSubmitSuccess('')
+
+    try {
+      const { data, error } = await supabase
+        .schema('public')
+        .from('customers')
+        .update(payload)
+        .eq('id', customerId)
+        .select('id, full_name, phone, notes, created_at')
+        .maybeSingle()
+
+      if (error) {
+        throw error
+      }
+
+      if (!data) {
+        throw new Error('تعذر حفظ تعديلات العميل في الوقت الحالي.')
+      }
+
+      const nextCustomer = {
+        ...customer,
+        ...data,
+      }
+
+      setCustomer(nextCustomer)
+      setEditFormValues(createCustomerFormValues(nextCustomer))
+      setEditSubmitSuccess('تم تحديث بيانات العميل بنجاح.')
+
+      try {
+        await syncEditedCustomerSnapshots(nextCustomer)
+      } catch (snapshotError) {
+        console.error('Failed to sync edited customer snapshots', snapshotError)
+      }
+    } catch (error) {
+      setEditSubmitError(error?.message || 'تعذر حفظ تعديلات العميل في الوقت الحالي.')
+    } finally {
+      setEditSubmitting(false)
+    }
+  }
 
   const enrichedTransfers = transfers
     .map((transfer) => {
@@ -975,7 +1116,7 @@ function CustomerDetailsPage() {
 
   const transfersSectionCount = customerNotFound ? 0 : totalTransfers
   const activitySectionCount = customerNotFound ? 0 : recentActivityItems.length
-  const actionsSectionCount = customerNotFound ? 0 : 2
+  const actionsSectionCount = customerNotFound ? 0 : 3
 
   const sectionNavItems = CUSTOMER_DETAILS_SECTIONS.map((section) => {
     if (section.key === 'overview') {
@@ -1031,6 +1172,16 @@ function CustomerDetailsPage() {
                 حوالة جديدة للعميل
               </Link>
             ) : null}
+            <button
+              type="button"
+              className="button secondary"
+              onClick={handleToggleEditCustomer}
+              disabled={editDisabled}
+            >
+              {isEditingCustomer
+                ? '\u0625\u063a\u0644\u0627\u0642 \u0627\u0644\u062a\u0639\u062f\u064a\u0644'
+                : '\u062a\u0639\u062f\u064a\u0644 \u0628\u064a\u0627\u0646\u0627\u062a \u0627\u0644\u0639\u0645\u064a\u0644'}
+            </button>
             <button type="button" className="button secondary" onClick={handleTransfersRefresh}>
               تحديث الحوالات
             </button>
@@ -1208,7 +1359,36 @@ function CustomerDetailsPage() {
             .filter(Boolean)
             .join(' ')}
         >
+          {isOffline && !customerUnavailable ? (
+            <InlineMessage kind="info" className="customer-edit-offline-note">
+              {'\u062a\u0639\u062f\u064a\u0644 \u0628\u064a\u0627\u0646\u0627\u062a \u0627\u0644\u0639\u0645\u064a\u0644 \u0645\u062a\u0627\u062d \u0623\u062b\u0646\u0627\u0621 \u0627\u0644\u0627\u062a\u0635\u0627\u0644 \u0641\u0642\u0637 \u062d\u0627\u0644\u064a\u0627. \u064a\u0645\u0643\u0646\u0643 \u0645\u0631\u0627\u062c\u0639\u0629 \u0627\u0644\u0645\u0644\u0641 \u0645\u062d\u0644\u064a\u0627 \u062f\u0648\u0646 \u062a\u0639\u062f\u064a\u0644 \u062d\u062a\u0649 \u064a\u0639\u0648\u062f \u0627\u0644\u0627\u062a\u0635\u0627\u0644.'}
+            </InlineMessage>
+          ) : null}
+
           <InfoGrid className="customer-details-secondary-grid">
+            <InfoCard
+              title={'\u062a\u0639\u062f\u064a\u0644 \u0628\u064a\u0627\u0646\u0627\u062a \u0627\u0644\u0639\u0645\u064a\u0644'}
+              value={
+                '\u062d\u062f\u0651\u062b \u0627\u0644\u0627\u0633\u0645 \u0648\u0631\u0642\u0645 \u0627\u0644\u0647\u0627\u062a\u0641 \u0648\u0627\u0644\u0645\u0644\u0627\u062d\u0638\u0627\u062a \u0627\u0644\u062f\u0627\u062e\u0644\u064a\u0629 \u0641\u0642\u0637 \u062f\u0648\u0646 \u0627\u0644\u0645\u0633\u0627\u0633 \u0628\u0627\u0644\u062d\u0648\u0627\u0644\u0627\u062a \u0623\u0648 \u0633\u062c\u0644 \u0627\u0644\u062a\u062d\u0635\u064a\u0644.'
+              }
+              className={isEditingCustomer ? 'info-card--accent' : ''}
+            >
+              <p className="support-text">
+                {isOffline
+                  ? '\u0627\u0644\u062a\u062d\u062f\u064a\u062b \u0627\u0644\u0645\u0628\u0627\u0634\u0631 \u0644\u0628\u064a\u0627\u0646\u0627\u062a \u0627\u0644\u0639\u0645\u064a\u0644 \u0645\u062a\u0627\u062d \u0641\u0642\u0637 \u0623\u062b\u0646\u0627\u0621 \u0627\u0644\u0627\u062a\u0635\u0627\u0644\u060c \u0648\u0644\u0627 \u064a\u062a\u0645 \u0625\u0646\u0634\u0627\u0621 \u0637\u0627\u0628\u0648\u0631 \u062a\u0639\u062f\u064a\u0644 \u0645\u062d\u0644\u064a \u0641\u064a \u0647\u0630\u0627 \u0627\u0644\u0645\u0633\u0627\u0631.'
+                  : '\u064a\u0628\u0642\u0649 \u0643\u0644 \u062a\u0627\u0631\u064a\u062e \u0627\u0644\u062d\u0648\u0627\u0644\u0627\u062a \u0648\u0627\u0644\u0645\u062f\u0641\u0648\u0639\u0627\u062a \u0643\u0645\u0627 \u0647\u0648\u060c \u0648\u064a\u062a\u0645 \u062a\u062d\u062f\u064a\u062b \u0628\u064a\u0627\u0646\u0627\u062a \u0627\u0644\u0645\u0644\u0641 \u0641\u0642\u0637.'}
+              </p>
+              <button
+                type="button"
+                className="button secondary"
+                onClick={handleToggleEditCustomer}
+                disabled={editDisabled}
+              >
+                {isEditingCustomer
+                  ? '\u0625\u062e\u0641\u0627\u0621 \u0646\u0645\u0648\u0630\u062c \u0627\u0644\u062a\u0639\u062f\u064a\u0644'
+                  : '\u062a\u0639\u062f\u064a\u0644 \u0645\u0644\u0641 \u0627\u0644\u0639\u0645\u064a\u0644'}
+              </button>
+            </InfoCard>
             {customerId ? (
               <InfoCard
                 title="إنشاء حوالة جديدة لهذا العميل"
@@ -1236,6 +1416,40 @@ function CustomerDetailsPage() {
               </Link>
             </InfoCard>
           </InfoGrid>
+          {isEditingCustomer && customer ? (
+            <CustomersFormSection
+              title={'\u062a\u0639\u062f\u064a\u0644 \u0645\u0644\u0641 \u0627\u0644\u0639\u0645\u064a\u0644'}
+              description={
+                '\u062d\u062f\u0651\u062b \u0628\u064a\u0627\u0646\u0627\u062a \u0627\u0644\u0627\u0633\u0645 \u0648\u0627\u0644\u0647\u0627\u062a\u0641 \u0648\u0627\u0644\u0645\u0644\u0627\u062d\u0638\u0627\u062a \u0627\u0644\u062f\u0627\u062e\u0644\u064a\u0629 \u0644\u0644\u0639\u0645\u064a\u0644 \u0627\u0644\u062d\u0627\u0644\u064a \u0641\u0642\u0637. \u0644\u0646 \u064a\u062a\u0645 \u062a\u0639\u062f\u064a\u0644 \u0627\u0644\u062d\u0648\u0627\u0644\u0627\u062a \u0623\u0648 \u0633\u062c\u0644 \u0627\u0644\u0645\u062f\u0641\u0648\u0639\u0627\u062a.'
+              }
+              className="customer-edit-form-section"
+              submitError={editSubmitError}
+              submitSuccess={editSubmitSuccess}
+              submitLabel={'\u062d\u0641\u0638 \u0627\u0644\u062a\u0639\u062f\u064a\u0644\u0627\u062a'}
+              submittingLabel={'\u062c\u0627\u0631 \u062d\u0641\u0638 \u0627\u0644\u062a\u0639\u062f\u064a\u0644\u0627\u062a...'}
+              formValues={editFormValues}
+              infoMessage={
+                isOffline
+                  ? '\u062a\u0639\u062f\u064a\u0644 \u0628\u064a\u0627\u0646\u0627\u062a \u0627\u0644\u0639\u0645\u064a\u0644 \u0645\u062a\u0627\u062d \u0623\u062b\u0646\u0627\u0621 \u0627\u0644\u0627\u062a\u0635\u0627\u0644 \u0641\u0642\u0637 \u062d\u0627\u0644\u064a\u0627.'
+                  : ''
+              }
+              onChange={handleEditFormChange}
+              onSubmit={handleEditCustomerSubmit}
+              submitting={editSubmitting}
+              isConfigured={isConfigured}
+              submitDisabled={isOffline}
+              secondaryAction={
+                <button
+                  type="button"
+                  className="button secondary"
+                  onClick={handleCloseEditCustomer}
+                  disabled={editSubmitting}
+                >
+                  {'\u0625\u0644\u063a\u0627\u0621'}
+                </button>
+              }
+            />
+          ) : null}
         </SectionCard>
 
         {customer ? (

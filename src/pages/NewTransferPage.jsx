@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import NewTransferHeader from '../components/new-transfer/NewTransferHeader.jsx'
 import TransferComputedSummary from '../components/new-transfer/TransferComputedSummary.jsx'
@@ -25,6 +25,7 @@ import {
   saveReadSnapshot,
   withLiveReadTimeout,
 } from '../lib/offline/readCache.js'
+import { fetchUsdRubRate } from '../lib/exchangeRates.js'
 import { queueOfflineTransfer } from '../lib/offline/transferQueue.js'
 import { supabase } from '../lib/supabase.js'
 
@@ -35,6 +36,19 @@ function createEmptyForm(customerId = '') {
     global_rate: '',
     percentage: '0',
     notes: '',
+  }
+}
+
+function createEmptyRateAssistState() {
+  return {
+    error: '',
+    fetchedAt: '',
+    isLoading: false,
+    publishedAt: '',
+    rate: null,
+    sourceLabel: '',
+    sourceUpdatedAt: '',
+    sourceUrl: '',
   }
 }
 
@@ -54,6 +68,12 @@ function roundCurrency(value) {
 
 function roundRate(value) {
   return Math.round((value + Number.EPSILON) * 1000000) / 1000000
+}
+
+function formatRateInputValue(value) {
+  const roundedValue = roundRate(value)
+
+  return Number.isFinite(roundedValue) ? String(roundedValue) : ''
 }
 
 function formatNumber(value, digits = 2) {
@@ -185,9 +205,11 @@ function NewTransferPage() {
   const [customersError, setCustomersError] = useState(isConfigured ? '' : configError)
   const [customerRefreshKey, setCustomerRefreshKey] = useState(0)
   const [formValues, setFormValues] = useState(() => createEmptyForm(presetCustomerId))
+  const [rateAssist, setRateAssist] = useState(() => createEmptyRateAssistState())
   const [submitError, setSubmitError] = useState('')
   const [submitSuccess, setSubmitSuccess] = useState('')
   const [submitting, setSubmitting] = useState(false)
+  const rateAssistRequestRef = useRef(null)
   const {
     activeCount: pendingTransferCount,
     failedCount: failedTransferCount,
@@ -314,6 +336,12 @@ function NewTransferPage() {
     markLiveSnapshot,
   ])
 
+  useEffect(() => {
+    return () => {
+      rateAssistRequestRef.current?.abort()
+    }
+  }, [])
+
   const handleCustomerRefresh = () => {
     setCustomerRefreshKey((current) => current + 1)
   }
@@ -323,10 +351,79 @@ function NewTransferPage() {
 
     setSubmitError('')
     setSubmitSuccess('')
+    if (name === 'global_rate') {
+      setRateAssist((current) =>
+        current.error
+          ? {
+              ...current,
+              error: '',
+            }
+          : current
+      )
+    }
     setFormValues((current) => ({
       ...current,
       [name]: value,
     }))
+  }
+
+  const handleFetchRate = async () => {
+    if (isOffline) {
+      setRateAssist((current) => ({
+        ...current,
+        error: 'أنت تعمل دون اتصال. أدخل السعر يدويًا حتى يعود الاتصال.',
+        isLoading: false,
+      }))
+      return
+    }
+
+    rateAssistRequestRef.current?.abort()
+
+    const controller = new AbortController()
+    rateAssistRequestRef.current = controller
+
+    setRateAssist((current) => ({
+      ...current,
+      error: '',
+      isLoading: true,
+    }))
+
+    try {
+      const latestRate = await fetchUsdRubRate({ signal: controller.signal })
+
+      if (rateAssistRequestRef.current !== controller) {
+        return
+      }
+
+      setFormValues((current) => ({
+        ...current,
+        global_rate: formatRateInputValue(latestRate.rate),
+      }))
+      setRateAssist({
+        error: '',
+        fetchedAt: latestRate.fetchedAt,
+        isLoading: false,
+        publishedAt: latestRate.publishedAt,
+        rate: latestRate.rate,
+        sourceLabel: latestRate.sourceLabel,
+        sourceUpdatedAt: latestRate.sourceUpdatedAt,
+        sourceUrl: latestRate.sourceUrl,
+      })
+    } catch (error) {
+      if (controller.signal.aborted) {
+        return
+      }
+
+      setRateAssist((current) => ({
+        ...current,
+        error: error?.message || 'تعذر جلب سعر USD/RUB الآن. أدخل السعر يدويًا أو أعد المحاولة.',
+        isLoading: false,
+      }))
+    } finally {
+      if (rateAssistRequestRef.current === controller) {
+        rateAssistRequestRef.current = null
+      }
+    }
   }
 
   const selectedCustomer = customers.find((customer) => customer.id === formValues.customer_id) || null
@@ -558,6 +655,20 @@ function NewTransferPage() {
         valueAfterPercentageLabel={valueAfterPercentageLabel}
         amountDisplayLabel={parsedAmount === null ? '' : formatNumber(parsedAmount, 2)}
         globalRateDisplayLabel={parsedGlobalRate === null ? '' : formatNumber(parsedGlobalRate, 4)}
+        rateAssist={{
+          error: rateAssist.error,
+          fetchedAtLabel: rateAssist.fetchedAt ? formatDateTime(rateAssist.fetchedAt) : '',
+          fetchedRateLabel: rateAssist.rate === null ? '' : formatNumber(rateAssist.rate, 4),
+          isLoading: rateAssist.isLoading,
+          isOffline,
+          onFetchRate: handleFetchRate,
+          publishedAtLabel: rateAssist.publishedAt ? formatDateTime(rateAssist.publishedAt) : '',
+          sourceLabel: rateAssist.sourceLabel,
+          sourceUpdatedAtLabel: rateAssist.sourceUpdatedAt
+            ? formatDateTime(rateAssist.sourceUpdatedAt)
+            : '',
+          sourceUrl: rateAssist.sourceUrl,
+        }}
       />
 
       <TransferComputedSummary

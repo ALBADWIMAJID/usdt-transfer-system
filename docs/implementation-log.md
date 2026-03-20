@@ -1,5 +1,220 @@
 # Implementation Log
 
+## 2026-03-20 - Customer edit submit guard fix
+
+Scope: targeted bug fix only. Corrects the customer-edit submit guard so the flow no longer treats the static
+`configError` label as an active configuration failure on every save attempt.
+
+Files changed:
+
+- `src/pages/CustomerDetailsPage.jsx` - removes the always-truthy `configError` guard from the edit submit path
+- `docs/implementation-log.md`
+- `docs/last-change-summary.md`
+
+Verification:
+
+- `npm run lint` - passed
+- `npm run build` - passed
+
+## 2026-03-20 - Safe customer edit workflow
+
+Scope: customer-profile editing only. Adds a compact edit flow from `CustomerDetailsPage`, reuses the existing customer
+form section, keeps transfer/payment history untouched, and stays online-only rather than introducing a new offline edit
+queue.
+
+Files changed:
+
+- `src/pages/CustomerDetailsPage.jsx` - adds the edit entry point, edit state, online-only save flow, and snapshot sync
+- `src/components/customers/CustomersFormSection.jsx` - supports reusable titles, submit disabling, and secondary action
+  buttons for edit mode
+- `src/pages/CustomersPage.jsx` - reuses shared customer profile payload helpers for create flow consistency
+- `src/lib/customerProfile.js` - centralizes customer form defaults, payload normalization, and validation
+- `src/lib/offline/customerSnapshots.js` - patches customer-related read snapshots after a successful online edit
+- `src/index.css` - adds compact customer form action styling and customer-details edit form spacing
+- `docs/implementation-log.md`
+- `docs/last-change-summary.md`
+
+Verification:
+
+- `npm run lint` - passed
+- `npm run build` - passed
+
+Suggested commit message:
+
+- `Add safe customer edit workflow`
+
+## 2026-03-20 - EDUQUEST branding presentation cleanup
+
+Scope: branding-presentation cleanup only. Refines the EDUQUEST asset strategy so full logo, compact mark, print-safe
+logo, and Home Screen icons each use a more appropriate derived variant. No business logic, route, schema, auth,
+Supabase, offline, or replay behavior changes.
+
+Files changed:
+
+- `src/config/branding.js` - adds a dedicated `printLogo` asset path while keeping branding centralized
+- `src/components/ui/BrandLogo.jsx` - selects the full or print-safe asset by variant
+- `src/components/AppShell.jsx` - switches the sidebar lockup to compact brand usage without the long tagline
+- `src/pages/LoginPage.jsx` - uses the hero brand variant for a lighter, less blocky login presentation
+- `src/index.css` - refines compact mark treatment, hero/print logo presentation, print-preview styling, and print-media
+  branding hierarchy
+- `public/offline.html` - uses the lighter EDUQUEST print-safe logo treatment
+- `public/sw.js` - bumps shell cache version and precaches the new print-safe logo asset
+- `public/branding/eduquest-logo.png` - regenerated tighter full-logo crop
+- `public/branding/eduquest-logo-print.png` - new print-safe logo variant
+- `public/branding/eduquest-mark.png` - regenerated transparent compact mark variant
+- `public/icons/eduquest-icon-192.png`
+- `public/icons/eduquest-icon-512.png`
+- `public/icons/eduquest-icon-maskable-512.png`
+- `public/apple-touch-icon.png`
+- `docs/implementation-log.md`
+- `docs/last-change-summary.md`
+
+Verification:
+
+- `npm run lint` - passed
+- `npm run build` - passed
+
+Suggested commit message:
+
+- `Refine EDUQUEST branding presentation variants`
+
+## 2026-03-20 - EDUQUEST branding asset integration
+
+Scope: branding-only update. Replaces the visible app identity with `EDUQUEST`, integrates the supplied logo asset into
+shared brand surfaces, and swaps placeholder Home Screen/PWA icon wiring to new EDUQUEST-derived PNG assets. No business
+logic, route, schema, auth, Supabase, offline, or replay behavior changes.
+
+Files changed:
+
+- `src/config/branding.js` - central branding source now uses `EDUQUEST` text plus base-safe logo/icon asset paths
+- `src/components/ui/BrandMark.jsx` - replaces the old monogram SVG with the new EDUQUEST square mark asset
+- `src/components/ui/BrandLockup.jsx` - avoids duplicate office/system lines when both resolve to the same brand name
+- `src/components/ui/BrandLogo.jsx` - shared full-logo component for larger brand surfaces
+- `src/pages/LoginPage.jsx` - login hero branding now uses the EDUQUEST logo asset
+- `src/components/transfer-details/PrintStatement.jsx` - print header branding now uses the EDUQUEST logo asset
+- `src/index.css` - compact support for the new raster logo/mark in light and dark themes
+- `index.html` - updated visible app title plus favicon/apple-touch icon wiring
+- `public/manifest.webmanifest` - updated app name/short name and PWA icon paths
+- `public/offline.html` - updated offline shell branding
+- `public/sw.js` - bumps the shell cache version and precaches the new EDUQUEST logo/icon assets
+- `public/branding/eduquest-logo.png`
+- `public/branding/eduquest-mark.png`
+- `public/icons/eduquest-icon-192.png`
+- `public/icons/eduquest-icon-512.png`
+- `public/icons/eduquest-icon-maskable-512.png`
+- `public/apple-touch-icon.png`
+- `docs/implementation-log.md`
+- `docs/last-change-summary.md`
+
+Verification:
+
+- `npm run lint` - passed
+- `npm run build` - passed
+
+Suggested commit message:
+
+- `Integrate EDUQUEST branding and PWA icons`
+
+## 2026-03-20 - Dashboard profit KPI + drill-down
+
+Scope: compact dashboard enhancement only. Adds a profit KPI backed by the existing `commission_rub` transfer field,
+plus a drill-down list that reuses the current operations sheet pattern. No transfer/payment calculation changes, schema
+changes, route changes, auth changes, or offline queue/replay behavior changes.
+
+Files changed:
+
+- `src/pages/DashboardPage.jsx` - dashboard transfer query now includes `commission_rub`; computes total profit and
+  today's profit from the stored transfer field, adds a profit headline KPI, and wires a profit drill-down list that
+  links each row to the transfer details page
+- `src/index.css` - adds a small `dashboard-snapshot-card--wide` layout hook so the new KPI fits the existing desktop
+  and mobile-lite dashboard grids without a broader redesign
+- `docs/implementation-log.md`
+- `docs/last-change-summary.md`
+
+Verification:
+
+- `npm run lint` - passed
+- `npm run build` - passed
+
+Suggested commit message:
+
+- `Add dashboard profit KPI drill-down`
+
+## 2026-03-20 - NewTransfer live USD/RUB rate assist
+
+Scope: compact assistive rate helper for `NewTransferPage`. No transfer business-rule changes, validation changes,
+submit contract changes, schema changes, route changes, auth changes, or offline queue/replay behavior changes.
+
+Files changed:
+
+- `src/lib/exchangeRates.js` - isolated `fetchUsdRubRate()` helper using the CORS-enabled `CBR XML Daily` USD/RUB feed,
+  with timeout/error handling and source metadata
+- `src/pages/NewTransferPage.jsx` - keeps `global_rate` as the source of truth, adds optional live-rate fetch state and
+  populates the existing manual field on success without changing save semantics
+- `src/components/new-transfer/TransferFormSection.jsx` - adds a compact inline helper beside the existing rate field:
+  fetch button, source/timestamp text, loading/error state, and manual-entry-preserved messaging
+- `src/index.css` - compact helper styling aligned with the current light/dark mobile form language
+- `docs/implementation-log.md`
+- `docs/last-change-summary.md`
+
+Verification:
+
+- `npm run lint` - passed
+- `npm run build` - passed
+
+Suggested commit message:
+
+- `Add live USD RUB rate assist to new transfer`
+
+## 2026-03-20 - Print return / deep-link recovery safeguard
+
+Scope: minimal **PWA/service-worker** hardening for the reported iPhone/Home Screen print-return blocker. No business logic,
+schema, auth, route contracts, offline queue semantics, replay ordering, or print statement content changes.
+
+Files changed:
+
+- `public/sw.js` - same-origin **navigation** requests that come back as failed/non-OK HTML responses now fall back to the
+  cached app shell instead of surfacing a raw host 404 page; this protects BrowserRouter deep links such as
+  `/transfers/:transferId` when the app is resumed/reopened after print in Safari/Home Screen mode
+- `docs/iphone-qa-checklist.md` - added a dedicated **return after print** device scenario
+- `docs/implementation-log.md`
+- `docs/last-change-summary.md`
+
+Verification:
+
+- `npm run lint` - passed
+- `npm run build` - passed
+
+Suggested commit message:
+
+- `Fix print return deep-link recovery on iPhone PWA`
+
+## 2026-03-20 - Final mobile UI/theme QA and sign-off
+
+Scope: final **QA/sign-off** pass after **T4.3**. **CSS/docs only**. No business logic, routes, auth, schema, print flow, or offline behavior changes.
+
+Files changed:
+
+- `src/index.css` - final mobile sign-off fixes:
+  - dark **`ThemePreferenceControl`** active-segment contrast
+  - mobile **page-hero** / **Dashboard Lite** action buttons aligned to the touch-target token
+  - mobile **drawer** top/bottom/right safe-area offsets
+  - mobile **operations-sheet** body bottom safe-area padding
+- `docs/mobile-ui-signoff.md` - final sign-off record (checked areas, pass/fail status, issues fixed, deferred limitations, completion statement)
+- `docs/project-current-state.md`
+- `docs/code-map.md`
+- `docs/implementation-log.md`
+- `docs/last-change-summary.md`
+
+Verification:
+
+- `npm run lint` - passed
+- `npm run build` - passed
+
+Suggested commit message:
+
+- `Final mobile UI theme QA and sign-off`
+
 ## 2026-03-20 — T4.3 follow-up: date/time interior + sheet actions + select hints
 
 Scope: **CSS-only** — extends **T4.3** without logic, routes, schema, auth, offline, or print changes. Further reduce

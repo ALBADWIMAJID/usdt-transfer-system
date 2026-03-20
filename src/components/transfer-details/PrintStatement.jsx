@@ -1,5 +1,5 @@
 import { branding } from '../../config/branding.js'
-import BrandLockup from '../ui/BrandLockup.jsx'
+import BrandLogo from '../ui/BrandLogo.jsx'
 import DetailList from '../ui/DetailList.jsx'
 import InlineMessage from '../ui/InlineMessage.jsx'
 import StatusBadge from '../ui/StatusBadge.jsx'
@@ -47,7 +47,7 @@ function PrintStatement({
       <div className="statement-sheet">
         <div className="statement-header">
           <div className="statement-branding">
-            <BrandLockup tone="print" size="sm" showOffice={false} showTagline={false} />
+            <BrandLogo variant="print" className="statement-brand-logo" />
             <div className="statement-brand-copy">
               <p className="eyebrow">{branding.printTitle}</p>
               <h2>{referenceNumber || `حوالة #${transferId}`}</h2>

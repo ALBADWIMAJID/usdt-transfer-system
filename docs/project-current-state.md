@@ -208,6 +208,10 @@ Latest mobile UI transformation progress:
   **autofill** surface match, **light** global **`color-scheme`**, **operations-sheet** body + actions chrome,
   **WebKit** date/time interiors + calendar **pointer** cursor, **select** **option** hints — see
   **`docs/last-change-summary.md`** and **`docs/mobile-theme-system.md`** §24
+- **Final mobile UI/theme QA + sign-off complete (repo/browser scope):** final cross-screen review of light/dark
+  presentation, controls, safe-area/sticky behavior, and operational-state clarity; only tiny CSS fixes applied
+  (**theme selector dark contrast**, **hero/dashboard action touch targets**, **drawer/sheet safe-area clearance**). See
+  **`docs/mobile-ui-signoff.md`**.
 - Mobile visual system: **Payvo-inspired fintech theme** + **documented theme system**
   (`docs/mobile-theme-system.md`) and **light/dark token architecture** (`data-theme`, `--theme-*`,
   `--type-*`); **dark** mode is a first-class polished appearance for major surfaces (residual literals may
@@ -284,6 +288,7 @@ What that means:
 - Manual QA artifacts now exist in:
   - `docs/iphone-qa-checklist.md`
   - `docs/mobile-qa-final-checklist.md` (Phase 10 UI record; static + device sign-off)
+  - `docs/mobile-ui-signoff.md` (final repo/browser sign-off for the mobile UI/theme scope)
   - `docs/deployment-readiness-checklist.md`
   - `docs/manual-test-matrix.md`
 - Approved snapshot-backed read pages now use deterministic offline-read

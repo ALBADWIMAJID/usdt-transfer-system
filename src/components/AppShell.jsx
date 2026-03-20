@@ -193,7 +193,7 @@ function AppShell() {
       <aside className={`sidebar${mobileNavOpen ? ' open' : ''}`} aria-label="التنقل الرئيسي">
         <div className="sidebar-panel">
           <div className="sidebar-header">
-            <BrandLockup tone="sidebar" size="md" />
+            <BrandLockup tone="sidebar" size="md" showTagline={false} />
 
             <button
               type="button"

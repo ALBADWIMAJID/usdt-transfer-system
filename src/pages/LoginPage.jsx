@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { Navigate, useLocation } from 'react-router-dom'
 import { branding } from '../config/branding.js'
-import BrandLockup from '../components/ui/BrandLockup.jsx'
+import BrandLogo from '../components/ui/BrandLogo.jsx'
 import ThemePreferenceControl from '../components/ui/ThemePreferenceControl.jsx'
 import { useAuth } from '../context/auth-context.js'
 
@@ -39,9 +39,9 @@ function LoginPage() {
     <div className="auth-screen">
       <section className="auth-card">
         <div className="auth-brand-panel">
-          <BrandLockup tone="auth" size="lg" showOffice={false} showTagline={false} />
+          <BrandLogo variant="hero" className="auth-brand-logo" />
           <div className="auth-brand-copy">
-            <p className="eyebrow">{branding.officeName}</p>
+            <p className="eyebrow">{branding.systemName}</p>
             <h1>تسجيل الدخول</h1>
             <p className="auth-copy">
               ادخل باستخدام بيانات المشغل للوصول إلى لوحة عمليات احترافية للحوالات والعملاء

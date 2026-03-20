@@ -1,10 +1,24 @@
+const basePath = import.meta.env.BASE_URL || '/'
+
+function resolveBrandAsset(pathname) {
+  const normalizedPath = pathname.replace(/^\/+/, '')
+  return `${basePath}${normalizedPath}`
+}
+
 export const branding = {
-  systemName: 'منصة المدار للحوالات',
-  officeName: 'مكتب المدار للتسويات المالية',
-  shortName: 'MD',
+  systemName: 'EDUQUEST',
+  officeName: 'EDUQUEST',
+  shortName: 'EDUQUEST',
   tagline: 'تشغيل احترافي للحوالات والتسويات والمدفوعات اليومية',
   printTitle: 'كشف الحوالة الرسمي',
-  logoMode: 'monogram',
+  logoMode: 'asset',
+  assets: {
+    logo: resolveBrandAsset('branding/eduquest-logo.png'),
+    printLogo: resolveBrandAsset('branding/eduquest-logo-print.png'),
+    mark: resolveBrandAsset('branding/eduquest-mark.png'),
+    appIcon: resolveBrandAsset('icons/eduquest-icon-512.png'),
+    appleTouchIcon: resolveBrandAsset('apple-touch-icon.png'),
+  },
   palette: {
     primary: '#0d7a72',
     primaryRgb: '13, 122, 114',

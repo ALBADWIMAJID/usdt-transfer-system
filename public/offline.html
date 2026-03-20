@@ -4,7 +4,7 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
     <meta name="theme-color" content="#11293b" />
-    <title>منصة المدار للحوالات</title>
+    <title>EDUQUEST</title>
     <style>
       :root {
         color-scheme: light;
@@ -43,22 +43,23 @@
       }
 
       .brand {
-        display: flex;
-        align-items: center;
-        gap: 0.9rem;
+        display: grid;
+        gap: 0.75rem;
         margin-bottom: 1rem;
       }
 
       .brand-mark {
-        width: 3rem;
-        height: 3rem;
+        width: min(100%, 9.5rem);
+        padding: 0.15rem 0.1rem;
         border-radius: 18px;
-        background: linear-gradient(180deg, var(--secondary), #183c55);
-        display: grid;
-        place-items: center;
-        color: #fff;
-        font-weight: 800;
-        letter-spacing: 0.08em;
+        background: linear-gradient(180deg, rgba(255, 255, 255, 0.82), rgba(241, 246, 251, 0.92));
+        box-shadow: 0 10px 22px rgba(15, 23, 42, 0.06);
+      }
+
+      .brand-mark img {
+        display: block;
+        width: 100%;
+        height: auto;
       }
 
       h1 {
@@ -105,9 +106,11 @@
   <body>
     <main class="offline-shell">
       <div class="brand">
-        <div class="brand-mark">MD</div>
+        <div class="brand-mark">
+          <img src="./branding/eduquest-logo-print.png" alt="EDUQUEST" />
+        </div>
         <div>
-          <h1>منصة المدار للحوالات</h1>
+          <h1>EDUQUEST</h1>
           <p>تم تحميل غلاف التطبيق مسبقا، لكن الاتصال مطلوب لجلب البيانات الحية.</p>
         </div>
       </div>

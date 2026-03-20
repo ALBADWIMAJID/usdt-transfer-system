@@ -3,7 +3,9 @@ import FormMessages from '../ui/FormMessages.jsx'
 import SectionCard from '../ui/SectionCard.jsx'
 
 function CustomersFormSection({
+  title = 'إنشاء ملف عميل',
   description = 'أضف عميلا جديدا حتى يتمكن فريق التشغيل من إنشاء الحوالات ومتابعة التسويات له.',
+  className = '',
   submitError,
   submitLabel = 'إنشاء العميل',
   submitSuccess,
@@ -14,12 +16,24 @@ function CustomersFormSection({
   onSubmit,
   submitting,
   isConfigured,
+  submitDisabled = false,
+  secondaryAction = null,
 }) {
+  const submitButton = (
+    <button
+      type="submit"
+      className="button primary customers-form-submit"
+      disabled={submitting || !isConfigured || submitDisabled}
+    >
+      {submitting ? submittingLabel : submitLabel}
+    </button>
+  )
+
   return (
     <SectionCard
-      title="إنشاء ملف عميل"
+      title={title}
       description={description}
-      className="customers-form-section"
+      className={['customers-form-section', className].filter(Boolean).join(' ')}
     >
       <FormMessages
         items={[
@@ -63,9 +77,14 @@ function CustomersFormSection({
           />
         </FieldShell>
 
-        <button type="submit" className="button primary" disabled={submitting || !isConfigured}>
-          {submitting ? submittingLabel : submitLabel}
-        </button>
+        {secondaryAction ? (
+          <div className="customers-form-actions">
+            {submitButton}
+            {secondaryAction}
+          </div>
+        ) : (
+          submitButton
+        )}
       </form>
     </SectionCard>
   )

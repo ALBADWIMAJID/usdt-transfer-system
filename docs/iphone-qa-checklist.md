@@ -29,6 +29,7 @@ Status fields:
 | Apple touch icon quality | App added to Home Screen | Inspect installed icon on Home Screen | PNG icon is used and is readable at iPhone size | Not Run |  |
 | Theme/status bar presentation | Standalone launch | Open app from Home Screen and inspect top chrome/status area | Theme color and top area feel coherent and readable | Not Run |  |
 | App shell offline reopen | One successful online visit and Home Screen install preferred | Turn on Airplane Mode, reopen app | Cached shell opens and offline fallback is understandable | Not Run |  |
+| Return after print | `TransferDetailsPage` opened for a valid transfer in Safari and Home Screen modes | Open the print statement, trigger print, dismiss/complete the print dialog, then return to the app and reopen it if needed | The app returns to a valid in-scope app route instead of a browser/server "page not found" state, and does not require removing/re-adding the Home Screen app | Not Run |  |
 
 ## Connectivity and Offline Reads
 

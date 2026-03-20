@@ -29,13 +29,14 @@ import {
   withLiveReadTimeout,
 } from '../lib/offline/readCache.js'
 import { getPaymentMethodLabel, getTransferStatusMeta } from '../lib/transfer-ui.js'
+import {
+  createEmptyCustomerForm,
+  normalizeCustomerProfilePayload,
+  validateCustomerProfilePayload,
+} from '../lib/customerProfile.js'
 import { supabase } from '../lib/supabase.js'
 
-const emptyForm = {
-  full_name: '',
-  phone: '',
-  notes: '',
-}
+const emptyForm = createEmptyCustomerForm()
 
 const emptyPortfolioStats = {
   totalCustomers: 0,
@@ -1351,13 +1352,13 @@ function CustomersPage() {
     }
 
     const payload = {
-      full_name: formValues.full_name.trim(),
-      phone: formValues.phone.trim() || null,
-      notes: formValues.notes.trim() || null,
+      ...normalizeCustomerProfilePayload(formValues),
     }
 
-    if (!payload.full_name) {
-      setSubmitError('اسم العميل مطلوب.')
+    const validationError = validateCustomerProfilePayload(payload)
+
+    if (validationError) {
+      setSubmitError(validationError)
       return
     }
 

@@ -1,4 +1,4 @@
-const SHELL_CACHE = 'usdt-transfer-shell-v2'
+const SHELL_CACHE = 'usdt-transfer-shell-v4'
 const SCOPE_URL = new URL('./', self.location.href)
 const APP_SHELL_KEY = new URL('__app-shell__', SCOPE_URL).toString()
 
@@ -24,12 +24,13 @@ const PRECACHE_URLS = [
   './',
   'offline.html',
   'manifest.webmanifest',
-  'icons/favicon.svg',
-  'icons/apple-touch-icon.svg',
-  'icons/apple-touch-icon-180.png',
-  'icons/icon-192.png',
-  'icons/icon-512.png',
-  'icons/icon-maskable-512.png',
+  'apple-touch-icon.png',
+  'branding/eduquest-logo.png',
+  'branding/eduquest-logo-print.png',
+  'branding/eduquest-mark.png',
+  'icons/eduquest-icon-192.png',
+  'icons/eduquest-icon-512.png',
+  'icons/eduquest-icon-maskable-512.png',
 ].map(toScopedUrl)
 
 self.addEventListener('message', (event) => {
@@ -111,6 +112,14 @@ async function cacheFirst(request) {
   return networkResponse
 }
 
+async function resolveNavigationFallback() {
+  return (
+    (await caches.match(APP_SHELL_KEY)) ||
+    (await caches.match(toScopedUrl('./'))) ||
+    (await caches.match(toScopedUrl('offline.html')))
+  )
+}
+
 self.addEventListener('fetch', (event) => {
   const { request } = event
 
@@ -129,15 +138,20 @@ self.addEventListener('fetch', (event) => {
           if (networkResponse && networkResponse.ok) {
             const cache = await caches.open(SHELL_CACHE)
             cache.put(APP_SHELL_KEY, networkResponse.clone())
+            return networkResponse
+          }
+
+          if (url.origin === self.location.origin) {
+            const fallbackResponse = await resolveNavigationFallback()
+
+            if (fallbackResponse) {
+              return fallbackResponse
+            }
           }
 
           return networkResponse
         } catch {
-          return (
-            (await caches.match(APP_SHELL_KEY)) ||
-            (await caches.match(toScopedUrl('./'))) ||
-            (await caches.match(toScopedUrl('offline.html')))
-          )
+          return resolveNavigationFallback()
         }
       })()
     )
@@ -152,7 +166,7 @@ self.addEventListener('fetch', (event) => {
   event.respondWith(
     cacheFirst(request).catch(async () => {
       if (request.destination === 'image') {
-        return caches.match(toScopedUrl('icons/icon-192.png'))
+        return caches.match(toScopedUrl('icons/eduquest-icon-192.png'))
       }
 
       return caches.match(toScopedUrl('offline.html'))

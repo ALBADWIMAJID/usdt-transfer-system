@@ -27,7 +27,7 @@ import {
   saveReadSnapshot,
   withLiveReadTimeout,
 } from '../lib/offline/readCache.js'
-import { ACTIVE_TRANSFER_STATUSES, getPaymentMethodLabel } from '../lib/transfer-ui.js'
+import { ACTIVE_TRANSFER_STATUSES, getPaymentMethodLabel, getTransferStatusMeta } from '../lib/transfer-ui.js'
 import { supabase } from '../lib/supabase.js'
 
 const DAY_IN_MS = 24 * 60 * 60 * 1000
@@ -46,6 +46,9 @@ const emptyDashboardStats = {
   todayPaidRub: null,
   todayPaymentCount: null,
   todayPaymentTransferCount: null,
+  totalProfitRub: null,
+  todayProfitRub: null,
+  todayProfitTransferCount: null,
 }
 const emptyDashboardQueueItems = { partial: [], open: [] }
 const emptyDashboardDrillDownData = {
@@ -59,6 +62,7 @@ const emptyDashboardDrillDownData = {
   recentTransfers: [],
   recentPayments: [],
   todayPayments: [],
+  profitTransfers: [],
 }
 
 function roundCurrency(value) {
@@ -206,6 +210,16 @@ function compareTransfersByPriority(left, right) {
   }
 
   return (parseDateValue(right.created_at)?.getTime() || 0) - (parseDateValue(left.created_at)?.getTime() || 0)
+}
+
+function compareTransfersByProfit(left, right) {
+  const profitDifference = (Number(right.commissionRub) || 0) - (Number(left.commissionRub) || 0)
+
+  if (Math.abs(profitDifference) > 0.009) {
+    return profitDifference
+  }
+
+  return (parseDateValue(right.createdAt)?.getTime() || 0) - (parseDateValue(left.createdAt)?.getTime() || 0)
 }
 
 function getQueueMeta(transfer) {
@@ -370,6 +384,40 @@ function renderPaymentDrillDownItem(item, compact = false) {
   )
 }
 
+function renderProfitDrillDownItem(item) {
+  return (
+    <RecordCard key={item.id} to={item.to} className="dashboard-activity-card dashboard-money-card">
+      <RecordHeader
+        eyebrow={item.isProfitToday ? 'ربح اليوم' : 'ربح الحوالة'}
+        title={item.referenceNumber}
+        subtitle={item.customerName}
+        subtitleClassName="record-muted-strong"
+        metaItems={[
+          { label: 'الإنشاء', value: item.createdAtLabel },
+          { label: 'الحالة', value: item.statusLabel },
+        ]}
+        aside={
+          <>
+            <span
+              className={[
+                'activity-chip',
+                item.isProfitToday ? 'activity-chip--warning' : 'activity-chip--success',
+              ]
+                .filter(Boolean)
+                .join(' ')}
+            >
+              {item.commissionRubLabel}
+            </span>
+            <span className="record-compact-action">فتح الحوالة</span>
+          </>
+        }
+      />
+
+      <p className="record-note record-note--compact">{item.profitNote}</p>
+    </RecordCard>
+  )
+}
+
 function DashboardPage() {
   const { configError, isConfigured } = useAuth()
   const { isOffline } = useNetworkStatus()
@@ -410,12 +458,18 @@ function DashboardPage() {
         return false
       }
 
-      setStats(snapshot.data.stats || emptyDashboardStats)
+      setStats({
+        ...emptyDashboardStats,
+        ...(snapshot.data.stats || {}),
+      })
       setRecentTransfers(snapshot.data.recentTransfers || [])
       setRecentPayments(snapshot.data.recentPayments || [])
       setAttentionItems(snapshot.data.attentionItems || [])
       setQueueItems(snapshot.data.queueItems || emptyDashboardQueueItems)
-      setDrillDownData(snapshot.data.drillDownData || emptyDashboardDrillDownData)
+      setDrillDownData({
+        ...emptyDashboardDrillDownData,
+        ...(snapshot.data.drillDownData || {}),
+      })
       setLastUpdatedAt(snapshot.data.lastUpdatedAt || '')
       setLoadError('')
       setLoading(false)
@@ -449,7 +503,7 @@ function DashboardPage() {
         supabase
           .schema('public')
           .from('transfers')
-          .select('id, reference_number, customer_id, status, usdt_amount, payable_rub, created_at')
+          .select('id, reference_number, customer_id, status, usdt_amount, payable_rub, commission_rub, created_at')
           .order('created_at', { ascending: false }),
         supabase
           .schema('public')
@@ -480,18 +534,7 @@ function DashboardPage() {
             'تعذر تحميل بيانات لوحة التحكم.'
         )
         setLoading(false)
-        setDrillDownData({
-          allTransfers: [],
-          remainingTransfers: [],
-          openTransfers: [],
-          partialTransfers: [],
-          paidTransfers: [],
-          overpaidTransfers: [],
-          urgentTransfers: [],
-          recentTransfers: [],
-          recentPayments: [],
-          todayPayments: [],
-        })
+        setDrillDownData(emptyDashboardDrillDownData)
         return
       }
 
@@ -516,6 +559,7 @@ function DashboardPage() {
 
       const transferRecords = transfers.map((transfer) => {
         const payableRub = Number(transfer.payable_rub) || 0
+        const commissionRub = roundCurrency(Number(transfer.commission_rub) || 0)
         const totalPaidRub = paymentTotalsByTransfer[transfer.id] || 0
         const remainingRub = roundCurrency(payableRub - totalPaidRub)
         const normalizedStatus = normalizeStatus(transfer.status)
@@ -535,6 +579,7 @@ function DashboardPage() {
           ...transfer,
           normalizedStatus,
           payableRub,
+          commissionRub,
           totalPaidRub,
           remainingRub,
           ageInDays,
@@ -593,6 +638,7 @@ function DashboardPage() {
         .map((transfer, index) => {
           const customerName = customerNames[transfer.customer_id] || 'عميل غير متاح'
           const queueMeta = getQueueMeta(transfer)
+          const statusLabel = getTransferStatusMeta(transfer.status).label
 
           return {
             id: transfer.id ?? transfer.created_at ?? `dashboard-transfer-${index}`,
@@ -605,9 +651,16 @@ function DashboardPage() {
             createdAtLabel: formatDate(transfer.created_at),
             ageLabel: formatRelativeAge(transfer.created_at, now),
             status: transfer.status,
+            statusLabel,
             usdtAmountLabel: formatNumber(transfer.usdt_amount, 2),
             payableRubLabel: `${formatNumber(transfer.payableRub, 2)} RUB`,
             totalPaidRubLabel: `${formatNumber(transfer.totalPaidRub, 2)} RUB`,
+            commissionRubLabel: `${formatNumber(transfer.commissionRub, 2)} RUB`,
+            isProfitToday: isToday(transfer.created_at, now),
+            profitNote: `قيمة التسوية ${formatNumber(transfer.payableRub, 2)} RUB لكمية ${formatNumber(
+              transfer.usdt_amount,
+              2
+            )} USDT.`,
             remainingRubLabel: transfer.isOverpaid
               ? `-${formatNumber(Math.abs(transfer.remainingRub), 2)} RUB`
               : transfer.hasOutstanding
@@ -638,6 +691,9 @@ function DashboardPage() {
         (left, right) =>
           (parseDateValue(right.createdAt)?.getTime() || 0) - (parseDateValue(left.createdAt)?.getTime() || 0)
       )
+      const profitTransfers = transferQueueItems
+        .filter((transfer) => Math.abs(transfer.commissionRub) > 0.009)
+        .sort(compareTransfersByProfit)
 
       const recentPaymentsSource = paymentsWithActivity
         .map((payment, index) => {
@@ -688,6 +744,13 @@ function DashboardPage() {
           0
         )
       )
+      const todayProfitTransfers = profitTransfers.filter((transfer) => transfer.isProfitToday)
+      const totalProfitRub = roundCurrency(
+        transferRecords.reduce((total, transfer) => total + (Number(transfer.commissionRub) || 0), 0)
+      )
+      const todayProfitRub = roundCurrency(
+        todayProfitTransfers.reduce((total, transfer) => total + (Number(transfer.commissionRub) || 0), 0)
+      )
 
       const nextStats = {
         customers: customersResult.count ?? 0,
@@ -708,6 +771,9 @@ function DashboardPage() {
         todayPaidRub: totalPaidTodayRub,
         todayPaymentCount: paymentsToday.length,
         todayPaymentTransferCount,
+        totalProfitRub,
+        todayProfitRub,
+        todayProfitTransferCount: todayProfitTransfers.length,
       }
 
       const nextAttentionItems = urgentTransfers.slice(0, 6).map((transfer) => ({
@@ -799,6 +865,7 @@ function DashboardPage() {
         todayPayments: recentPaymentsSource.filter((payment) =>
           paymentsToday.some((sourcePayment) => sourcePayment.id === payment.id)
         ),
+        profitTransfers,
       }
 
       const nextLastUpdatedAt = new Date().toISOString()
@@ -919,6 +986,16 @@ function DashboardPage() {
       viewAllLabel: 'فتح الحوالات المدفوعة في الصف',
       renderItem: (item) => <TransferRecordCard key={item.id} transfer={item} compact />,
     },
+    profit: {
+      title: 'تفصيل الربح',
+      totalValue: `${formatNumber(stats.totalProfitRub, 2)} RUB`,
+      subtitle: `ربح اليوم ${formatNumber(stats.todayProfitRub, 2)} RUB عبر ${stats.todayProfitTransferCount ?? 0} حوالة`,
+      description: 'يعتمد هذا المؤشر على الحقل المخزن commission_rub لكل حوالة، ويُحسب ربح اليوم بحسب وقت إنشاء الحوالة.',
+      items: drillDownData.profitTransfers,
+      emptyMessage: 'لا توجد حاليا حوالات تحمل ربحا محفوظا ضمن السجلات الحالية.',
+      searchPlaceholder: 'ابحث بالعميل أو مرجع الحوالة',
+      renderItem: (item) => renderProfitDrillDownItem(item),
+    },
     overpaid: {
       title: 'الحوالات فوق المطلوب',
       totalValue: stats.overpaidTransfers ?? 0,
@@ -1022,6 +1099,17 @@ function DashboardPage() {
       className: stats.overpaidTransfers > 0 ? 'dashboard-snapshot-card--danger' : 'dashboard-snapshot-card--success',
       valueClassName: stats.overpaidTransfers > 0 ? 'text-danger' : 'text-success',
       onClick: () => openDrillDown('overpaid'),
+    },
+    {
+      key: 'profit',
+      label: 'إجمالي الربح',
+      value: loading ? '...' : `${formatNumber(stats.totalProfitRub, 2)} RUB`,
+      copy: loading
+        ? 'جار احتساب الربح المحفوظ...'
+        : `اليوم ${formatNumber(stats.todayProfitRub, 2)} RUB على ${stats.todayProfitTransferCount ?? 0} حوالة`,
+      className: 'dashboard-snapshot-card--success dashboard-snapshot-card--wide',
+      valueClassName: 'text-success',
+      onClick: () => openDrillDown('profit'),
     },
   ]
 
