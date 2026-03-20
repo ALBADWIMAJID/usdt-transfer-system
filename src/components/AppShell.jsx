@@ -4,6 +4,7 @@ import { branding } from '../config/branding.js'
 import { useAuth } from '../context/auth-context.js'
 import BrandLockup from './ui/BrandLockup.jsx'
 import ConnectionBadge from './ui/ConnectionBadge.jsx'
+import ThemePreferenceControl from './ui/ThemePreferenceControl.jsx'
 import InlineMessage from './ui/InlineMessage.jsx'
 import SyncStatusBanner from './ui/SyncStatusBanner.jsx'
 
@@ -230,6 +231,10 @@ function AppShell() {
                 )
               })}
             </nav>
+          </div>
+
+          <div className="sidebar-theme-wrap">
+            <ThemePreferenceControl />
           </div>
 
           <div className="sidebar-footer">

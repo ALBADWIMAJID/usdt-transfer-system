@@ -1,6 +1,26 @@
 <!doctype html>
-<html lang="ar" dir="rtl" data-theme="light">
+<html lang="ar" dir="rtl">
   <head>
+    <script>
+      (function () {
+        try {
+          var KEY = 'usdt-theme-mode';
+          var raw = localStorage.getItem(KEY);
+          var mode = raw === 'light' || raw === 'dark' || raw === 'auto' ? raw : 'auto';
+          var resolved =
+            mode === 'dark'
+              ? 'dark'
+              : mode === 'light'
+                ? 'light'
+                : window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches
+                  ? 'dark'
+                  : 'light';
+          document.documentElement.dataset.theme = resolved;
+        } catch (e) {
+          document.documentElement.dataset.theme = 'light';
+        }
+      })();
+    </script>
     <meta charset="UTF-8" />
     <meta
       name="viewport"

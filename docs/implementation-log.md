@@ -1,5 +1,163 @@
 # Implementation Log
 
+## 2026-03-20 — T4.1 Dark surface fix + typography & density normalization
+
+Requested scope:
+- **Dark** surfaces less oppressive; **white/light native controls** in dark less jarring; **typography** aligned
+  (especially mobile); **density** improved on phone; **CSS/tokens only** — no logic, routes, offline, schema.
+
+Files changed:
+- `src/index.css` — **dark `:root`:** lifted canvas/surfaces/borders/chrome/elevated/lite-KPI stacks, **`accent-color`**,
+  **full `--type-*` mirror**; **T4.1** **`color-scheme: dark`** + **`option`** surface hints; **≤960px dark:** solid
+  **`--theme-mobile-control-fill`**, brighter **`--mobile-canvas-*`** / **`--mobile-surface-*`**; **≤960/720/540px**
+  **`--type-value-emphasis-size`**; **`.stat-value` / `.dashboard-snapshot-value` / operations sheet total /
+  customers portfolio stat** on **`--type-value-emphasis-*`**; **density:** page/record cards, forms, tabs, banners,
+  queue groups, lists, lite KPI padding
+- `docs/mobile-theme-system.md` — §9 note, **§22 T4.1**
+- `docs/code-map.md`, `docs/project-current-state.md`, `docs/implementation-log.md`,
+  `docs/last-change-summary.md`
+
+Verification:
+- `npm run lint` — passed
+- `npm run build` — passed
+
+Suggested commit message:
+- `T4.1 Dark surface fix and typography density normalization`
+
+## 2026-03-20 — T4 Final iOS chrome completion (mobile shell)
+
+Requested scope:
+- Refine **shared mobile chrome** (top bar, bottom tab bar, drawer, trays, status strip material, operations
+  bottom sheet) toward **native iPhone** feel; **no** business logic, routes, offline, page-body redesign, or new
+  visual direction.
+
+Files changed:
+- `src/index.css` — **≤960px** mobile **`:root` (light + dark):** **`--mobile-chrome-blur`**, **`--mobile-tab-bar-blur`**,
+  **`--mobile-tray-blur`**, **`--mobile-drawer-blur`**, **`--mobile-scrim-blur`**; **top bar** padding/title/badge/menu;
+  **sync strip** tray styling (**light** blur harmonized); **drawer** margin, **26px** radius, **grabber**,
+  **padding-top**; **bottom nav** radius/spacing/active; **app-section-nav** + **dashboard lite** tray density;
+  **customers** **`.app-section-nav`** aligned with global tabs; **540px** tray radii; **720px** top bar compact;
+  **operations-sheet-panel** grabber + radius; scrim/drawer/topbar/tabbar blur wired to tokens
+- `docs/mobile-theme-system.md` — §4 blur token rows, **§21 T4**
+- `docs/code-map.md`, `docs/project-current-state.md`, `docs/implementation-log.md`,
+  `docs/last-change-summary.md`
+
+Verification:
+- `npm run lint` — passed
+- `npm run build` — passed
+
+Suggested commit message:
+- `T4 Final iOS chrome completion`
+
+## 2026-03-20 — T3.6 Dark mode readability & liquid-glass correction
+
+Requested scope:
+- Improve **dark** readability, surface **layering**, and **glass vs solid** placement on mobile chrome and
+  shared surfaces; **no** business logic, routes, offline behavior, light-theme redesign, or T4.
+
+Files changed:
+- `src/index.css` — **dark `:root`:** lifted canvas/surfaces, clearer **`--theme-text-*`**, borders, shadows,
+  KPI/lite/chrome/drawer/status tokens; **`:root[data-theme='dark'] .app-section-nav`** (desktop), **`.topbar`**
+  border, **`.operations-sheet-copy h2`**; **≤960px dark `:root`:** **`--mobile-*`** canvas/glass/grouped/
+  elevated + **`--mobile-surface-content`**; **T3.6 rules:** drawer panel gradient + blur, top bar / bottom nav /
+  app-section-nav / dashboard lite nav **blur** tuning; sync banner **blur off** in dark; **solid** nested cards
+  + page-scoped **`.page-card`** / filter bar; drawer **nav** text/icon contrast; customers/transfers tab count
+  **brand** color in dark
+- `docs/mobile-theme-system.md` — §3 note, §4 **`--mobile-surface-content`**, **§20 T3.6**
+- `docs/code-map.md`, `docs/project-current-state.md`, `docs/implementation-log.md`,
+  `docs/last-change-summary.md`
+
+Verification:
+- `npm run lint` — passed
+- `npm run build` — passed
+
+Suggested commit message:
+- `T3.6 Dark mode readability and liquid glass correction`
+
+## 2026-03-20 — T3.5 Theme activation (light / dark / auto)
+
+Requested scope:
+- User-visible theme switching on existing **`data-theme`** architecture; **`light`**, **`dark`**, **`auto`**
+  (OS **`prefers-color-scheme`**); persist safely; **no** business logic, routes, schema, auth, offline, or
+  broad UI redesign.
+
+Files changed:
+- `index.html` — inline bootstrap sets **`document.documentElement.dataset.theme`** from **`localStorage`**
+  **`usdt-theme-mode`** + system scheme; try/catch fallback **`light`**; removed static **`data-theme`** on
+  **`<html>`**
+- `src/lib/themePreference.js` — storage key, normalize/read/write, **`resolveDataThemeFromMode`**
+- `src/context/theme-preference-context.js`, `src/context/ThemePreferenceProvider.jsx` — context, **`setMode`**,
+  **`auto`** listener, cross-tab **`storage`**, DOM sync
+- `src/components/ui/ThemePreferenceControl.jsx` — compact segment UI (**فاتح / داكن / تلقائي**)
+- `src/App.jsx` — **`ThemePreferenceProvider`** wrap; removed redundant default **`dataset.theme`**
+- `src/components/AppShell.jsx` — **`sidebar-theme-wrap`** + control above footer
+- `src/pages/LoginPage.jsx` — same control before **`auth-footer`**
+- `src/index.css` — **`.theme-preference*`**, **`.sidebar-theme-wrap`** (+ mobile drawer tweaks)
+- `docs/mobile-theme-system.md` — §11 rewrite, §4 row, §19 T3.5; `docs/code-map.md`,
+  `docs/project-current-state.md`, `docs/implementation-log.md`, `docs/last-change-summary.md`
+
+Default behavior:
+- **No stored value or invalid value → `auto`** (resolved from OS). Bootstrap failure → **`light`**.
+
+Verification:
+- `npm run lint` — passed
+- `npm run build` — passed
+
+Suggested commit message:
+- `T3.5 Theme activation with light dark auto modes`
+
+## 2026-03-20 — T3 Full dark mode rollout (mobile + shared selectors)
+
+Requested scope:
+- Complete **dark** visual coherence for the mobile product (and shared CSS that serves both themes) using
+  existing **`--theme-*` / `--type-*` / `--mobile-*`**; **no** business logic, routes, offline behavior,
+  schema, or light-theme redesign.
+
+Files changed:
+- `src/index.css` — **`:root[data-theme='dark']`:** **`--theme-list-row-fill`**, **`--theme-control-inset-well`**
+  (dark values); **T3 tokens** (**`--theme-page-shell-*`**, **`--theme-elevated-panel-bg`**, **`--theme-panel-tint-*`**,
+  **`--theme-chrome-*`**, **`--theme-nav-*`**, **`--theme-sidebar-footer-bg`**, **`--theme-auth-highlight-chip-bg`**,
+  **`--theme-sync-calm-bg`**) with selector rewires across shell (topbar, sync, drawer-adjacent nav), **page heroes /
+  cards**, dashboard/customers/transfers/transfer-details/customer-details/new-transfer scoped surfaces, queue
+  groups, KPI tiles, banners, payment/follow-up panels, activity chips, record meta; **≤960px dark** overrides
+  **`--theme-button-primary-bg`** (vertical navy → teal); **desktop** **`.sidebar-panel`** → shell tokens,
+  **`.sidebar-header`** → **`--theme-border-default`**; **`.brand-mark-line`** → **`--theme-on-primary`**
+- `docs/mobile-theme-system.md` — §3 rollout note, §4 T3 token rows, §8 non-goals trim, **§18 T3 contract**
+- `docs/code-map.md`, `docs/project-current-state.md`, `docs/implementation-log.md`,
+  `docs/last-change-summary.md`
+
+Verification:
+- `npm run lint` — passed
+- `npm run build` — passed
+
+Suggested commit message:
+- `T3 Full dark mode rollout`
+
+## 2026-03-20 — T2 Full light theme completion (mobile follow-up)
+
+Requested scope:
+- Finish **light** visual consistency across mobile (shared primitives where they overlap desktop) using
+  **`--theme-*` / `--type-*` / `--mobile-*`**; **no** business logic, routes, offline behavior, dark-mode
+  completion pass, or visible theme toggle.
+
+Files changed:
+- `src/index.css` — **`:root` light + dark:** **`--theme-on-primary`**, **`--theme-button-primary-bg`**,
+  **`--theme-app-tab-*`** for **`app-section-tab`**; **base** **`.status-banner`** / variants on semantic
+  status + surface tokens; **`.button.primary`**, **`.record-meta`**, **`.metric-card`** / **`.stat-label`**,
+  **`.offline-snapshot-chip--*`** token cleanup; **≤960px:** **`--theme-button-primary-bg`** vertical CTA
+  override (light), **`--theme-mobile-control-fill`**, mobile **`.field`** controls, **`.record-meta`**,
+  **`.status-banner`** variant fills, **`.page-intro h2`** color, primary button shadows from **`--theme-cta-*`**
+- `docs/mobile-theme-system.md` — §4 token rows + §17 T2 contract
+- `docs/code-map.md`, `docs/project-current-state.md`, `docs/implementation-log.md`,
+  `docs/last-change-summary.md`
+
+Verification:
+- `npm run lint` — passed
+- `npm run build` — passed
+
+Suggested commit message:
+- `T2 Full light theme completion`
+
 ## 2026-03-20 — T1 Global header compression pass (mobile follow-up)
 
 Requested scope:

@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { Navigate, useLocation } from 'react-router-dom'
 import { branding } from '../config/branding.js'
 import BrandLockup from '../components/ui/BrandLockup.jsx'
+import ThemePreferenceControl from '../components/ui/ThemePreferenceControl.jsx'
 import { useAuth } from '../context/auth-context.js'
 
 function LoginPage() {
@@ -88,6 +89,8 @@ function LoginPage() {
             {submitting ? 'جار تسجيل الدخول...' : 'دخول'}
           </button>
         </form>
+
+        <ThemePreferenceControl className="auth-theme-preference" />
 
         <p className="auth-footer">
           بعد نجاح المصادقة سيتم تحويلك مباشرة إلى لوحة التشغيل الخاصة بـ {branding.shortName}.

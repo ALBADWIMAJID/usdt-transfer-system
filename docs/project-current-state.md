@@ -63,7 +63,9 @@ work (per `docs/usdt-mobile-app-like-ui-plan.md`).
   **`--theme-sheet-shadow-up`**. **≤960px** drawer header/footer washes, user chip/avatar/sign-out, topbar
   hairline, connection badge fills, and operational chips tie to existing **`--theme-drawer-*`** /
   **`--theme-status-chip-*`** / **`--theme-connection-badge-fill`**; **`.operations-sheet-panel`** uses theme
-  borders/surfaces/shadows for side + bottom sheet. No routes or business/offline logic changes.
+  borders/surfaces/shadows for side + bottom sheet. **T3** extends **`--theme-page-shell-*`**, elevated/tinted
+  panels, chrome, sync calm strip, and rewires selectors so **`data-theme="dark"`** matches the same premium
+  language. No routes or business/offline logic changes.
 - **Phase 5 (page):** **`CustomerDetailsPage`** mobile simplification — **`.customer-details-page`** in
   **`src/index.css`** + minimal **`CustomerSummary`** API; see **`docs/last-change-summary.md`**.
 - **Phase 6 (page):** **`NewTransferPage`** — **`.new-transfer-page`** in **`src/index.css`** + form
@@ -100,6 +102,27 @@ work (per `docs/usdt-mobile-app-like-ui-plan.md`).
   **`PageHeader`** description class **`page-hero-description`** (mobile-hidden), unified **`.page-hero`** app-bar
   rhythm on **≤960px** across dashboard (stack + Lite), transfers, customers, customer details, transfer
   details, new transfer; see **`docs/mobile-theme-system.md`** §16 and **`docs/last-change-summary.md`**.
+- **T2 (mobile follow-up):** **light theme completion** — shared **`.button.primary`**, **`app-section-tab`**,
+  **`.status-banner`**, mobile **`.field`** fills, **`.record-meta`** / metric surfaces, offline chips on
+  **`--theme-*`** / **`--theme-mobile-control-fill`**; see **`docs/mobile-theme-system.md`** §17.
+- **T3 (mobile follow-up):** **full dark-mode rollout** — semantic **shell / elevated / tinted panel** tokens
+  wired through heroes, cards, queue rows, drawers, sheets, tabs, banners, forms, chips, sync strip, auth,
+  payment/transfer panels; dark **`--theme-list-row-fill`** + **`--theme-control-inset-well`**; mobile dark
+  primary CTA gradient; desktop **`.sidebar-panel`** + **`.sidebar-header`** on theme tokens; see
+  **`docs/mobile-theme-system.md`** §18.
+- **T3.5 (theme activation):** **light / dark / auto** user preference — **`localStorage`** **`usdt-theme-mode`**,
+  **`index.html`** inline bootstrap + **`ThemePreferenceProvider`**, **`ThemePreferenceControl`** in **AppShell**
+  drawer and **LoginPage**; **`auto`** uses **`prefers-color-scheme`** with live updates; see
+  **`docs/mobile-theme-system.md`** §11 / §19.
+- **T3.6 (dark polish):** dark-mode **readability**, **surface layering**, and **liquid-glass placement** — lifted
+  dark **`--theme-*`** canvas/surfaces/text; **≤960px** **`--mobile-*`** + **`--mobile-surface-content`**; chrome
+  frosted, page content **solid**; drawer/nav/tab fixes; see **`docs/mobile-theme-system.md`** §20.
+- **T4 (iOS chrome):** final **shared mobile shell** refinement — **`--mobile-*-blur`** tokens, top/bottom chrome,
+  drawer sheet affordances, section/dashboard **tray** geometry, operations **sheet** grabber; see
+  **`docs/mobile-theme-system.md`** §21.
+- **T4.1 (dark + type + density):** lifted dark **canvas/surfaces**, **`color-scheme` / `option`** hints, full dark
+  **`--type-*`**, solid **mobile** control fill, **`--type-value-emphasis-size`** at **960/720/540px**, shared KPI
+  metrics on tokens, tighter **≤960px** cards/forms/lists; see **`docs/mobile-theme-system.md`** §22.
 
 ## Current UI Organization Notes
 
@@ -156,9 +179,23 @@ Latest mobile UI transformation progress:
   **`docs/mobile-qa-final-checklist.md`**; physical iPhone rows remain **Not run (device)** until executed
 - **T1 complete (mobile follow-up):** compact shared **`page-hero`** / **`PageHeader`** on phone — see
   **`docs/last-change-summary.md`** and **`docs/mobile-theme-system.md`** §16
+- **T2 complete (mobile follow-up):** coherent **light** theme across mobile shared surfaces — see
+  **`docs/last-change-summary.md`** and **`docs/mobile-theme-system.md`** §17
+- **T3 complete (mobile follow-up):** coherent **dark** theme across mobile (and shared chrome touched by the
+  same selectors) — see **`docs/last-change-summary.md`** and **`docs/mobile-theme-system.md`** §18
+- **T3.5 complete:** user-facing **theme preference** (**light / dark / auto**) with persistence and OS sync —
+  see **`docs/last-change-summary.md`** and **`docs/mobile-theme-system.md`** §11 / §19
+- **T3.6 complete:** dark-mode **visual correction** (readability + layering + glass discipline) — see
+  **`docs/last-change-summary.md`** and **`docs/mobile-theme-system.md`** §20
+- **T4 complete:** **mobile chrome** refinement (native-adjacent shell, shared blur tokens, trays/tab bar/drawer) —
+  see **`docs/last-change-summary.md`** and **`docs/mobile-theme-system.md`** §21
+- **T4.1 complete:** dark **surface** lift, **native control** theme hints, **typography** normalization (incl. full
+  dark **`--type-*`**), **mobile density** pass — see **`docs/last-change-summary.md`** and
+  **`docs/mobile-theme-system.md`** §22
 - Mobile visual system: **Payvo-inspired fintech theme** + **documented theme system**
   (`docs/mobile-theme-system.md`) and **light/dark token architecture** (`data-theme`, `--theme-*`,
-  `--type-*`); full dark polish deferred
+  `--type-*`); **dark** mode is a first-class polished appearance for major surfaces (residual literals may
+  remain in low-traffic desktop-only rules)
 
 Offline / PWA baseline remains at:
 - Phase 12 complete: shell + status UI + snapshot reads + customer queue +

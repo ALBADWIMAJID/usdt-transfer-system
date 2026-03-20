@@ -12,12 +12,22 @@
 - `src/App.jsx`
   - Applies branding to the document
   - Sets Arabic RTL document state
-  - Sets `document.documentElement.dataset.theme` default to **`light`** if unset (theme hook; see
-    `docs/mobile-theme-system.md`)
+  - Wraps the tree with **`ThemePreferenceProvider`** (theme preference + **`data-theme`** sync; see
+    `docs/mobile-theme-system.md` §11)
   - Defines routed app structure
+- `index.html`
+  - Inline script (head): reads **`usdt-theme-mode`** + **`prefers-color-scheme`**, sets **`data-theme`** before
+    the JS bundle (reduces flash)
+- `src/lib/themePreference.js`
+  - **`THEME_STORAGE_KEY`**, **`readStoredMode`**, **`writeStoredMode`**, **`resolveDataThemeFromMode`**
+- `src/context/ThemePreferenceProvider.jsx` + `src/context/theme-preference-context.js`
+  - Applies resolved theme to **`<html>`**, **`auto`** **`matchMedia`** listener, cross-tab **`storage`** sync
+- `src/components/ui/ThemePreferenceControl.jsx`
+  - Three-segment **المظهر** control (used in **`AppShell`** drawer and **`LoginPage`**)
 - `docs/mobile-theme-system.md`
   - **Theme contract:** visual direction, token categories (`--theme-*`, `--type-*`, `--mobile-*`),
-    light/dark philosophy, allowed/forbidden patterns, switching via **`data-theme`**
+    light/dark philosophy, allowed/forbidden patterns, **`data-theme`** + **`localStorage`** preference (**T3.5**
+    §11 / §19); **T2** §17 (light completion), **T3** §18 (dark rollout)
 - `docs/mobile-qa-final-checklist.md`
   - **Phase 10 record:** plan §20 scenario matrix (static vs device), issues/fixes, deferrals; companion to
     **`docs/iphone-qa-checklist.md`**
@@ -26,7 +36,10 @@
     semantic tokens + legacy aliases; mobile `@media` scopes light/dark **`:root`** overrides
   - Shared primitives (forms, buttons, `code`, info/record cards, statement table copy, utility text
     colors) and **Dashboard Mobile Lite** base + **≤960px** drawer / section tabs / Lite overrides use
-    **`--theme-*`** / **`--type-*`** / **`--mobile-*`** where rolled out (see `docs/mobile-theme-system.md`)
+    **`--theme-*`** / **`--type-*`** / **`--mobile-*`** where rolled out; **`data-theme="dark"`** shares the
+    same selectors with dark token values (**T3** §18, **T3.6** §20); **T4** §21 — final **iOS-like mobile chrome**
+    (top bar, tab bar, drawer, trays, sheet grabbers, shared blur tokens); **T4.1** §22 — dark surface lift, **`color-scheme`**
+    / **`option`** hints, complete dark **`--type-*`**, mobile control solid fill + density
   - **Phase 9:** **`--touch-target-min`**, shared mobile **`status-banner`** / **`empty-state`** /
     **`loading-state`** / **`sync-status-banner`** rhythm, calmer hover motion, **`prefers-reduced-motion`**
     block, safe-area padding tweaks

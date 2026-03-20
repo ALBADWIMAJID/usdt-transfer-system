@@ -4,6 +4,7 @@ import AppShell from './components/AppShell.jsx'
 import ProtectedRoute from './components/ProtectedRoute.jsx'
 import { applyBrandingToDocument, branding } from './config/branding.js'
 import AuthProvider from './context/AuthProvider.jsx'
+import ThemePreferenceProvider from './context/ThemePreferenceProvider.jsx'
 import NetworkProvider from './context/NetworkProvider.jsx'
 import SyncProvider from './context/SyncProvider.jsx'
 import { useAuth } from './context/auth-context.js'
@@ -54,23 +55,21 @@ function App() {
     root.dir = 'rtl'
     document.body.dir = 'rtl'
     document.title = branding.systemName
-    /* Theme hook: light | dark — see docs/mobile-theme-system.md */
-    if (!root.dataset.theme) {
-      root.dataset.theme = 'light'
-    }
     applyBrandingToDocument(root)
   }, [])
 
   return (
-    <NetworkProvider>
-      <SyncProvider>
-        <AuthProvider>
-          <BrowserRouter>
-            <AppRoutes />
-          </BrowserRouter>
-        </AuthProvider>
-      </SyncProvider>
-    </NetworkProvider>
+    <ThemePreferenceProvider>
+      <NetworkProvider>
+        <SyncProvider>
+          <AuthProvider>
+            <BrowserRouter>
+              <AppRoutes />
+            </BrowserRouter>
+          </AuthProvider>
+        </SyncProvider>
+      </NetworkProvider>
+    </ThemePreferenceProvider>
   )
 }
 
