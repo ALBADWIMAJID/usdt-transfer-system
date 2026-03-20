@@ -4,6 +4,11 @@ import RecordHeader from '../ui/RecordHeader.jsx'
 import RecordMeta from '../ui/RecordMeta.jsx'
 
 function CustomerRecordCard({ customer, compact = false }) {
+  const transferCountTitle = customer.isArchived ? 'الحوالات المرتبطة' : 'الحوالات النشطة'
+  const transferCountValue = customer.isArchived
+    ? customer.totalTransfersLabel
+    : customer.activeTransfersLabel
+
   return (
     <RecordCard
       to={customer.to}
@@ -58,7 +63,7 @@ function CustomerRecordCard({ customer, compact = false }) {
             className={customer.remainingCardClassName}
             valueClassName={customer.remainingValueClassName}
           />
-          <InfoCard title="الحوالات النشطة" value={customer.activeTransfersLabel} />
+          <InfoCard title={transferCountTitle} value={transferCountValue} />
         </div>
       ) : (
         <div className="record-meta-grid customer-portfolio-grid">
@@ -70,7 +75,7 @@ function CustomerRecordCard({ customer, compact = false }) {
             className={customer.remainingCardClassName}
             valueClassName={customer.remainingValueClassName}
           />
-          <InfoCard title="التحويلات النشطة" value={customer.activeTransfersLabel} />
+          <InfoCard title={transferCountTitle} value={transferCountValue} />
         </div>
       )}
 

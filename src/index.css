@@ -3185,6 +3185,11 @@ a.dashboard-mobile-lite-tertiary {
   border-color: rgba(var(--brand-secondary-rgb), 0.08);
 }
 
+.customer-portfolio-card--archived {
+  border-color: rgba(var(--brand-secondary-rgb), 0.12);
+  background: var(--theme-surface-elevated);
+}
+
 .customer-portfolio-grid {
   margin-top: 1rem;
 }
@@ -7124,16 +7129,43 @@ a:hover article {
     display: block;
   }
 
-  .customer-details-page .customer-details-actions-section .button {
-    width: 100%;
-    min-height: 44px;
-    margin-top: 0.42rem;
-  }
+.customer-details-page .customer-details-actions-section .button {
+  width: 100%;
+  min-height: 44px;
+  margin-top: 0.42rem;
+}
 
-  .customer-details-page .customer-edit-form-section .customers-form-actions {
-    grid-template-columns: 1fr;
-    gap: 0.48rem;
-  }
+.customer-details-page .customer-lifecycle-note {
+  margin-top: 0;
+  margin-bottom: 0.52rem;
+}
+
+.customer-details-page .customer-lifecycle-confirm-card {
+  margin-top: 0.62rem;
+}
+
+.customer-details-page .customer-lifecycle-danger-button {
+  border-color: rgba(239, 68, 68, 0.22);
+  background: rgba(127, 29, 29, 0.08);
+  color: var(--theme-status-danger-text);
+}
+
+.customer-details-page .customer-lifecycle-danger-button:hover,
+.customer-details-page .customer-lifecycle-danger-button:focus-visible {
+  border-color: rgba(239, 68, 68, 0.32);
+  background: rgba(127, 29, 29, 0.12);
+  color: var(--theme-status-danger-text);
+}
+
+.customer-details-page .customer-edit-form-section .customers-form-actions {
+  grid-template-columns: 1fr;
+  gap: 0.48rem;
+}
+
+.customer-details-page .customer-lifecycle-actions {
+  grid-template-columns: 1fr;
+  gap: 0.48rem;
+}
 
   .customer-details-page .customer-details-queue-section .filter-bar {
     margin-top: 0;

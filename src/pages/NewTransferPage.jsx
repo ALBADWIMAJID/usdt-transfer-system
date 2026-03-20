@@ -114,6 +114,10 @@ function normalizeCustomerOptions(customers = []) {
   const customerMap = new Map()
 
   customers.forEach((customer) => {
+    if (customer?.is_archived) {
+      return
+    }
+
     const id = String(customer?.id || customer?.internalId || '').trim()
     const fullName = String(customer?.full_name || customer?.name || '').trim()
 
@@ -267,6 +271,7 @@ function NewTransferPage() {
             .schema('public')
             .from('customers')
             .select('id, full_name')
+            .eq('is_archived', false)
             .order('full_name', { ascending: true }),
           {
             timeoutMessage: 'تعذر إكمال تحميل قائمة العملاء في الوقت المتوقع.',

@@ -1,5 +1,32 @@
 # Implementation Log
 
+## 2026-03-20 - Safe customer archive and delete workflow
+
+Scope: customer lifecycle only. Adds conservative customer archive/delete handling from `CustomerDetailsPage`, keeps
+hard delete limited to customers without linked transfers, archives customers with linked transfers, and keeps the
+mutation flow online-only instead of inventing a new offline queue.
+
+Files changed:
+
+- `src/pages/CustomerDetailsPage.jsx` - adds archive/delete entry points, confirmation states, online-only lifecycle
+  mutations, and archived-customer presentation updates
+- `src/pages/CustomersPage.jsx` - separates active and archived customers in the portfolio view and keeps archived
+  counts out of active operational totals
+- `src/components/customers/CustomerRecordCard.jsx` - adjusts the compact transfer counter label for archived customers
+- `src/pages/NewTransferPage.jsx` - excludes archived customers from active selection options
+- `src/lib/offline/customerSnapshots.js` - syncs edited, archived, and deleted customer changes across cached read
+  snapshots
+- `src/index.css` - adds archived-card and customer lifecycle action styling
+- `supabase/migrations/20260320_add_customer_archive_state.sql` - adds `is_archived` and `archived_at` to customers
+- `supabase/baselines/current_app_contract_snapshot.sql` - records the archive-state contract in the baseline snapshot
+- `docs/implementation-log.md`
+- `docs/last-change-summary.md`
+
+Verification:
+
+- `npm run lint` - passed
+- `npm run build` - passed
+
 ## 2026-03-20 - Customer edit submit guard fix
 
 Scope: targeted bug fix only. Corrects the customer-edit submit guard so the flow no longer treats the static

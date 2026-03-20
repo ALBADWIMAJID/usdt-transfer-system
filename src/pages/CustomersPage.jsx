@@ -226,6 +226,17 @@ function compareCustomersByPriority(left, right) {
   return (right.lastActivityAtTs || 0) - (left.lastActivityAtTs || 0)
 }
 
+function compareArchivedCustomers(left, right) {
+  const rightArchivedAt = parseDateValue(right?.archivedAt)?.getTime() || 0
+  const leftArchivedAt = parseDateValue(left?.archivedAt)?.getTime() || 0
+
+  if (rightArchivedAt !== leftArchivedAt) {
+    return rightArchivedAt - leftArchivedAt
+  }
+
+  return String(left?.name || '').localeCompare(String(right?.name || ''), 'ar')
+}
+
 function getStateSummary({ totalTransfers, overpaidCount, partialCount, openAwaitingCount }) {
   if (!totalTransfers) {
     return 'بدون حوالات بعد'
@@ -253,6 +264,18 @@ function getStateSummary({ totalTransfers, overpaidCount, partialCount, openAwai
 }
 
 function getCustomerPortfolioMeta(customer) {
+  if (customer.isArchived) {
+    return {
+      eyebrow: 'ملف مؤرشف',
+      queueLabel: 'مؤرشف',
+      queueClassName: 'queue-chip--neutral',
+      cardClassName: 'customer-portfolio-card--archived',
+      followUpNote: customer.archivedAt
+        ? `تمت أرشفة هذا العميل في ${formatDate(customer.archivedAt)} وأصبح متاحا للمراجعة التاريخية فقط.`
+        : 'تمت أرشفة هذا العميل وأصبح متاحا للمراجعة التاريخية فقط.',
+    }
+  }
+
   if (customer.hasOverpaid) {
     return {
       eyebrow: 'مراجعة مالية عاجلة',
@@ -304,17 +327,21 @@ function getCustomerPortfolioMeta(customer) {
 
 function buildBaseCustomerEntry(customer, index) {
   const meta = getCustomerPortfolioMeta({
+    archivedAt: customer.archived_at || '',
     totalTransfers: 0,
     overpaidCount: 0,
     partialCount: 0,
     openAwaitingCount: 0,
     hasOverpaid: false,
+    isArchived: Boolean(customer.is_archived),
     outstandingRubLabel: '--',
     overpaidAmountRubLabel: '--',
   })
 
   return {
+    archivedAt: customer.archived_at || '',
     id: customer.id ?? `${customer.full_name}-${customer.phone ?? 'no-phone'}-${index}`,
+    isArchived: Boolean(customer.is_archived),
     to: customer.id ? `/customers/${customer.id}` : '/customers',
     name: customer.full_name || 'عميل بدون اسم',
     phone: customer.phone || 'غير مضاف',
@@ -345,7 +372,7 @@ function buildBaseCustomerEntry(customer, index) {
     stateSummary: 'بدون حوالات بعد',
     remainingCardClassName: '',
     remainingValueClassName: '',
-    searchText: `${customer.full_name || ''} ${customer.phone || ''}`.toLowerCase(),
+    searchText: `${customer.full_name || ''} ${customer.phone || ''} ${customer.is_archived ? 'عميل مؤرشف' : ''}`.toLowerCase(),
     ...meta,
   }
 }
@@ -425,6 +452,7 @@ function CustomersPage() {
   const { clearSnapshotState, markCachedSnapshot, markLiveSnapshot, snapshotState } =
     useOfflineSnapshot()
   const [customers, setCustomers] = useState([])
+  const [archivedCustomers, setArchivedCustomers] = useState([])
   const [loading, setLoading] = useState(Boolean(isConfigured))
   const [loadError, setLoadError] = useState(isConfigured ? '' : configError)
   const [portfolioWarning, setPortfolioWarning] = useState('')
@@ -476,6 +504,7 @@ function CustomersPage() {
       if (!snapshot?.data) {
         clearSnapshotState()
         setCustomers([])
+        setArchivedCustomers([])
         setAttentionCustomers([])
         setRecentActivityItems([])
         setPortfolioStats(emptyPortfolioStats)
@@ -485,6 +514,7 @@ function CustomersPage() {
       }
 
       setCustomers(snapshot.data.customers || [])
+      setArchivedCustomers(snapshot.data.archivedCustomers || [])
       setAttentionCustomers(snapshot.data.attentionCustomers || [])
       setRecentActivityItems(snapshot.data.recentActivityItems || [])
       setPortfolioStats(snapshot.data.portfolioStats || emptyPortfolioStats)
@@ -525,6 +555,10 @@ function CustomersPage() {
         const baseEntries = (customersData ?? []).map((customer, index) =>
           buildBaseCustomerEntry(customer, index)
         )
+        const activeBaseEntries = baseEntries.filter((customer) => !customer.isArchived)
+        const archivedBaseEntries = baseEntries
+          .filter((customer) => customer.isArchived)
+          .sort(compareArchivedCustomers)
 
         const [transfersResult, paymentsResult] = await withLiveReadTimeout(
           Promise.all([
@@ -560,12 +594,13 @@ function CustomersPage() {
             return
           }
 
-          setCustomers(baseEntries)
+          setCustomers(activeBaseEntries)
+          setArchivedCustomers(archivedBaseEntries)
           setAttentionCustomers([])
           setRecentActivityItems([])
           setPortfolioStats({
             ...emptyPortfolioStats,
-            totalCustomers: baseEntries.length,
+            totalCustomers: activeBaseEntries.length,
           })
           setPortfolioFilter('all')
           setPortfolioWarning(
@@ -728,7 +763,9 @@ function CustomersPage() {
             openAwaitingCount,
           })
           const baseEntry = {
+            archivedAt: customer.archived_at || '',
             id: customer.id ?? `${customer.full_name}-${customer.phone ?? 'no-phone'}-${index}`,
+            isArchived: Boolean(customer.is_archived),
             to: customer.id ? `/customers/${customer.id}` : '/customers',
             name: customer.full_name || 'عميل بدون اسم',
             phone: customer.phone || 'غير مضاف',
@@ -760,7 +797,7 @@ function CustomersPage() {
             stateSummary,
             remainingCardClassName,
             remainingValueClassName,
-            searchText: `${customer.full_name || ''} ${customer.phone || ''} ${stateSummary} ${customer.notes || ''}`.toLowerCase(),
+            searchText: `${customer.full_name || ''} ${customer.phone || ''} ${stateSummary} ${customer.notes || ''} ${customer.is_archived ? 'عميل مؤرشف' : ''}`.toLowerCase(),
           }
 
           return {
@@ -768,7 +805,12 @@ function CustomersPage() {
             ...getCustomerPortfolioMeta(baseEntry),
           }
         })
+      const activePortfolioEntries = portfolioEntries
+        .filter((customer) => !customer.isArchived)
         .sort(compareCustomersByPriority)
+      const archivedPortfolioEntries = portfolioEntries
+        .filter((customer) => customer.isArchived)
+        .sort(compareArchivedCustomers)
 
       const portfolioActivityItems = [
         ...payments
@@ -781,7 +823,7 @@ function CustomersPage() {
 
             const customer = customerMap[transfer.customer_id]
 
-            if (!customer) {
+            if (!customer || customer.is_archived) {
               return null
             }
 
@@ -819,7 +861,7 @@ function CustomersPage() {
 
             const customer = customerMap[transfer.customer_id]
 
-            if (!customer) {
+            if (!customer || customer.is_archived) {
               return null
             }
 
@@ -860,22 +902,23 @@ function CustomersPage() {
         .sort((left, right) => right.eventAt - left.eventAt)
         .slice(0, 6)
 
-        const followUpCustomers = portfolioEntries.filter((customer) => customer.needsFollowUp)
-        const activeCollectionCustomers = portfolioEntries.filter(isActiveCollectionCustomer)
-        const openAwaitingCustomers = portfolioEntries.filter(isOpenWaitingCustomer)
+        const followUpCustomers = activePortfolioEntries.filter((customer) => customer.needsFollowUp)
+        const activeCollectionCustomers = activePortfolioEntries.filter(isActiveCollectionCustomer)
+        const openAwaitingCustomers = activePortfolioEntries.filter(isOpenWaitingCustomer)
 
-        setCustomers(portfolioEntries)
+        setCustomers(activePortfolioEntries)
+        setArchivedCustomers(archivedPortfolioEntries)
         setPortfolioStats({
-          totalCustomers: portfolioEntries.length,
+          totalCustomers: activePortfolioEntries.length,
           activeCollectionCustomers: activeCollectionCustomers.length,
           openAwaitingCustomers: openAwaitingCustomers.length,
-          overpaidCustomers: portfolioEntries.filter((customer) => customer.hasOverpaid).length,
+          overpaidCustomers: activePortfolioEntries.filter((customer) => customer.hasOverpaid).length,
           followUpCustomers: followUpCustomers.length,
-          todayFollowUpCustomers: portfolioEntries.filter(
+          todayFollowUpCustomers: activePortfolioEntries.filter(
             (customer) => customer.needsFollowUp && customer.hasActivityToday
           ).length,
           totalOutstandingRub: roundCurrency(
-            portfolioEntries.reduce((sum, customer) => sum + customer.outstandingRub, 0)
+            activePortfolioEntries.reduce((sum, customer) => sum + customer.outstandingRub, 0)
           ),
         })
         setAttentionCustomers(followUpCustomers.slice(0, 4))
@@ -887,18 +930,19 @@ function CustomersPage() {
           scope: 'customers-list',
           type: 'customers_list',
           data: {
-            customers: portfolioEntries,
+            archivedCustomers: archivedPortfolioEntries,
+            customers: activePortfolioEntries,
             portfolioStats: {
-              totalCustomers: portfolioEntries.length,
+              totalCustomers: activePortfolioEntries.length,
               activeCollectionCustomers: activeCollectionCustomers.length,
               openAwaitingCustomers: openAwaitingCustomers.length,
-              overpaidCustomers: portfolioEntries.filter((customer) => customer.hasOverpaid).length,
+              overpaidCustomers: activePortfolioEntries.filter((customer) => customer.hasOverpaid).length,
               followUpCustomers: followUpCustomers.length,
-              todayFollowUpCustomers: portfolioEntries.filter(
+              todayFollowUpCustomers: activePortfolioEntries.filter(
                 (customer) => customer.needsFollowUp && customer.hasActivityToday
               ).length,
               totalOutstandingRub: roundCurrency(
-                portfolioEntries.reduce((sum, customer) => sum + customer.outstandingRub, 0)
+                activePortfolioEntries.reduce((sum, customer) => sum + customer.outstandingRub, 0)
               ),
             },
             attentionCustomers: followUpCustomers.slice(0, 4),
@@ -1012,6 +1056,13 @@ function CustomersPage() {
 
     return matchesSearch && getPortfolioFilterMatch(customer, portfolioFilter)
   })
+  const filteredArchivedCustomers = archivedCustomers.filter((customer) => {
+    return (
+      !normalizedSearchQuery ||
+      String(customer.name || '').toLowerCase().includes(normalizedSearchQuery) ||
+      String(customer.phone || '').toLowerCase().includes(normalizedSearchQuery)
+    )
+  })
 
   const followUpCustomers = customers.filter((customer) => customer.needsFollowUp)
   const activeCollectionCustomers = customers.filter(isActiveCollectionCustomer)
@@ -1076,17 +1127,44 @@ function CustomersPage() {
       ])
     .filter((group) => group.items.length > 0)
 
+  if (filteredArchivedCustomers.length > 0) {
+    customerGroups.push({
+      key: 'archived',
+      title: 'عملاء مؤرشفون',
+      description: 'ملفات تاريخية لم تعد تظهر ضمن الاختيارات التشغيلية النشطة أو إنشاء الحوالات الجديدة.',
+      tone: 'default',
+      items: filteredArchivedCustomers,
+    })
+  }
+
   const activePortfolioFilterLabel = PORTFOLIO_FILTER_LABELS[portfolioFilter] || ''
   const followUpCustomersInView = filteredCustomers.filter((customer) => customer.needsFollowUp).length
   const pendingCustomerLabel =
     pendingCustomerCount > 0 ? ` • ${pendingCustomerCount} محلي بانتظار الإرسال` : ''
   const customerQueueSyncing = isSyncing && customerQueueCount > 0
+  const totalVisibleCustomers = filteredCustomers.length + filteredArchivedCustomers.length
   const customerCountLabel = loading
     ? 'جار تحميل محفظة العملاء...'
     : `عرض ${filteredCustomers.length} من أصل ${customers.length} عميل • ${followUpCustomersInView} بحاجة متابعة${pendingCustomerLabel}`
   const listScopeLabel = activePortfolioFilterLabel
     ? `يتم الآن التركيز على: ${activePortfolioFilterLabel}. ما زال بإمكانك استخدام البحث أو إلغاء التركيز للعودة إلى كل المحفظة.`
     : 'العملاء مرتبون هنا حسب أولوية المتابعة: فوق المطلوب، ثم التحصيل الجزئي، ثم الملفات المفتوحة.'
+  void customerCountLabel
+  void listScopeLabel
+  const visibleCustomerCountLabel = loading
+    ? '\u062c\u0627\u0631 \u062a\u062d\u0645\u064a\u0644 \u0645\u062d\u0641\u0638\u0629 \u0627\u0644\u0639\u0645\u0644\u0627\u0621...'
+    : `Ø¹Ø±Ø¶ ${totalVisibleCustomers} Ù…Ù† Ø£ØµÙ„ ${customers.length + archivedCustomers.length} Ø¹Ù…ÙŠÙ„ â€¢ ${followUpCustomersInView} Ø¨Ø­Ø§Ø¬Ø© Ù…ØªØ§Ø¨Ø¹Ø©${archivedCustomers.length > 0 ? ` â€¢ ${archivedCustomers.length} Ù…Ø¤Ø±Ø´Ù` : ''}${pendingCustomerLabel}`
+  const visibleListScopeLabel = activePortfolioFilterLabel
+    ? `ÙŠØªÙ… Ø§Ù„Ø¢Ù† Ø§Ù„ØªØ±ÙƒÙŠØ² Ø¹Ù„Ù‰: ${activePortfolioFilterLabel}. Ù…Ø§ Ø²Ø§Ù„ Ø¨Ø¥Ù…ÙƒØ§Ù†Ùƒ Ø§Ø³ØªØ®Ø¯Ø§Ù… Ø§Ù„Ø¨Ø­Ø« Ø£Ùˆ Ø¥Ù„ØºØ§Ø¡ Ø§Ù„ØªØ±ÙƒÙŠØ² Ù„Ù„Ø¹ÙˆØ¯Ø© Ø¥Ù„Ù‰ ÙƒÙ„ Ø§Ù„Ù…Ø­ÙØ¸Ø©ØŒ Ù…Ø¹ Ø¨Ù‚Ø§Ø¡ Ø§Ù„Ù…Ù„ÙØ§Øª Ø§Ù„Ù…Ø¤Ø±Ø´ÙØ© Ø¶Ù…Ù† Ù…Ø¬Ù…ÙˆØ¹Ø© Ù…Ø³ØªÙ‚Ù„Ø© Ø¹Ù†Ø¯ ÙˆØ¬ÙˆØ¯Ù‡Ø§.`
+    : 'Ø§Ù„Ø¹Ù…Ù„Ø§Ø¡ Ø§Ù„Ù†Ø´Ø·ÙˆÙ† Ù…Ø±ØªØ¨ÙˆÙ† Ù‡Ù†Ø§ Ø­Ø³Ø¨ Ø£ÙˆÙ„ÙˆÙŠØ© Ø§Ù„Ù…ØªØ§Ø¨Ø¹Ø©: ÙÙˆÙ‚ Ø§Ù„Ù…Ø·Ù„ÙˆØ¨ØŒ Ø«Ù… Ø§Ù„ØªØ­ØµÙŠÙ„ Ø§Ù„Ø¬Ø²Ø¦ÙŠØŒ Ø«Ù… Ø§Ù„Ù…Ù„ÙØ§Øª Ø§Ù„Ù…ÙØªÙˆØ­Ø©ØŒ Ù…Ø¹ Ø¹Ø±Ø¶ Ø§Ù„Ù…Ù„ÙØ§Øª Ø§Ù„Ù…Ø¤Ø±Ø´ÙØ© ÙÙŠ Ù…Ø¬Ù…ÙˆØ¹Ø© Ù…Ø³ØªÙ‚Ù„Ø© Ø¹Ù†Ø¯ ÙˆØ¬ÙˆØ¯Ù‡Ø§.'
+  void visibleCustomerCountLabel
+  void visibleListScopeLabel
+  const customerHeaderCountLabel = loading
+    ? '\u062c\u0627\u0631 \u062a\u062d\u0645\u064a\u0644 \u0645\u062d\u0641\u0638\u0629 \u0627\u0644\u0639\u0645\u0644\u0627\u0621...'
+    : `\u0639\u0631\u0636 ${totalVisibleCustomers} \u0645\u0646 \u0623\u0635\u0644 ${customers.length + archivedCustomers.length} \u0639\u0645\u064a\u0644 \u2022 ${followUpCustomersInView} \u0628\u062d\u0627\u062c\u0629 \u0645\u062a\u0627\u0628\u0639\u0629${archivedCustomers.length > 0 ? ` \u2022 ${archivedCustomers.length} \u0645\u0624\u0631\u0634\u0641` : ''}${pendingCustomerLabel}`
+  const customersListScopeLabel = activePortfolioFilterLabel
+    ? `\u064a\u062a\u0645 \u0627\u0644\u0622\u0646 \u0627\u0644\u062a\u0631\u0643\u064a\u0632 \u0639\u0644\u0649: ${activePortfolioFilterLabel}. \u0645\u0627 \u0632\u0627\u0644 \u0628\u0625\u0645\u0643\u0627\u0646\u0643 \u0627\u0633\u062a\u062e\u062f\u0627\u0645 \u0627\u0644\u0628\u062d\u062b \u0623\u0648 \u0625\u0644\u063a\u0627\u0621 \u0627\u0644\u062a\u0631\u0643\u064a\u0632 \u0644\u0644\u0639\u0648\u062f\u0629 \u0625\u0644\u0649 \u0643\u0644 \u0627\u0644\u0645\u062d\u0641\u0638\u0629\u060c \u0645\u0639 \u0628\u0642\u0627\u0621 \u0627\u0644\u0645\u0644\u0641\u0627\u062a \u0627\u0644\u0645\u0624\u0631\u0634\u0641\u0629 \u0636\u0645\u0646 \u0645\u062c\u0645\u0648\u0639\u0629 \u0645\u0633\u062a\u0642\u0644\u0629 \u0639\u0646\u062f \u0648\u062c\u0648\u062f\u0647\u0627.`
+    : '\u0627\u0644\u0639\u0645\u0644\u0627\u0621 \u0627\u0644\u0646\u0634\u0637\u0648\u0646 \u0645\u0631\u062a\u0628\u0648\u0646 \u0647\u0646\u0627 \u062d\u0633\u0628 \u0623\u0648\u0644\u0648\u064a\u0629 \u0627\u0644\u0645\u062a\u0627\u0628\u0639\u0629: \u0641\u0648\u0642 \u0627\u0644\u0645\u0637\u0644\u0648\u0628\u060c \u062b\u0645 \u0627\u0644\u062a\u062d\u0635\u064a\u0644 \u0627\u0644\u062c\u0632\u0626\u064a\u060c \u062b\u0645 \u0627\u0644\u0645\u0644\u0641\u0627\u062a \u0627\u0644\u0645\u0641\u062a\u0648\u062d\u0629\u060c \u0645\u0639 \u0639\u0631\u0636 \u0627\u0644\u0645\u0644\u0641\u0627\u062a \u0627\u0644\u0645\u0624\u0631\u0634\u0641\u0629 \u0641\u064a \u0645\u062c\u0645\u0648\u0639\u0629 \u0645\u0633\u062a\u0642\u0644\u0629 \u0639\u0646\u062f \u0648\u062c\u0648\u062f\u0647\u0627.'
   const customerFormDescription = isOffline
     ? 'يمكنك حفظ ملف عميل محليا أثناء انقطاع الاتصال. سيبقى منفصلا عن ملفات العملاء المؤكدة حتى تنجح المزامنة.'
     : 'أضف عميلا جديدا حتى يتمكن فريق التشغيل من إنشاء الحوالات ومتابعة التسويات له.'
@@ -1407,7 +1485,7 @@ function CustomersPage() {
   return (
     <>
       <div className="stack customers-portfolio-page">
-        <CustomersHeader customerCountLabel={customerCountLabel} onRefresh={handleRefresh} />
+        <CustomersHeader customerCountLabel={customerHeaderCountLabel} onRefresh={handleRefresh} />
 
         <OfflineSnapshotNotice snapshotState={snapshotState} />
         <InlineMessage kind="warning" className="customers-portfolio-metrics-warning">
@@ -1585,10 +1663,10 @@ function CustomersPage() {
           onSearchChange={setSearchQuery}
           errorMessage={loadError}
           loading={loading}
-          hasCustomers={customers.length > 0}
-          hasFilteredCustomers={filteredCustomers.length > 0}
+          hasCustomers={customers.length + archivedCustomers.length > 0}
+          hasFilteredCustomers={filteredCustomers.length + filteredArchivedCustomers.length > 0}
           groups={customerGroups}
-          scopeLabel={listScopeLabel}
+          scopeLabel={customersListScopeLabel}
           activePortfolioFilterLabel={activePortfolioFilterLabel}
           onClearPortfolioFilter={() => setPortfolioFilter('all')}
           onRetry={handleRefresh}

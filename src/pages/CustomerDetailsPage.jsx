@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Link, useParams } from 'react-router-dom'
+import { Link, useNavigate, useParams } from 'react-router-dom'
 import CustomerFollowUpPanel from '../components/customer-details/CustomerFollowUpPanel.jsx'
 import CustomerRecentActivity from '../components/customer-details/CustomerRecentActivity.jsx'
 import CustomerSummary from '../components/customer-details/CustomerSummary.jsx'
@@ -23,7 +23,11 @@ import {
 } from '../lib/customerProfile.js'
 import { getCustomerDetailsSnapshotKey } from '../lib/offline/cacheKeys.js'
 import { getOfflineSnapshotMissingMessage } from '../lib/offline/freshness.js'
-import { syncEditedCustomerSnapshots } from '../lib/offline/customerSnapshots.js'
+import {
+  syncArchivedCustomerSnapshots,
+  syncDeletedCustomerSnapshots,
+  syncEditedCustomerSnapshots,
+} from '../lib/offline/customerSnapshots.js'
 import {
   isBrowserOffline,
   isLikelyOfflineReadFailure,
@@ -156,6 +160,7 @@ function getTransferPriority(entry) {
 
 function CustomerDetailsPage() {
   const { customerId } = useParams()
+  const navigate = useNavigate()
   const { configError, isConfigured } = useAuth()
   const { isOffline } = useNetworkStatus()
   const { clearSnapshotState, markCachedSnapshot, markLiveSnapshot, snapshotState } =
@@ -180,6 +185,10 @@ function CustomerDetailsPage() {
   const [editSubmitting, setEditSubmitting] = useState(false)
   const [editSubmitError, setEditSubmitError] = useState('')
   const [editSubmitSuccess, setEditSubmitSuccess] = useState('')
+  const [pendingLifecycleAction, setPendingLifecycleAction] = useState('')
+  const [lifecycleSubmitting, setLifecycleSubmitting] = useState(false)
+  const [lifecycleSubmitError, setLifecycleSubmitError] = useState('')
+  const [lifecycleSubmitSuccess, setLifecycleSubmitSuccess] = useState('')
 
   useEffect(() => {
     if (!isConfigured || !supabase || !customerId) {
@@ -229,7 +238,7 @@ function CustomerDetailsPage() {
           supabase
             .schema('public')
             .from('customers')
-            .select('id, full_name, phone, notes, created_at')
+            .select('id, full_name, phone, notes, is_archived, archived_at, created_at')
             .eq('id', customerId)
             .maybeSingle(),
           {
@@ -518,6 +527,7 @@ function CustomerDetailsPage() {
   const totalsReady = !paymentTotalsLoading && !paymentTotalsError
   const customerUnavailable = customerNotFound || Boolean(customerError)
   const editDisabled = !isEditingCustomer && (isOffline || customerUnavailable || !customer)
+  const isArchivedCustomer = Boolean(customer?.is_archived)
 
   useEffect(() => {
     setIsEditingCustomer(false)
@@ -525,6 +535,10 @@ function CustomerDetailsPage() {
     setEditSubmitting(false)
     setEditSubmitError('')
     setEditSubmitSuccess('')
+    setPendingLifecycleAction('')
+    setLifecycleSubmitting(false)
+    setLifecycleSubmitError('')
+    setLifecycleSubmitSuccess('')
   }, [customerId])
 
   useEffect(() => {
@@ -567,10 +581,31 @@ function CustomerDetailsPage() {
     }
 
     setActiveSection('actions')
+    setPendingLifecycleAction('')
+    setLifecycleSubmitError('')
+    setLifecycleSubmitSuccess('')
     setIsEditingCustomer(true)
     setEditSubmitError('')
     setEditSubmitSuccess('')
     setEditFormValues(customer ? createCustomerFormValues(customer) : createEmptyCustomerForm())
+  }
+
+  const handlePrepareLifecycleAction = (action) => {
+    setActiveSection('actions')
+    setIsEditingCustomer(false)
+    setEditSubmitting(false)
+    setEditSubmitError('')
+    setEditSubmitSuccess('')
+    setPendingLifecycleAction(action)
+    setLifecycleSubmitError('')
+    setLifecycleSubmitSuccess('')
+  }
+
+  const handleCancelLifecycleAction = () => {
+    setPendingLifecycleAction('')
+    setLifecycleSubmitting(false)
+    setLifecycleSubmitError('')
+    setLifecycleSubmitSuccess('')
   }
 
   const handleEditCustomerSubmit = async (event) => {
@@ -613,7 +648,7 @@ function CustomerDetailsPage() {
         .from('customers')
         .update(payload)
         .eq('id', customerId)
-        .select('id, full_name, phone, notes, created_at')
+        .select('id, full_name, phone, notes, is_archived, archived_at, created_at')
         .maybeSingle()
 
       if (error) {
@@ -642,6 +677,122 @@ function CustomerDetailsPage() {
       setEditSubmitError(error?.message || 'تعذر حفظ تعديلات العميل في الوقت الحالي.')
     } finally {
       setEditSubmitting(false)
+    }
+  }
+
+  const handleCustomerLifecycleSubmit = async () => {
+    if (isOffline) {
+      setLifecycleSubmitError('إدارة أرشفة العميل أو حذفه متاحة أثناء الاتصال فقط حاليا.')
+      setLifecycleSubmitSuccess('')
+      return
+    }
+
+    if (!isConfigured || !supabase) {
+      setLifecycleSubmitError(configError || 'تعذر الاتصال بقاعدة البيانات حاليا.')
+      setLifecycleSubmitSuccess('')
+      return
+    }
+
+    if (!customerId || !customer || !pendingLifecycleAction) {
+      setLifecycleSubmitError('تعذر تحديد ملف العميل المطلوب تحديث حالته.')
+      setLifecycleSubmitSuccess('')
+      return
+    }
+
+    setLifecycleSubmitting(true)
+    setLifecycleSubmitError('')
+    setLifecycleSubmitSuccess('')
+
+    try {
+      const { count, error: countError } = await supabase
+        .schema('public')
+        .from('transfers')
+        .select('id', { count: 'exact', head: true })
+        .eq('customer_id', customerId)
+
+      if (countError) {
+        throw countError
+      }
+
+      const linkedTransfersCount = Number(count) || 0
+
+      if (pendingLifecycleAction === 'delete' && linkedTransfersCount > 0) {
+        setPendingLifecycleAction('archive')
+        setLifecycleSubmitError('هذا العميل مرتبط بحوالات موجودة، لذلك تم تحويل الإجراء إلى الأرشفة بدلا من الحذف النهائي.')
+        return
+      }
+
+      if (pendingLifecycleAction === 'archive' && linkedTransfersCount === 0) {
+        setPendingLifecycleAction('delete')
+        setLifecycleSubmitError('لا توجد حوالات مرتبطة بهذا العميل حاليا، ويمكنك حذفه نهائيا بدلا من أرشفته.')
+        return
+      }
+
+      if (pendingLifecycleAction === 'delete') {
+        const { error: deleteError } = await supabase
+          .schema('public')
+          .from('customers')
+          .delete()
+          .eq('id', customerId)
+
+        if (deleteError) {
+          throw deleteError
+        }
+
+        try {
+          await syncDeletedCustomerSnapshots(customerId)
+        } catch (snapshotError) {
+          console.error('Failed to sync deleted customer snapshots', snapshotError)
+        }
+
+        navigate('/customers', {
+          replace: true,
+          state: {
+            customerLifecycleMessage: 'تم حذف ملف العميل نهائيا لأنه لا يحتوي على حوالات مرتبطة.',
+          },
+        })
+        return
+      }
+
+      const archivePayload = {
+        archived_at: new Date().toISOString(),
+        is_archived: true,
+      }
+
+      const { data, error } = await supabase
+        .schema('public')
+        .from('customers')
+        .update(archivePayload)
+        .eq('id', customerId)
+        .select('id, full_name, phone, notes, is_archived, archived_at, created_at')
+        .maybeSingle()
+
+      if (error) {
+        throw error
+      }
+
+      if (!data) {
+        throw new Error('تعذر تحديث حالة أرشفة العميل في الوقت الحالي.')
+      }
+
+      const nextCustomer = {
+        ...customer,
+        ...data,
+      }
+
+      setCustomer(nextCustomer)
+      setPendingLifecycleAction('')
+      setLifecycleSubmitSuccess('تمت أرشفة العميل بنجاح. سيبقى متاحا للمراجعة التاريخية فقط ولن يظهر ضمن الاختيارات التشغيلية النشطة.')
+
+      try {
+        await syncArchivedCustomerSnapshots(nextCustomer)
+      } catch (snapshotError) {
+        console.error('Failed to sync archived customer snapshots', snapshotError)
+      }
+    } catch (error) {
+      setLifecycleSubmitError(error?.message || 'تعذر تحديث حالة العميل في الوقت الحالي.')
+    } finally {
+      setLifecycleSubmitting(false)
     }
   }
 
@@ -772,6 +923,10 @@ function CustomerDetailsPage() {
   const overpaidTransfersCount = enrichedTransfers.filter((transfer) => transfer.isOverpaid).length
   const settledTransfersCount = enrichedTransfers.filter((transfer) => transfer.isSettled).length
   const activeTransfersCount = openTransfersCount + partialTransfersCount
+  const canCreateTransfer = Boolean(customerId) && !customerUnavailable && !isArchivedCustomer
+  const canDeleteCustomer = Boolean(customer) && !customerUnavailable && totalTransfers === 0
+  const canArchiveCustomer =
+    Boolean(customer) && !customerUnavailable && totalTransfers > 0 && !isArchivedCustomer
   const filteredTransfers = enrichedTransfers.filter((transfer) =>
     matchesTransferStatusFilter(transfer.status, transferStatusFilter)
   )
@@ -893,6 +1048,14 @@ function CustomerDetailsPage() {
             ? 'هذا العميل يبدو مستقرا حاليا ولا توجد متابعة مالية عاجلة عبر حوالاته الحالية.'
             : 'راجع ملف العميل وحوالاته وإجمالياته المالية من شاشة متابعة واحدة.'
 
+  const resolvedCustomerStateTone = isArchivedCustomer ? 'neutral' : customerStateTone
+  const resolvedCustomerStateLabel = isArchivedCustomer ? 'مؤرشف' : customerStateLabel
+  const resolvedPageDescription = isArchivedCustomer
+    ? customer?.archived_at
+      ? `تمت أرشفة هذا العميل في ${formatDate(customer.archived_at)} للاحتفاظ بسجل حوالاته ومراجعته تاريخيا. لن يظهر ضمن اختيارات إنشاء الحوالات الجديدة.`
+      : 'تمت أرشفة هذا العميل للاحتفاظ بسجل حوالاته ومراجعته تاريخيا. لن يظهر ضمن اختيارات إنشاء الحوالات الجديدة.'
+    : pageDescription
+
   const totalPaidValue = paymentTotalsLoading
     ? 'جار التحميل...'
     : paymentTotalsError
@@ -965,6 +1128,22 @@ function CustomerDetailsPage() {
     ? [
         { title: 'رقم الهاتف', value: customer.phone || 'غير مضاف' },
         { title: 'تاريخ إنشاء الملف', value: formatDate(customer.created_at) },
+        { title: 'إجمالي الحوالات', value: totalTransfers, valueClassName: 'info-card-value--metric' },
+        {
+          title: 'ملاحظات',
+          value: customer.notes || 'لا توجد ملاحظات داخلية.',
+          className: 'info-card--full',
+        },
+      ]
+    : []
+
+  const customerSummaryItemsResolved = customerSummaryItems.length > 0
+    ? [
+        { title: 'تاريخ إنشاء الملف', value: formatDate(customer.created_at) },
+        { title: 'حالة الملف', value: isArchivedCustomer ? 'مؤرشف' : 'نشط' },
+        ...(isArchivedCustomer
+          ? [{ title: 'تاريخ الأرشفة', value: formatDate(customer.archived_at) }]
+          : []),
         { title: 'إجمالي الحوالات', value: totalTransfers, valueClassName: 'info-card-value--metric' },
         {
           title: 'ملاحظات',
@@ -1116,7 +1295,7 @@ function CustomerDetailsPage() {
 
   const transfersSectionCount = customerNotFound ? 0 : totalTransfers
   const activitySectionCount = customerNotFound ? 0 : recentActivityItems.length
-  const actionsSectionCount = customerNotFound ? 0 : 3
+  const actionsSectionCount = customerNotFound ? 0 : canCreateTransfer ? 4 : 3
 
   const sectionNavItems = CUSTOMER_DETAILS_SECTIONS.map((section) => {
     if (section.key === 'overview') {
@@ -1124,9 +1303,9 @@ function CustomerDetailsPage() {
         ...section,
         countLabel: customerNotFound ? '--' : totalTransfers,
         tone:
-          customerStateTone === 'danger'
+          resolvedCustomerStateTone === 'danger'
             ? 'danger'
-            : customerStateTone === 'warning'
+            : resolvedCustomerStateTone === 'warning'
               ? 'warning'
               : 'brand',
       }
@@ -1161,7 +1340,7 @@ function CustomerDetailsPage() {
         className="customer-details-page-hero"
         eyebrow="العميل"
         title={customer?.full_name || 'ملف العميل'}
-        description={pageDescription}
+        description={resolvedPageDescription}
         actions={
           <>
             <Link className="button secondary" to="/customers">
@@ -1252,10 +1431,10 @@ function CustomerDetailsPage() {
               <span
                 className={[
                   'queue-chip',
-                  `queue-chip--${customerStateTone === 'accent' ? 'neutral' : customerStateTone}`,
+                  `queue-chip--${resolvedCustomerStateTone === 'accent' ? 'neutral' : resolvedCustomerStateTone}`,
                 ].join(' ')}
               >
-                {customerStateLabel}
+                {resolvedCustomerStateLabel}
               </span>
             }
             highlightItems={customerSummaryHighlightItems}
@@ -1365,6 +1544,18 @@ function CustomerDetailsPage() {
             </InlineMessage>
           ) : null}
 
+          {lifecycleSubmitError ? (
+            <InlineMessage kind="error" className="customer-lifecycle-note">
+              {lifecycleSubmitError}
+            </InlineMessage>
+          ) : null}
+
+          {lifecycleSubmitSuccess ? (
+            <InlineMessage kind="success" className="customer-lifecycle-note">
+              {lifecycleSubmitSuccess}
+            </InlineMessage>
+          ) : null}
+
           <InfoGrid className="customer-details-secondary-grid">
             <InfoCard
               title={'\u062a\u0639\u062f\u064a\u0644 \u0628\u064a\u0627\u0646\u0627\u062a \u0627\u0644\u0639\u0645\u064a\u0644'}
@@ -1389,7 +1580,7 @@ function CustomerDetailsPage() {
                   : '\u062a\u0639\u062f\u064a\u0644 \u0645\u0644\u0641 \u0627\u0644\u0639\u0645\u064a\u0644'}
               </button>
             </InfoCard>
-            {customerId ? (
+            {canCreateTransfer ? (
               <InfoCard
                 title="إنشاء حوالة جديدة لهذا العميل"
                 value="استخدم هذا الاختصار للانتقال مباشرة إلى نموذج إنشاء حوالة جديدة مع اختيار هذا العميل مسبقا."
@@ -1416,6 +1607,115 @@ function CustomerDetailsPage() {
               </Link>
             </InfoCard>
           </InfoGrid>
+
+          {isArchivedCustomer ? (
+            <InfoCard
+              title="الملف مؤرشف"
+              value="تم إيقاف هذا العميل عن الظهور في الاختيارات التشغيلية النشطة، مع الإبقاء على ملفه وحوالاته للمراجعة التاريخية."
+              className="customer-lifecycle-confirm-card"
+            >
+              <p className="support-text">
+                {customer?.archived_at
+                  ? `تاريخ الأرشفة: ${formatDate(customer.archived_at)}`
+                  : 'يبقى هذا الملف متاحا للمراجعة فقط ولا يستخدم في إنشاء حوالات جديدة.'}
+              </p>
+            </InfoCard>
+          ) : canArchiveCustomer || canDeleteCustomer ? (
+            <InfoCard
+              title={canDeleteCustomer ? 'حذف العميل' : 'أرشفة العميل'}
+              value={
+                canDeleteCustomer
+                  ? 'لا توجد حوالات مرتبطة بهذا العميل حاليا، لذلك يمكن حذفه نهائيا بعد التأكيد.'
+                  : 'هذا العميل مرتبط بحوالات محفوظة، لذلك لا يمكن حذفه نهائيا. يمكنك أرشفته لإخراجه من الاختيارات التشغيلية النشطة.'
+              }
+              className={[
+                'customer-lifecycle-confirm-card',
+                pendingLifecycleAction === 'delete'
+                  ? 'info-card--danger'
+                  : pendingLifecycleAction === 'archive'
+                    ? 'info-card--accent'
+                    : '',
+              ]
+                .filter(Boolean)
+                .join(' ')}
+            >
+              <p className="support-text">
+                {canDeleteCustomer
+                  ? 'سيزال هذا الملف من القوائم والاختيارات النشطة بعد نجاح الحذف.'
+                  : 'ستبقى كل الحوالات والسجل المالي كما هما، لكن العميل لن يظهر ضمن إنشاء الحوالات الجديدة أو القوائم النشطة.'}
+              </p>
+              <button
+                type="button"
+                className={[
+                  'button',
+                  canDeleteCustomer
+                    ? 'secondary customer-lifecycle-danger-button'
+                    : 'secondary',
+                ]
+                  .filter(Boolean)
+                  .join(' ')}
+                onClick={() => handlePrepareLifecycleAction(canDeleteCustomer ? 'delete' : 'archive')}
+                disabled={isOffline || lifecycleSubmitting}
+              >
+                {canDeleteCustomer ? 'حذف العميل نهائيا' : 'أرشفة العميل'}
+              </button>
+            </InfoCard>
+          ) : null}
+
+          {pendingLifecycleAction && customer ? (
+            <InfoCard
+              title={pendingLifecycleAction === 'delete' ? 'تأكيد حذف العميل' : 'تأكيد أرشفة العميل'}
+              value={
+                pendingLifecycleAction === 'delete'
+                  ? 'سيتم حذف ملف العميل نهائيا لأنه لا يملك حوالات مرتبطة. راجع الاسم قبل المتابعة.'
+                  : 'سيتم تحويل هذا العميل إلى ملف مؤرشف مع الإبقاء على جميع الحوالات والسجل المرتبط به.'
+              }
+              className={[
+                'customer-lifecycle-confirm-card',
+                pendingLifecycleAction === 'delete' ? 'info-card--danger' : 'info-card--accent',
+              ]
+                .filter(Boolean)
+                .join(' ')}
+            >
+              <p className="support-text">
+                {pendingLifecycleAction === 'delete'
+                  ? `الاسم الحالي: ${customer.full_name || 'عميل بدون اسم'}. سيختفي العميل من القوائم ومحددات الإنشاء بعد نجاح الحذف.`
+                  : `الاسم الحالي: ${customer.full_name || 'عميل بدون اسم'}. بعد الأرشفة سيبقى الملف متاحا للمراجعة التاريخية فقط.`}
+              </p>
+              <div className="customers-form-actions customer-lifecycle-actions">
+                <button
+                  type="button"
+                  className={[
+                    'button',
+                    pendingLifecycleAction === 'delete'
+                      ? 'secondary customer-lifecycle-danger-button'
+                      : 'primary',
+                  ]
+                    .filter(Boolean)
+                    .join(' ')}
+                  onClick={handleCustomerLifecycleSubmit}
+                  disabled={lifecycleSubmitting}
+                >
+                  {lifecycleSubmitting
+                    ? pendingLifecycleAction === 'delete'
+                      ? 'جار حذف العميل...'
+                      : 'جار أرشفة العميل...'
+                    : pendingLifecycleAction === 'delete'
+                      ? 'تأكيد الحذف النهائي'
+                      : 'تأكيد الأرشفة'}
+                </button>
+                <button
+                  type="button"
+                  className="button secondary"
+                  onClick={handleCancelLifecycleAction}
+                  disabled={lifecycleSubmitting}
+                >
+                  إلغاء
+                </button>
+              </div>
+            </InfoCard>
+          ) : null}
+
           {isEditingCustomer && customer ? (
             <CustomersFormSection
               title={'\u062a\u0639\u062f\u064a\u0644 \u0645\u0644\u0641 \u0627\u0644\u0639\u0645\u064a\u0644'}
@@ -1466,7 +1766,7 @@ function CustomerDetailsPage() {
           >
             <InfoGrid className="customer-details-secondary-grid">
               <InfoCard title="المعرّف الداخلي" value={customer.id || '--'} />
-              {customerSummaryItems
+              {customerSummaryItemsResolved
                 .filter((item) => item.title !== 'رقم الهاتف')
                 .map((item) => (
                   <InfoCard

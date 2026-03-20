@@ -25,11 +25,16 @@ create table if not exists public.customers (
   full_name text not null,
   phone text,
   notes text,
+  is_archived boolean not null default false,
+  archived_at timestamptz,
   created_at timestamptz not null default timezone('utc', now())
 );
 
 create index if not exists customers_full_name_idx
 on public.customers (full_name);
+
+create index if not exists customers_is_archived_full_name_idx
+on public.customers (is_archived, full_name);
 
 create index if not exists customers_created_at_idx
 on public.customers (created_at desc);
