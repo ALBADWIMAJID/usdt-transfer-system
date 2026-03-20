@@ -49,11 +49,16 @@ function AppRoutes() {
 
 function App() {
   useEffect(() => {
-    document.documentElement.lang = 'ar'
-    document.documentElement.dir = 'rtl'
+    const root = document.documentElement
+    root.lang = 'ar'
+    root.dir = 'rtl'
     document.body.dir = 'rtl'
     document.title = branding.systemName
-    applyBrandingToDocument(document.documentElement)
+    /* Theme hook: light | dark — see docs/mobile-theme-system.md */
+    if (!root.dataset.theme) {
+      root.dataset.theme = 'light'
+    }
+    applyBrandingToDocument(root)
   }, [])
 
   return (

@@ -9,9 +9,11 @@ function TransferComputedSummary({
   valueBeforePercentageLabel,
   percentageLabel,
   valueAfterPercentageLabel,
+  className = '',
 }) {
   return (
     <SectionCard
+      className={['new-transfer-summary-section', className].filter(Boolean).join(' ')}
       title="معاينة التسوية"
       description="يتم تحديث الملخص التالي مباشرة ويعكس القيم التي سيتم حفظها مع الحوالة."
     >

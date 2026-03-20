@@ -4,6 +4,7 @@ import PageHeader from '../ui/PageHeader.jsx'
 function NewTransferHeader({ onRefresh }) {
   return (
     <PageHeader
+      className="new-transfer-page-hero"
       eyebrow="حوالة جديدة"
       title="إدخال حوالة جديدة"
       description="اختر العميل وأدخل البيانات التجارية وراجع مبلغ التسوية قبل حفظ الحوالة."

@@ -1,5 +1,275 @@
 # Implementation Log
 
+## 2026-03-20 — T1 Global header compression pass (mobile follow-up)
+
+Requested scope:
+- Compress **≤960px** **`PageHeader` / `page-hero`** footprint across dashboard (desktop stack + Lite),
+  transfers, customers, customer details, transfer details, new transfer; calmer top rhythm with shell
+  status; **no** business logic, routes, offline behavior, or page body redesigns.
+
+Files changed:
+- `src/components/ui/PageHeader.jsx` — **`page-hero-description`** class on description **`p`** for targeted
+  mobile hiding (support / freshness lines unchanged)
+- `src/index.css` — mobile **`:root`** tokens **`--mobile-page-hero-*`**; shared **`.page-hero`** block
+  (padding, title **`--theme-text-primary`**, compact eyebrow, **`page-actions`** 2-col grid + primary full
+  row); **`.page-content`** / **`shell-status-strip`** top spacing nudge; **720px** / **540px** token
+  tighten; **Dashboard Mobile Lite** header uses same tokens (with fallbacks); page-specific hero CSS
+  deduped (transfers / customers / customer details / new transfer overrides only where layout differs);
+  removed fragile **540px** **`p:last-of-type`** hero hiding (superseded by **`page-hero-description`**)
+- `docs/mobile-theme-system.md` — §16 compact page hero contract
+- `docs/code-map.md`, `docs/project-current-state.md`, `docs/implementation-log.md`,
+  `docs/last-change-summary.md`
+
+Verification:
+- `npm run lint` — passed
+- `npm run build` — passed
+
+Suggested commit message:
+- `T1 Global header compression pass`
+
+## 2026-03-20 — Phase 10 iPhone QA and docs finalization
+
+Requested scope:
+- Final **mobile trust** pass per `docs/usdt-mobile-app-like-ui-plan.md` §20: static QA against shell,
+  safe areas, sticky CTAs, lists, offline/sync visibility; **no** business logic, routes, offline semantics,
+  auth, print, or page redesigns.
+
+Files changed:
+- `index.html` — viewport meta adds **`interactive-widget=resizes-content`** (with **`viewport-fit=cover`**)
+  for keyboard/viewport behavior where supported
+- `src/index.css` — **≤960px:** `html` **`scroll-padding-bottom`** + **`.field:focus-within`**
+  **`scroll-margin-bottom`** so focused inputs clear the floating bottom nav when the browser scrolls
+  them into view
+- `docs/mobile-qa-final-checklist.md` — Phase 10 record (scenarios 1–11, static vs device, P10-1, deferrals)
+- `docs/iphone-qa-checklist.md` — pointer to record results in **`mobile-qa-final-checklist.md`**
+- `docs/mobile-theme-system.md` — §15 viewport / keyboard scroll contract
+- `docs/code-map.md`, `docs/project-current-state.md`, `docs/implementation-log.md`,
+  `docs/last-change-summary.md`
+
+Verification:
+- `npm run lint` — passed
+- `npm run build` — passed
+
+Physical iPhone sign-off remains **manual** via **`docs/iphone-qa-checklist.md`**.
+
+Suggested commit message:
+- `Phase 10 iPhone QA and docs finalization`
+
+## 2026-03-20 — Phase 9 System-wide mobile micro-polish and accessibility pass
+
+Requested scope:
+- Calmer, more consistent **≤960px** chrome: touch targets, spacing rhythm for notices/empty/loading,
+  truncation, motion restraint, **`prefers-reduced-motion`**, contrast tweaks, safe-area clearance; **no**
+  business logic, routes, offline queues, or page redesigns.
+
+Files changed:
+- `src/index.css` — mobile **`:root`** **`--touch-target-min`** (light + dark); Phase 9 block: **`min-width: 0`**
+  / wrapping for titles, tab label ellipsis containers, tokenized **`status-banner`** / **`empty-state`** /
+  **`loading-state`**, **`sync-status-banner`** variants on **`--theme-status-*`**, **`shell-status-strip`**
+  horizontal safe padding; larger **`.icon-button`**, **`.button`** / **`.field`** min-heights, drawer
+  **`nav-link`** + **`nav-link-icon`**, **chips** **`min-height`**, **bottom-nav** padding + scale tweak;
+  **`.page-content`** + **≤540px** bottom padding **`calc(5.75rem + safe-area)`**; sticky submit
+  **`bottom: calc(5.5rem + safe-area)`**; **`a:hover article`** no lift on mobile; **≤720px** connection
+  badge taller tap target; global **`@media (prefers-reduced-motion: reduce)`**
+- `src/components/AppShell.jsx` — bottom **`NavLink`** **`aria-label={item.label}`**
+- `docs/mobile-theme-system.md` — §12 touch targets, §13 reduced motion, maintenance §14
+- `docs/code-map.md`, `docs/project-current-state.md`, `docs/implementation-log.md`,
+  `docs/last-change-summary.md`
+
+Verification:
+- `npm run lint` — passed
+- `npm run build` — passed
+
+Suggested commit message:
+- `Phase 9 system-wide mobile micro-polish and accessibility pass`
+
+## 2026-03-20 — Phase 8 CustomersPage consistency pass
+
+Requested scope:
+- Align **`CustomersPage`** with the premium mobile shell (**hero**, **`app-section-*`**, grouped lists,
+  compact filters) and **`--theme-*`** / **`--type-*`** / **`--mobile-*`** tokens; **no** business logic,
+  routes, offline customer queue/replay semantics, or schema changes.
+
+Files changed:
+- `src/components/customers/CustomersHeader.jsx` — **`PageHeader`** **`className="customers-page-hero"`**;
+  count label wrapped in **`customers-page-hero-meta`**
+- `src/components/customers/CustomersList.jsx` — **`SectionCard`** **`customers-list-section`**;
+  **`FilterBar`** **`customers-list-filter-bar`**
+- `src/components/customers/CustomersFormSection.jsx` — **`customers-form-section`**;
+  **`customers-create-form`** on **`<form>`**
+- `src/pages/CustomersPage.jsx` — **`customers-portfolio-metrics-warning`** on portfolio warning
+  **`InlineMessage`**; **`customers-portfolio-queue-inline`** on cross-section queue **`InlineMessage`**
+- `src/index.css` — global **`.customers-portfolio-page`** token surfaces (preview cards/items, portfolio
+  groups, customer row status variants, calmer **`status-banner`** overrides); **≤960px** Phase 8 block
+  (compact hero, glass section nav + tab tokens, section description hides except pending copy, inset
+  filter bar, grouped **`customer-portfolio-group-list`** / preview lists / **`pending-transfer-list`**,
+  full-width create submit, **`empty-state`** / **`loading-state`** tone)
+- `docs/code-map.md`, `docs/project-current-state.md`, `docs/implementation-log.md`,
+  `docs/last-change-summary.md`
+
+Verification:
+- `npm run lint` — passed
+- `npm run build` — passed
+
+Suggested commit message:
+- `Phase 8 CustomersPage consistency pass`
+
+## 2026-03-20 — Phase 7 TransferDetailsPage mobile refinement pass
+
+Requested scope:
+- Stronger **≤960px** transfer follow-up screen: compact summary, clearer payment capture, grouped
+  payment history, visually secondary print tab/surface, **`--theme-*`** / **`--type-*`** / **`--mobile-*`**
+  alignment; **no** business logic, schema, routes, auth, print mechanics, or offline snapshot/queue
+  semantics.
+
+Files changed:
+- `src/pages/TransferDetailsPage.jsx` — **`PageHeader`** **`className`** adds **`transfer-details-page-hero`**;
+  **`TransferSummary`** **`recordHeaderClassName="transfer-details-summary-identity"`**
+- `src/components/transfer-details/TransferSummary.jsx` — optional **`recordHeaderClassName`** merged into
+  **`RecordHeader`**
+- `src/components/transfer-details/BalanceSummary.jsx` — **`InfoGrid`** **`className="balance-summary-grid"`**
+- `src/components/transfer-details/PaymentForm.jsx` — form **`transfer-payment-action-form`**;
+  amount **`FieldShell`** **`transfer-payment-amount-field`**; submit wrapper **`transfer-payment-submit-slot`**
+- `src/index.css` — global **`.transfer-details-page`** tokenized surfaces (highlight/balance/follow-up
+  cards, follow-up + payment-action panels + meta items); **≤960px** Phase 7 block (hero, section chrome,
+  identity + metric grids, tighter panels, payment form well + sticky primary CTA, grouped
+  **`payment-history-list`**, de-emphasized active print card); split shared **≤960px** rules so
+  **`.customer-details-page`** alone keeps older follow-up padding/copy font rules; **≤540px**
+  **`payment-form-row`** single column + **`payment-entry--priority`** row padding without rounding inside
+  grouped lists
+- `docs/code-map.md`, `docs/project-current-state.md`, `docs/implementation-log.md`,
+  `docs/last-change-summary.md`
+
+Verification:
+- `npm run lint` — passed
+- `npm run build` — passed
+
+Suggested commit message:
+- `Phase 7 TransferDetailsPage mobile refinement pass`
+
+## 2026-03-20 — Phase 6 NewTransferPage mobile capture flow polish
+
+Requested scope:
+- Guided **mobile** transfer entry: clearer grouping, calmer surfaces, stronger primary action,
+  better summary placement, keyboard/tab-bar-safe spacing; **no** validation, submit contract,
+  offline queue, or schema changes.
+
+Files changed:
+- `src/pages/NewTransferPage.jsx` — **`stack new-transfer-page`**; **`TransferComputedSummary`**
+  moved **above** pending **`SectionCard`**; pending section **`new-transfer-pending-section`**;
+  passes **`amountDisplayLabel`** / **`globalRateDisplayLabel`** into **`TransferFormSection`**
+- `src/components/new-transfer/NewTransferHeader.jsx` — **`PageHeader`** **`className="new-transfer-page-hero"`**
+- `src/components/new-transfer/TransferFormSection.jsx` — **`new-transfer-form-section`**,
+  **`.new-transfer-step--customer|--pricing|--notes|--submit`**, **`new-transfer-submit-strip`** before
+  submit, **`new-transfer-field-*`** on key fields; new optional string props for submit strip meta
+- `src/components/new-transfer/TransferComputedSummary.jsx` — **`className`** prop + default
+  **`new-transfer-summary-section`**
+- `src/index.css` — **`.new-transfer-page`** global token surfaces (submit strip, pending failed card);
+  **≤960px** hero compact, section cards, step hairlines, emphasized **USDT** input, sticky submit
+  **`bottom: calc(5.35rem + safe-area)`**, compact **2-col** summary grid + full-width highlighted
+  settlement card, pending section head
+- `docs/code-map.md`, `docs/project-current-state.md`, `docs/implementation-log.md`,
+  `docs/last-change-summary.md`
+
+Verification:
+- `npm run lint` — passed
+- `npm run build` — passed
+
+Suggested commit message:
+- `Phase 6 NewTransferPage mobile capture flow polish`
+
+## 2026-03-20 — Phase 5 CustomerDetailsPage mobile simplification
+
+Requested scope:
+- Cleaner **mobile** follow-up workspace for one customer; keep internal **`app-section-*`**
+  model, data loading, snapshot/offline behavior, and routes unchanged; align with **theme tokens**
+  and Payvo-style operational density.
+
+Files changed:
+- `src/pages/CustomerDetailsPage.jsx` — **`PageHeader`** `className="customer-details-page-hero"`;
+  **`CustomerSummary`** `recordHeaderClassName="customer-details-identity"`
+- `src/components/customer-details/CustomerSummary.jsx` — optional **`recordHeaderClassName`** passed
+  through to **`RecordHeader`**
+- `src/index.css` — global **`.customer-details-page`** follow-up panel + summary card surfaces use
+  **`--theme-*`** / **`--theme-status-*`**; **≤960px** compact hero (hide long description paragraph,
+  tokenized title/eyebrow, 2-col actions + full-width first secondary), section tab tweaks (hide tab
+  descriptions, tokenized counts), **`page-card`** glass/border tokens, compact identity strip (hide
+  duplicate name; phone + chip), 2-col highlight + metric grids, grouped **transfer-queue** /
+  **activity** lists (`--theme-lite-list-well`, `--theme-block-head-rule`), actions section full-width
+  buttons, queue **filter-bar** chip; **≤540px** preserve grouped list `gap: 0` + tighter row padding;
+  corrected **flex `order`** for section panels (removed obsolete totals/followup class names; added
+  **`customer-details-actions-section`**)
+- `docs/code-map.md`, `docs/project-current-state.md`, `docs/implementation-log.md`,
+  `docs/last-change-summary.md`
+
+What was not changed:
+- Business logic, Supabase, auth, print, offline queues/snapshots, section keys, transfer/activity data
+  shaping
+
+Verification:
+- `npm run lint` — passed
+- `npm run build` — passed
+
+Suggested commit message:
+- `Phase 5 CustomerDetailsPage mobile simplification`
+
+## 2026-03-20 (follow-up) — Mobile shell + shared sheet chrome tokens
+
+Scope:
+- **≤960px** drawer/menu: **`.sidebar-header`** → **`--theme-drawer-header-wash`**; **`.sidebar-footer`**
+  → **`--theme-drawer-footer-wash`**; **`.nav-link-icon`** color → **`--theme-nav-icon-fg`**; **`.user-chip`**
+  → **`--theme-fill-muted-navy`**; **`.user-avatar`** → **`--theme-avatar-gradient`**; **`.sidebar-signout`**
+  → **`--theme-surface-pill-muted`** + **`--theme-elev-micro`**
+- **Top bar / badges:** **`.topbar`** hairline → **`--theme-chrome-hairline-y`**; **`.topbar .connection-badge`**
+  → **`--theme-fill-muted-navy`**; **`.connection-badge`** fill → **`--theme-connection-badge-fill`**
+- **Mobile chips:** warning / danger / success → **`--theme-status-chip-*`**
+- **Shared operations sheet:** **`.operations-sheet-panel`** (base + **≤960** bottom sheet) → theme border,
+  surface gradient, **`--theme-drawer-shadow-out`** (side) / **`--theme-sheet-shadow-up`** (bottom)
+- **New token:** **`--theme-sheet-shadow-up`** (light + dark `:root`)
+
+Files: `src/index.css`, `docs/mobile-theme-system.md`, `docs/implementation-log.md`,
+`docs/last-change-summary.md`, `docs/project-current-state.md`
+
+Verification: `npm run lint`, `npm run build` — passed
+
+## 2026-03-20 - Shared theme rollout: mobile chrome + core surfaces (CSS)
+
+Requested scope:
+- Migrate **shared** mobile chrome and core surfaces from hardcoded light literals to the semantic
+  token system (`--theme-*`, `--type-*`, `--mobile-*`, existing `--theme-lite-*`); improve coherence
+  when `<html data-theme="dark">`; no user-facing theme toggle; no page-specific redesign; no logic,
+  routes, offline, or schema changes.
+
+Files changed:
+- `src/index.css` — new tokens **`--theme-list-row-fill`**, **`--theme-list-row-border`**,
+  **`--theme-control-inset-well`** (light + dark); global **`code`**, **`.empty-state`**, **`.field`**
+  inputs/placeholders/readonly/focus, **`.button.secondary`**, **`.icon-button`**, **`.info-card` /
+  `.record-card`** (+ success/danger variants + value colors), **`.text-*` utilities**, statement
+  **table** `td`/small; **Dashboard Mobile Lite** base + **≤960px** overrides (hero, KPIs, primary KPI,
+  nav shell, tabs, chips, blocks, grouped list, rows); **`.app-section-tab.active`**, **`.sidebar-panel`**
+  shadow/border; mobile **`.button.secondary`** fill; **`.dashboard-mobile-lite-row-sub`** →
+  **`--type-row-metadata-*`**
+
+What was not changed:
+- JSX (except docs only), Supabase, auth, print pipeline, offline queues/snapshots, routing, metrics
+  meaning
+
+Verification:
+- `npm run lint` — passed
+- `npm run build` — passed
+
+Docs:
+- `docs/mobile-theme-system.md` — document new tokens in category table
+- `docs/implementation-log.md`, `docs/last-change-summary.md`, `docs/project-current-state.md`,
+  `docs/code-map.md`
+
+Remaining for a **full** dark rollout:
+- Many **page-scoped** selectors (e.g. customer preview cards, transfer record variants) still use
+  light-oriented gradients/literals; address in future page or component passes.
+
+Suggested commit message:
+- `Roll out theme tokens to shared mobile chrome and surfaces`
+
 ## 2026-03-14T21:12:21+03:00 - Phase 1 PWA shell foundation documentation baseline
 
 Requested scope:
@@ -1207,3 +1477,277 @@ Verification:
 Suggested next step:
 - Manual iPhone QA (see `docs/last-change-summary.md`), then proceed to **Phase 2**
   when approved
+
+## 2026-03-21T18:00:00+03:00 - Phase 2 Unified mobile section navigation system
+
+Requested scope:
+- One shared visual + interaction pattern for internal section navigation on
+  Customers, Customer details, Transfers list, and Transfer details
+- CSS-first unification; no route or business-logic changes
+
+Files changed:
+- `src/index.css`
+- `src/pages/CustomersPage.jsx`
+- `src/pages/CustomerDetailsPage.jsx`
+- `src/pages/TransfersPage.jsx`
+- `src/pages/TransferDetailsPage.jsx`
+- `docs/implementation-log.md`
+- `docs/last-change-summary.md`
+- `docs/project-current-state.md`
+- `docs/code-map.md`
+
+What was added:
+- Canonical **`app-section-*`** class family replacing duplicated
+  `customers-section-*`, `customer-details-section-*`, and
+  `transfer-details-section-*` nav/workspace/panel rules
+- **`app-section-tab--row`** (label + optional count) vs **`--stack`** (centered
+  two-line segment for transfer details)
+- **`app-section-nav--two`** for `TransfersPage` two-column bar
+- Unified sticky offsets, nav chrome (blur/radius/gap), count badge tones, panel
+  show/hide, `focus-visible`, and consolidated **≤960px / ≤540px** compact rules
+- **≤960px:** single active treatment (brand gradient fill + white label) for
+  all section tabs; row tabs hide description + count; stack tabs stay readable
+- `TransferDetailsPage` section buttons now wrap copy in `app-section-tab-copy`
+  for typography parity with row tabs
+
+What was not changed:
+- Routes, auth, Supabase, offline snapshots/queues/replay/sync, print flow,
+  filtering/sorting semantics, section *keys* or page data flow
+- Semantic SectionCard modifier classes (e.g. `transfer-details-summary-section`)
+- `transfer-details-print-section` print behavior
+
+Verification:
+- `npm run lint` - passed
+- `npm run build` - passed
+- Build chunk-size warning unchanged
+
+Suggested next step:
+- Manual mobile QA on all four pages; then **Phase 3** (`TransfersPage`
+  mobile-first polish) when approved
+
+## 2026-03-21T22:30:00+03:00 - Phase 3 TransfersPage mobile-first polish
+
+Requested scope:
+- Presentation-only polish for `/transfers` as a mobile operational queue
+- Preserve all filter semantics, offline snapshot reads, grouping, and routes
+
+Files changed:
+- `src/hooks/useTransfersQueueCompactCards.js` (new; `matchMedia('(max-width: 720px)')` +
+  `useSyncExternalStore` for hydration-safe subscribe)
+- `src/components/transfers/TransfersHeader.jsx` — `className="transfers-queue-page-header"`
+- `src/components/transfers/TransfersFilterBar.jsx` — `transfers-queue-filter-bar` on `FilterBar`
+- `src/components/transfers/TransfersList.jsx` — wires compact hook into groups
+- `src/components/transfers/TransferQueueGroup.jsx` — optional `compactCards` → `TransferRecordCard`
+- `src/index.css` — scoped rules under `.transfers-queue-page` (header, filters, notes,
+  summary/group chrome); ≤960px transfers-only section **count** visibility override +
+  active-tab count contrast; extended operations-sheet **mobile-priority** card rules to
+  queue cards with **transfers-specific** follow-up note (no line-clamp)
+- `docs/implementation-log.md`, `docs/last-change-summary.md`, `docs/project-current-state.md`,
+  `docs/code-map.md`
+
+What was added:
+- Compact **page hero** on narrow widths (hide long framing copy; tighter title; action grid)
+- App-like **filter strip** (panel + responsive grid; lighter field chrome)
+- **Compact transfer cards** only when viewport ≤720px; desktop unchanged
+- Faster scan: hide duplicate queue scope note in summary panel on phone; hide metric
+  footers and group blurbs in-queue scope; show section tab counts on Transfers despite
+  global ≤960px row-tab compact rule
+
+What was not changed:
+- `TransfersPage.jsx` business logic, Supabase queries, filter state, `queueGroups` rules,
+  snapshot keys, or navigation contracts
+- Print flow, auth, offline queues, replay ordering, sync semantics, calculations
+
+Verification:
+- `npm run lint` - passed
+- `npm run build` - passed
+- Build chunk-size warning unchanged
+
+Suggested next step:
+- Manual iPhone QA on Transfers (see `docs/last-change-summary.md`); then **Phase 4**
+  Dashboard mobile prioritization when approved
+
+## 2026-03-22T12:00:00+03:00 - Phase 4 Dashboard Lite mobile rework (presentation)
+
+Requested scope:
+- Replace stacked mobile dashboard blocks with a single “operational home” pattern:
+  compact header, KPI strip, internal tabs, **one active panel** at a time
+- Keep all `DashboardPage` data loading, drill-down configs, snapshots, and href
+  builders unchanged; **no** route or business-logic edits
+
+Files changed:
+- `src/hooks/useDashboardMobileLiteLayout.js` (new; `matchMedia('(max-width: 960px)')` +
+  `useSyncExternalStore`)
+- `src/components/dashboard/DashboardMobileLite.jsx` (new; mobile-only UI shell)
+- `src/pages/DashboardPage.jsx` — branch: mobile → `DashboardMobileLite`, else existing
+  desktop stack (unchanged section components)
+- `src/index.css` — `dashboard-mobile-lite*` presentation rules + compact offline strip
+- `docs/implementation-log.md`, `docs/last-change-summary.md`, `docs/project-current-state.md`,
+  `docs/code-map.md`
+
+What was added:
+- **Mobile ≤960px:** dedicated layout with **المتابعة / الإجراءات / النشاط** tabs; each panel
+  shows condensed lists (caps on preview rows); headline KPIs reuse existing
+  `headlineCards` (today / remaining / overpayment); drill-down + `OperationsDrillDownSheet`
+  unchanged
+- **Desktop:** prior full dashboard sections remain as before
+
+What was not changed:
+- Supabase reads, stats derivation, `drillDownConfigs`, snapshot keys, `buildTransfersQueueHref`
+- Print, auth, offline queues/replay/sync semantics
+
+Verification:
+- `npm run lint` - passed
+- `npm run build` - passed
+- Build chunk-size warning unchanged
+
+Suggested next step:
+- Manual iPhone QA on Dashboard Lite; then **Phase 5** CustomerDetailsPage when approved
+
+## 2026-03-22T14:30:00+03:00 - iPhone visual system pass (mobile shell + surfaces)
+
+Requested scope:
+- Mobile-only presentation: reduce “responsive website” feel; align top bar, bottom nav,
+  drawer, and shared surfaces with a calmer, more **native-like** iPhone app language
+- No business logic, routes, auth, offline, or schema changes
+
+Files changed:
+- `src/index.css` — within `@media (max-width: 960px)` (and minor ≤540 bottom-nav tweaks):
+  mobile CSS variables; body canvas; topbar; connection badge; menu `icon-button`; drawer
+  backdrop + sidebar panel + nav rows + footer; bottom tab bar + active/inactive states;
+  `app-section-nav` / `app-section-tab` (tint selection vs gradient pill); transfers active
+  count chip; sync strip; record/info cards, fields, buttons; operational chips; Dashboard
+  Mobile Lite material overrides
+- `docs/implementation-log.md`, `docs/last-change-summary.md`, `docs/project-current-state.md`,
+  `docs/code-map.md`
+
+What was added:
+- **Hairline borders** (`--mobile-hairline`), **quaternary fills**, softer shadows
+- **Frosted** bars (saturate + blur) with lighter elevation
+- **Tint-based** selection for tabs and bottom nav (operational, not decorative gradients)
+
+What was not changed:
+- `AppShell.jsx` markup or navigation config
+- Desktop **>960px** base styles (except inherited token usage where cascade applies only in
+  mobile block for overridden rules)
+
+Verification:
+- `npm run lint` - passed
+- `npm run build` - passed
+
+Suggested next step:
+- Manual iPhone QA on shell + key flows; then continue plan-driven page work when approved
+
+## 2026-03-20T12:00:00+03:00 - Mobile chrome and grouped-list refinement pass
+
+Requested scope:
+- Mobile-only (≤960px): push shell + Dashboard Lite closer to a modern iPhone **operations** app
+- Refine top bar, bottom tab bar, drawer, KPI density, list row language, grouped surfaces
+- No business logic, routes, auth, offline, schema, print, or Phase 5 CustomerDetails work
+
+Files changed:
+- `src/index.css` — `@media (max-width: 960px)` / `720px` / `540px` adjustments: topbar materials +
+  connection; hide `.topbar-user` on ≤960; bottom nav **full-bleed** + active indicator; drawer **inset
+  sheet** + scroll mid + hide `.nav-link-note` + compact footer; Dashboard Lite KPI grid, tabs,
+  blocks, grouped list hairlines; `720` topbar `.connection-badge` scoped to `.topbar`
+- `src/components/dashboard/DashboardMobileLite.jsx` — add `dashboard-mobile-lite-list--grouped` to
+  preview list roots (presentational)
+- `docs/implementation-log.md`, `docs/last-change-summary.md`, `docs/project-current-state.md`,
+  `docs/code-map.md`
+
+What was added:
+- **Top bar:** softer bar, subtler separator; calmer one-line connection in header
+- **Tab bar:** system-like full-width bar, active **dot** + typography (no docked pill per tab)
+- **Drawer:** floating sheet geometry, simpler nav rows, smaller account region copy
+- **Lite KPIs:** three-across operational strip, reduced vertical waste
+- **Lite lists:** grouped inset list surface replacing per-row card boxes
+
+What was not changed:
+- `AppShell.jsx` markup / navigation config / route targets
+- Data, drill-downs, offline queues, sync, calculations
+- Desktop **>960px** presentation (aside from shared class names on DOM only when Lite mounts)
+
+Verification:
+- `npm run lint` - passed
+- `npm run build` - passed
+
+Suggested next step:
+- Manual QA on iPhone/notch devices for tab bar safe-area + drawer height; then plan Phase 5 when
+  approved
+
+## 2026-03-20T18:00:00+03:00 - Payvo-inspired fintech mobile theme pass
+
+Requested scope:
+- Mobile-only visual system (≤960px / 720px refinements): premium banking / wallet mood per plan
+- Tokens, shell (top bar, floating tab bar, drawer), shared surfaces, Dashboard Lite, lists/cards,
+  segmented controls, primary CTA — **no** logic, routes, auth, offline, schema, print
+
+Files changed:
+- `src/index.css` — viewport-scoped mobile tokens (`--mobile-canvas-*`, `--mobile-surface-*`,
+  `--mobile-tab-*`, `--mobile-ink-*`, deeper `--brand-secondary` override ≤960); canvas gradient
+  body; frosted top bar + connection; **floating** pill tab bar with inset safe-area; drawer sheet
+  (scrim, panel border, footer gradient); `app-section-*` segmented bar (glass, iOS-like active
+  pill); calmer sync strip; page heroes without decorative `::after`; cards/record rows borderless
+  glass surfaces; transfers filter panel; tighter `record-list` gap; vertical primary button
+  gradient; Dashboard Lite KPI/tab/block/list harmonization with tokens; `720` tab bar density
+- `src/components/AppShell.jsx` — hide sidebar section label on mobile (`desktop-only` on
+  “الأقسام الرئيسية”) for cleaner menu grouping
+- `docs/implementation-log.md`, `docs/last-change-summary.md`, `docs/project-current-state.md`,
+  `docs/code-map.md`
+
+What was added:
+- Coherent **fintech mobile token** layer and deeper navy secondary on phone only
+- **Native-like** floating bottom navigation + increased `page-content` bottom padding
+- **Premium sheet** drawer (blur, inner highlight, calmer account footer)
+- **Unified** glass surfaces across section tabs, cards, filters, sync, Lite home
+
+What was not changed:
+- Navigation targets, data wiring, offline/snapshot/sync semantics, desktop layouts (>960px baseline
+  rules unchanged outside mobile cascade)
+
+Verification:
+- `npm run lint` - passed
+- `npm run build` - passed
+
+Suggested next step:
+- Manual iPhone QA (floating tab vs home indicator, drawer scroll, section tabs on all four pages);
+  optional contrast check on mint primary KPI tile
+
+## 2026-03-20T22:30:00+03:00 - Theme system foundation + dark-mode architecture
+
+Requested scope:
+- Documented mobile/fintech theme contract; semantic **light + dark** CSS token layers; typography
+  and surface foundations; **`data-theme`** hook without full dark UI rollout; no logic/routes/offline
+  changes
+
+Files changed:
+- `docs/mobile-theme-system.md` **(new)** — direction, allowed/forbidden choices, token categories,
+  typography/surface contracts, switching notes, branding caveat
+- `src/index.css` — split **`:root`** into universal document defaults + `:root[data-theme='light']`
+  / `:not([data-theme])` + `:root[data-theme='dark']` with `--theme-*`, `--type-*`, legacy aliases;
+  **`--theme-body-background`** for `body`; mobile `@media` blocks scoped to light/dark `:root`;
+  shell tokens (`--theme-mobile-*`); segmented hover → `--theme-overlay-hover`; page title /
+  metric emphasis wired to `--type-*`; **540px** `page-content` bottom padding aligned with floating
+  tab bar (`5.65rem`)
+- `src/App.jsx` — default `document.documentElement.dataset.theme = 'light'` if unset
+- `index.html` — `data-theme="light"` on `<html>` for pre-React paint
+- `docs/implementation-log.md`, `docs/last-change-summary.md`, `docs/project-current-state.md`,
+  `docs/code-map.md`
+
+What was added:
+- Single **theme system doc** for future prompts
+- **Semantic** vs **legacy** token split (`--theme-*` / `--type-*` vs `--bg`, `--text`, …)
+- **Dark** token values (architecture); flip `data-theme="dark"` for incremental QA
+- **Typography scale** with mobile/720/540 overrides via token only
+
+What was not changed:
+- Business logic, schema, routes, auth, print, offline, calculations
+- Per-page JSX (except theme init in `App.jsx`)
+
+Verification:
+- `npm run lint` - passed
+- `npm run build` - passed
+
+Suggested next step:
+- Optional: `prefers-color-scheme` or settings toggle writing `data-theme`; migrate remaining hardcoded
+  light `rgba(255,…)` in mobile block to tokens

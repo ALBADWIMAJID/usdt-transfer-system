@@ -11,7 +11,7 @@ function BalanceSummary({
   remainingNote,
 }) {
   return (
-    <InfoGrid>
+    <InfoGrid className="balance-summary-grid">
       <InfoCard
         title="مبلغ التسوية"
         value={settlementValue}

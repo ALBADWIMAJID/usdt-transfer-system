@@ -16,7 +16,7 @@ function TransfersFilterBar({
   queueOptions,
 }) {
   return (
-    <FilterBar>
+    <FilterBar className="transfers-queue-filter-bar">
       <SearchField
         id="transfer_search"
         name="transfer_search"

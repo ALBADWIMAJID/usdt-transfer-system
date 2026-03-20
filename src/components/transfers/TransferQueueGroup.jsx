@@ -1,6 +1,6 @@
 import TransferRecordCard from './TransferRecordCard.jsx'
 
-function TransferQueueGroup({ title, description, count, tone = 'default', transfers = [] }) {
+function TransferQueueGroup({ title, description, count, tone = 'default', transfers = [], compactCards = false }) {
   return (
     <section className={['transfer-queue-group', `transfer-queue-group--${tone}`].filter(Boolean).join(' ')}>
       <div className="transfer-queue-group-head">
@@ -13,7 +13,7 @@ function TransferQueueGroup({ title, description, count, tone = 'default', trans
 
       <div className="record-list transfer-queue-group-list">
         {transfers.map((transfer) => (
-          <TransferRecordCard key={transfer.id} transfer={transfer} />
+          <TransferRecordCard key={transfer.id} transfer={transfer} compact={compactCards} />
         ))}
       </div>
     </section>

@@ -1,5 +1,7 @@
 # iPhone QA Checklist
 
+**Phase 10 record:** After running this checklist, summarize outcomes in **`docs/mobile-qa-final-checklist.md`** (scenario status, device sign-off).
+
 Purpose:
 - Manual validation checklist for real iPhone Safari and Add to Home Screen
   behavior

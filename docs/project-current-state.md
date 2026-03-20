@@ -53,9 +53,27 @@ work (per `docs/usdt-mobile-app-like-ui-plan.md`).
 
 - **Branch at freeze:** `main` (confirm locally with `git branch --show-current`)
 - **Working tree:** should be clean before starting Phase 2+ (`git status`)
-- **Latest validated UI pass in repo:** **Phase 1 AppShell mobile transformation**
-  (shell-only CSS in `src/index.css`; see `docs/implementation-log.md` entries
-  `2026-03-15T05:20:00+03:00` and **`2026-03-21T12:00:00+03:00`** refresh pass)
+- **Latest validated UI pass in repo:** **Shared theme rollout (mobile chrome + core surfaces)** —
+  extends the **theme system foundation** (`docs/mobile-theme-system.md`): global primitives
+  (`code`, `.field`, `.button`/`.icon-button`, `.empty-state`, `.info-card`/`.record-card`, statement
+  table body text, `.text-success`/`.danger`/`.strong`), **Dashboard Mobile Lite** surfaces (hero, KPIs,
+  nav shell, tabs, blocks, grouped lists, rows), and **≤960px** drawer panel + **app-section-tab**
+  active state wired to **`--theme-*`**, **`--type-row-metadata-*`**, and existing **`--theme-lite-*`**
+  / **`--mobile-*`** tokens; new **`--theme-list-row-*`**, **`--theme-control-inset-well`**,
+  **`--theme-sheet-shadow-up`**. **≤960px** drawer header/footer washes, user chip/avatar/sign-out, topbar
+  hairline, connection badge fills, and operational chips tie to existing **`--theme-drawer-*`** /
+  **`--theme-status-chip-*`** / **`--theme-connection-badge-fill`**; **`.operations-sheet-panel`** uses theme
+  borders/surfaces/shadows for side + bottom sheet. No routes or business/offline logic changes.
+- **Phase 5 (page):** **`CustomerDetailsPage`** mobile simplification — **`.customer-details-page`** in
+  **`src/index.css`** + minimal **`CustomerSummary`** API; see **`docs/last-change-summary.md`**.
+- **Phase 6 (page):** **`NewTransferPage`** — **`.new-transfer-page`** in **`src/index.css`** + form
+  structure in **`TransferFormSection`**; see **`docs/last-change-summary.md`**.
+- **Phase 7 (page):** **`TransferDetailsPage`** — **`.transfer-details-page`** in **`src/index.css`** +
+  **`transfer-details-page-hero`**, **`transfer-details-summary-identity`**, **`balance-summary-grid`**,
+  **`transfer-payment-*`** hooks in **`PaymentForm`**; see **`docs/last-change-summary.md`**.
+- **Phase 8 (page):** **`CustomersPage`** — **`.customers-portfolio-page`** in **`src/index.css`** +
+  **`customers-page-hero`**, list/filter/form section classes, tokenized banners; see
+  **`docs/last-change-summary.md`**.
 - **App shell source:** `src/components/AppShell.jsx` (shared UI:
   `ConnectionBadge.jsx`, `SyncStatusBanner.jsx`, `BrandLockup.jsx`, etc.)
 - **Pages with internal section navigation (route unchanged):**
@@ -63,34 +81,84 @@ work (per `docs/usdt-mobile-app-like-ui-plan.md`).
   - `CustomerDetailsPage` — overview-style sections (overview, transfers, activity, actions, etc.)
   - `TransferDetailsPage` — Summary, Payments, Payment History, Print
   - `TransfersPage` — **مؤشرات الصف** (summary) and **صف المتابعة** (queue); uses the
-    same shared section-nav / panel CSS patterns as other long pages (e.g.
-    `customer-details-section-nav`, `transfer-details-section-panel`) — this is
-    **stable shipped layout**, not a partial Phase 3 polish pass
-- **Not using internal section tabs:** `DashboardPage`, `NewTransferPage`, `LoginPage`
-  (and other routes) — organization is via cards/sections without the shared
-  sticky section-bar pattern
-- **Next implementation step (plan order):** **Phase 2 — Unified mobile section
-  navigation system** (`docs/usdt-mobile-app-like-ui-plan.md` §12)
+    unified **`app-section-*`** internal navigation system (`app-section-nav--two`
+    for two columns); **Phase 3** added mobile-first queue polish (compact header,
+    lighter filters, compact cards under 720px, transfers-only section counts on
+    phone)
+- **DashboardPage:** on **≤960px** uses **dashboard-mobile-lite** in-page tabs
+  (المتابعة / الإجراءات / النشاط) — **not** `app-section-*`; route `/dashboard`
+  unchanged. **`NewTransferPage`**, **`LoginPage`**, etc. — no internal section bar
+- **Phase 9 (system):** mobile micro-polish + a11y — **`--touch-target-min`**, unified banners / empty /
+  loading / sync strip on **≤960px**, calmer hover motion, **`prefers-reduced-motion`**, safe-area padding,
+  bottom nav **`aria-label`**; see **`docs/last-change-summary.md`** and **`docs/mobile-theme-system.md`**
+  §12–13.
+- **Phase 10 (UI plan):** iPhone QA + docs finalization — record in **`docs/mobile-qa-final-checklist.md`**;
+  viewport **`interactive-widget=resizes-content`**; **≤960px** `html` scroll-padding + **`.field:focus-within`**
+  scroll-margin for keyboard clearance vs bottom nav; **`Phase 9`** remains the last broad chrome pass.
+  **Device sign-off** still uses **`docs/iphone-qa-checklist.md`** (cannot be completed from CI alone).
+- **T1 (mobile follow-up):** global **header / page-hero compression** — shared **`--mobile-page-hero-*`** tokens,
+  **`PageHeader`** description class **`page-hero-description`** (mobile-hidden), unified **`.page-hero`** app-bar
+  rhythm on **≤960px** across dashboard (stack + Lite), transfers, customers, customer details, transfer
+  details, new transfer; see **`docs/mobile-theme-system.md`** §16 and **`docs/last-change-summary.md`**.
 
 ## Current UI Organization Notes
 
-- Latest completed pass is **Phase 1 AppShell mobile transformation** (refreshed
-  2026-03-21): shell-level mobile refinement only:
-  - mobile top bar (title-first, safe-area padding, lighter chrome)
-  - global page frame and `content-shell` grid (`auto auto 1fr` + `min-height: 0`)
-  - safe-area handling (top, horizontal, bottom + floating bottom nav clearance)
-  - bottom navigation (inset dock / tab-bar feel)
-  - global sync/connection status presentation (lighter strip + topbar badge)
-  - mobile spacing rhythm
-- `TransfersPage` redesign/polish was intentionally excluded from this pass
-- Existing page-level business behavior and offline semantics remain unchanged
-- Internal sectioned page organizations (including `TransferDetailsPage`) remain
-  as previously implemented; this pass did not alter them
+- Latest completed passes:
+  - **Phase 2 Unified mobile section navigation system:** shared **`app-section-*`**
+    classes for in-page section bars, tabs, counts, workspace, and panels across
+    `CustomersPage`, `CustomerDetailsPage`, `TransfersPage`, and
+    `TransferDetailsPage`; consistent sticky offsets; unified active state on small
+    screens; `TransfersPage` uses **`app-section-nav--two`**
+  - **Phase 3 TransfersPage mobile-first polish:** scoped presentation under
+    `.transfers-queue-page` (compact hero, app-like filter panel, denser queue
+    groups); `useTransfersQueueCompactCards` enables **`TransferRecordCard` compact
+    mode** at ≤720px only; transfers-only override keeps **section tab counts**
+    visible under ≤960px with readable active-state styling
+  - **Phase 4 Dashboard mobile prioritization (Lite rework):** `DashboardMobileLite`
+    + `useDashboardMobileLiteLayout` (≤960px) — one active panel, condensed previews,
+    same drill-downs; desktop keeps full multi-section dashboard
+  - **Phase 5 CustomerDetailsPage mobile simplification:** `CustomerDetailsPage` +
+    `CustomerSummary` optional **`recordHeaderClassName`**; **`src/index.css`** rules under
+    **`.customer-details-page`** (≤960px / 540px) — compact hero, hide redundant copy, 2×2
+    actions, denser highlight + metric grids, grouped transfer/activity lists, follow-up
+    panel **`--theme-status-*`** backgrounds; fixed flex **order** for real section class names
+  - **Phase 7 TransferDetailsPage mobile refinement:** **`TransferDetailsPage`** +
+    **`TransferSummary`** / **`BalanceSummary`** / **`PaymentForm`** presentation hooks;
+    **`src/index.css`** **`.transfer-details-page`** — tokenized summary/follow-up/payment surfaces,
+    compact hero + grouped **`payment-history-list`**, sticky payment submit, secondary print tab/card
+  - **Phase 8 CustomersPage consistency:** **`customers-page-hero`**, scoped **`app-section-*`** chrome,
+    grouped **`customer-portfolio-group-list`** / preview rows / pending local list, compact filter well,
+    token banners + surfaces under **`.customers-portfolio-page`**
+  - **Phase 9 System-wide mobile micro-polish:** shared **`src/index.css`** rules (touch targets, truncation
+    helpers, **`sync-status-banner`** / **`status-banner`** tokens, reduced motion, bottom content /
+    sticky CTA clearance)
+  - **Mobile visual system (post–Phase 4):** **Payvo / fintech wallet–inspired** token + glass
+    language for top bar, **floating** bottom nav, drawer, `app-section-*` tabs, cards, record rows,
+    filters, chips, and Dashboard Lite on **≤960px** (`src/index.css`); deeper navy secondary on
+    mobile viewport only for operational chrome
+  - no route changes, no business/offline logic changes from these UI phases
+- Prior pass **Phase 1 AppShell mobile transformation** (shell: top bar, frame,
+  safe areas, bottom dock, sync strip) — **supplemented** by the iPhone-like material
+  pass in the same `src/index.css` mobile `@media` block
+- Page-level section *content* and semantic layout classes (e.g.
+  `transfer-details-summary-section`, `customer-details-queue-section`) are
+  unchanged
 
 ## Active Phase
 
 Latest mobile UI transformation progress:
 - Phase 1 complete: AppShell mobile transformation
+- Phase 2 complete: Unified internal section navigation (`app-section-*`)
+- Phase 3 complete: TransfersPage mobile-first operational queue polish
+- Phase 4 complete: Dashboard Lite mobile home (single-panel + KPI strip on phone)
+- Phases 5–9 complete: per-page mobile passes + system-wide micro-polish (see **`docs/last-change-summary.md`**)
+- **Phase 10 complete (repo/CI scope):** static QA + docs + keyboard scroll-into-view polish — see
+  **`docs/mobile-qa-final-checklist.md`**; physical iPhone rows remain **Not run (device)** until executed
+- **T1 complete (mobile follow-up):** compact shared **`page-hero`** / **`PageHeader`** on phone — see
+  **`docs/last-change-summary.md`** and **`docs/mobile-theme-system.md`** §16
+- Mobile visual system: **Payvo-inspired fintech theme** + **documented theme system**
+  (`docs/mobile-theme-system.md`) and **light/dark token architecture** (`data-theme`, `--theme-*`,
+  `--type-*`); full dark polish deferred
 
 Offline / PWA baseline remains at:
 - Phase 12 complete: shell + status UI + snapshot reads + customer queue +
@@ -162,6 +230,7 @@ What that means:
   PWA install flows
 - Manual QA artifacts now exist in:
   - `docs/iphone-qa-checklist.md`
+  - `docs/mobile-qa-final-checklist.md` (Phase 10 UI record; static + device sign-off)
   - `docs/deployment-readiness-checklist.md`
   - `docs/manual-test-matrix.md`
 - Approved snapshot-backed read pages now use deterministic offline-read

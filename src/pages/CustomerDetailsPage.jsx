@@ -1017,6 +1017,7 @@ function CustomerDetailsPage() {
   return (
     <div className="stack customer-details-page">
       <PageHeader
+        className="customer-details-page-hero"
         eyebrow="العميل"
         title={customer?.full_name || 'ملف العميل'}
         description={pageDescription}
@@ -1039,8 +1040,8 @@ function CustomerDetailsPage() {
 
       <OfflineSnapshotNotice snapshotState={snapshotState} />
 
-      <div className="customer-details-section-nav-shell">
-        <nav className="customer-details-section-nav" aria-label="أقسام صفحة العميل">
+      <div className="app-section-nav-shell">
+        <nav className="app-section-nav" aria-label="أقسام صفحة العميل">
           {sectionNavItems.map((section) => {
             const isActiveSection = activeSection === section.key
 
@@ -1049,7 +1050,7 @@ function CustomerDetailsPage() {
                 key={section.key}
                 type="button"
                 className={[
-                  'customer-details-section-button',
+                  'app-section-tab app-section-tab--row',
                   isActiveSection ? 'active' : '',
                 ]
                   .filter(Boolean)
@@ -1057,14 +1058,14 @@ function CustomerDetailsPage() {
                 aria-pressed={isActiveSection}
                 onClick={() => setActiveSection(section.key)}
               >
-                <span className="customer-details-section-button-copy">
+                <span className="app-section-tab-copy">
                   <strong>{section.label}</strong>
                   <small>{section.description}</small>
                 </span>
                 <span
                   className={[
-                    'customer-details-section-button-count',
-                    `customer-details-section-button-count--${section.tone}`,
+                    'app-section-tab-count',
+                    `app-section-tab-count--${section.tone}`,
                   ].join(' ')}
                 >
                   {section.countLabel}
@@ -1075,12 +1076,12 @@ function CustomerDetailsPage() {
         </nav>
       </div>
 
-      <div className="customer-details-section-workspace">
+      <div className="app-section-workspace">
         <SectionCard
           title="لوحة المتابعة المالية للعميل"
           description="افهم وضع العميل المالي خلال ثوان: إجمالي المستحق، المدفوع، المتبقي، وما يحتاج متابعة الآن."
           className={[
-            'customer-details-section-panel',
+            'app-section-panel',
             'customer-details-summary-section',
             activeSection === 'overview' ? 'is-active' : '',
           ]
@@ -1095,6 +1096,7 @@ function CustomerDetailsPage() {
             title={customer?.full_name || 'عميل بدون اسم'}
             subtitle={customer?.phone || 'لا يوجد رقم هاتف مسجل'}
             metaItems={[]}
+            recordHeaderClassName="customer-details-identity"
             aside={
               <span
                 className={[
@@ -1152,7 +1154,7 @@ function CustomerDetailsPage() {
           title="طابور حوالات العميل"
           description="ترتيب الحوالات حسب أولوية المتابعة: مراجعة مالية ثم تحصيل جزئي ثم الحوالات المفتوحة."
           className={[
-            'customer-details-section-panel',
+            'app-section-panel',
             'customer-details-queue-section',
             activeSection === 'transfers' ? 'is-active' : '',
           ]
@@ -1178,7 +1180,7 @@ function CustomerDetailsPage() {
           title="الحركة الأخيرة لهذا العميل"
           description="سجل سريع لأحدث الدفعات والحوالات المرتبطة بالعميل لتسهيل المتابعة اليومية."
           className={[
-            'customer-details-section-panel',
+            'app-section-panel',
             'customer-details-recent-section',
             activeSection === 'activity' ? 'is-active' : '',
           ]
@@ -1199,7 +1201,7 @@ function CustomerDetailsPage() {
           title="الإجراءات على ملف العميل"
           description="اختصارات تشغيلية آمنة تسهل بدء الحركات ذات الصلة بهذا العميل."
           className={[
-            'customer-details-section-panel',
+            'app-section-panel',
             'customer-details-actions-section',
             activeSection === 'actions' ? 'is-active' : '',
           ]
@@ -1241,7 +1243,7 @@ function CustomerDetailsPage() {
             title="تفاصيل ملف العميل"
             description="ملاحظات الملف وبياناته الداخلية عند الحاجة إلى مراجعة أعمق."
             className={[
-              'customer-details-section-panel',
+              'app-section-panel',
               'customer-details-secondary-section',
               activeSection === 'overview' ? 'is-active' : '',
             ]

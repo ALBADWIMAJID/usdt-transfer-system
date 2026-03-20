@@ -1409,10 +1409,12 @@ function CustomersPage() {
         <CustomersHeader customerCountLabel={customerCountLabel} onRefresh={handleRefresh} />
 
         <OfflineSnapshotNotice snapshotState={snapshotState} />
-        <InlineMessage kind="warning">{portfolioWarning}</InlineMessage>
+        <InlineMessage kind="warning" className="customers-portfolio-metrics-warning">
+          {portfolioWarning}
+        </InlineMessage>
 
-        <div className="customers-section-nav-shell">
-          <nav className="customers-section-nav" aria-label="أقسام صفحة العملاء">
+        <div className="app-section-nav-shell">
+          <nav className="app-section-nav" aria-label="أقسام صفحة العملاء">
             {sectionNavItems.map((section) => {
               const isActiveSection = activeSection === section.key
 
@@ -1420,20 +1422,20 @@ function CustomersPage() {
                 <button
                   key={section.key}
                   type="button"
-                  className={['customers-section-button', isActiveSection ? 'active' : '']
+                  className={['app-section-tab app-section-tab--row', isActiveSection ? 'active' : '']
                     .filter(Boolean)
                     .join(' ')}
                   aria-pressed={isActiveSection}
                   onClick={() => setActiveSection(section.key)}
                 >
-                  <span className="customers-section-button-copy">
+                  <span className="app-section-tab-copy">
                     <strong>{section.label}</strong>
                     <small>{section.description}</small>
                   </span>
                   <span
                     className={[
-                      'customers-section-button-count',
-                      `customers-section-button-count--${section.tone}`,
+                      'app-section-tab-count',
+                      `app-section-tab-count--${section.tone}`,
                     ].join(' ')}
                   >
                     {section.countLabel}
@@ -1446,7 +1448,7 @@ function CustomersPage() {
 
         <InlineMessage
           kind={failedPendingCustomerCount > 0 ? 'warning' : 'info'}
-          className="customers-section-inline-status"
+          className="app-section-inline-status customers-portfolio-queue-inline"
         >
           {showCrossSectionQueueNotice
             ? failedPendingCustomerCount > 0
@@ -1455,7 +1457,7 @@ function CustomersPage() {
             : ''}
         </InlineMessage>
 
-        <div className="customers-section-workspace">
+        <div className="app-section-workspace">
 
         {activeSection === 'portfolio' ? (
         <CustomersPortfolioSummary

@@ -6,10 +6,32 @@
   - Loads global CSS
   - Registers the production service worker
   - Boots the React app
+- `src/components/ui/PageHeader.jsx`
+  - Shared **page hero / app-bar** shell: **`section.page-hero`**; route body copy in **`p.page-hero-description`**
+    (mobile-hidden); **`PageActions`** → **`inline-actions page-actions`**
 - `src/App.jsx`
   - Applies branding to the document
   - Sets Arabic RTL document state
+  - Sets `document.documentElement.dataset.theme` default to **`light`** if unset (theme hook; see
+    `docs/mobile-theme-system.md`)
   - Defines routed app structure
+- `docs/mobile-theme-system.md`
+  - **Theme contract:** visual direction, token categories (`--theme-*`, `--type-*`, `--mobile-*`),
+    light/dark philosophy, allowed/forbidden patterns, switching via **`data-theme`**
+- `docs/mobile-qa-final-checklist.md`
+  - **Phase 10 record:** plan §20 scenario matrix (static vs device), issues/fixes, deferrals; companion to
+    **`docs/iphone-qa-checklist.md`**
+- `src/index.css`
+  - **`:root[data-theme='light']` / `:not([data-theme])`** and **`:root[data-theme='dark']`** define
+    semantic tokens + legacy aliases; mobile `@media` scopes light/dark **`:root`** overrides
+  - Shared primitives (forms, buttons, `code`, info/record cards, statement table copy, utility text
+    colors) and **Dashboard Mobile Lite** base + **≤960px** drawer / section tabs / Lite overrides use
+    **`--theme-*`** / **`--type-*`** / **`--mobile-*`** where rolled out (see `docs/mobile-theme-system.md`)
+  - **Phase 9:** **`--touch-target-min`**, shared mobile **`status-banner`** / **`empty-state`** /
+    **`loading-state`** / **`sync-status-banner`** rhythm, calmer hover motion, **`prefers-reduced-motion`**
+    block, safe-area padding tweaks
+  - **Phase 10:** **≤960px** `html` **`scroll-padding-bottom`** + **`.field:focus-within`**
+    **`scroll-margin-bottom`** (keyboard vs floating tab bar); see **`docs/mobile-theme-system.md`** §15
 
 ## Auth / Session Flow
 
@@ -44,6 +66,30 @@
   - Shared access hook for sync state
 - `src/hooks/useReplayQueue.js`
   - Queue replay access hook over shared sync state
+- `src/hooks/useTransfersQueueCompactCards.js`
+  - Presentation-only: `matchMedia('(max-width: 720px)')` + `useSyncExternalStore` so
+    `TransfersList` can render **compact** `TransferRecordCard` rows on phone without
+    affecting desktop layout
+- `src/hooks/useDashboardMobileLiteLayout.js`
+  - Presentation-only: `matchMedia('(max-width: 960px)')` + `useSyncExternalStore` so
+    `DashboardPage` renders **`DashboardMobileLite`** (single-panel workspace) on phone
+    widths while desktop keeps the full section stack
+
+## Unified internal section navigation (Phase 2)
+
+Operational pages with in-route section switching share **`app-section-*`**
+classes in `src/index.css`:
+
+- `app-section-nav-shell` — sticky wrapper
+- `app-section-nav` — segmented row grid (`app-section-nav--two` when only two
+  sections, e.g. transfers queue summary vs list)
+- `app-section-tab--row` — label + optional count badge (customers, customer
+  details, transfers)
+- `app-section-tab--stack` — centered label stack (transfer details four tabs)
+- `app-section-tab-copy` / `app-section-tab-count` (+ `--neutral` / `--brand` /
+  `--warning` / `--danger`)
+- `app-section-inline-status` — optional message directly under the bar
+- `app-section-workspace` / `app-section-panel` (+ `.is-active`)
 
 ## Routing Map
 
@@ -61,8 +107,10 @@ Protected shell:
 - `src/components/AppShell.jsx` (not under `src/layout/`)
   - Hosts shared connection badge and sync status banner
   - Keeps the sync banner focused on non-idle attention states
-  - Mobile shell chrome is styled primarily in `src/index.css` (Phase 1 mobile
-    transformation)
+  - Mobile shell chrome is styled in `src/index.css` (Phase 1 layout + **Payvo-inspired fintech
+    theme** for ≤960px: mobile tokens, frosted top bar, **floating** tab bar, premium drawer sheet)
+  - **Phase 9:** bottom **`NavLink`** items use **`aria-label={item.label}`** so VoiceOver gets the full
+    route name while the visible tab stays short
 
 ## Important Page Responsibilities
 
@@ -72,6 +120,14 @@ Protected shell:
   - Snapshot-backed offline read fallback for main dashboard data
   - Drill-down entry points into transfer queue data
   - Offline-capable drill-down inputs derived from the saved dashboard snapshot
+  - **Phase 4 mobile:** `DashboardMobileLite.jsx` when ≤960px — internal tabs
+    (المتابعة / الإجراءات / النشاط), **3-column** headline KPI grid, condensed previews with
+    **`dashboard-mobile-lite-list--grouped`** (hairline rows); **desktop** unchanged multi-section
+    layout
+- `src/components/dashboard/DashboardMobileLite.jsx`
+  - Mobile-only presentation shell for `/dashboard`; reuses parent drill-downs and
+    `headlineCards`; no independent data fetching; preview lists use grouped list class for
+    app-like row surfaces (CSS in `index.css`)
 - `src/pages/CustomersPage.jsx`
   - Customer creation
   - Internal sectioned workspace for:
@@ -79,24 +135,44 @@ Protected shell:
     - Portfolio Summary
     - Needs Attention
     - Recent Activity
-  - Page-level section navigation inside `/customers`
-  - Short-label mobile tab bar plus desktop segmented row
+  - Page-level section navigation inside `/customers` using shared
+    **`app-section-*`** classes (Phase 2)
+  - **Phase 8 consistency:** root **`customers-portfolio-page`**; **`CustomersHeader`**
+    **`customers-page-hero`**; list/form/presentation hooks — **`src/index.css`**
+    **`.customers-portfolio-page`**
   - Customer drill-down sheet entry points
   - Offline customer capture and pending/failed local customer visibility
 - `src/pages/CustomerDetailsPage.jsx`
   - One-customer follow-up workspace
   - Customer transfer queue and recent activity
+  - Internal section navigation via **`app-section-*`** (same system as other
+    long operational pages)
+  - **Phase 5 mobile simplification:** compact **`customer-details-page-hero`** (tokenized
+    shell, long description hidden ≤960px, 2-col actions with full-width back row),
+    **`customer-details-identity`** on **`CustomerSummary`** (name only in hero; strip shows
+    phone + state chip), grouped **transfer** / **activity** lists
+    (`--theme-lite-list-well`, hairlines), denser KPI grids + follow-up panel tones via
+    **`--theme-status-*`** — scoped in **`src/index.css`** under **`.customer-details-page`**
 - `src/pages/TransfersPage.jsx`
   - Transfer follow-up queue
   - Queue-focused filters and summaries
-  - Internal section navigation inside `/transfers` (two sections: summary
-    indicators vs follow-up queue), reusing the shared section-nav / panel CSS
-    patterns used on other long pages
+  - Internal section navigation inside `/transfers` (two sections: summary vs
+    queue) via **`app-section-nav app-section-nav--two`** + row tabs and panels
+  - **Phase 3 mobile polish** (presentation): `TransfersHeader` /
+    `TransfersFilterBar` / `TransfersList` + `src/index.css` scoped to
+    `.transfers-queue-page` — compact hero, lighter filter panel, optional compact
+    cards via `useTransfersQueueCompactCards` (≤720px); section tab counts remain
+    visible on phone for this page only
 - `src/pages/NewTransferPage.jsx`
   - Transfer creation form and computed settlement preview
   - Online-first transfer creation path
   - Offline transfer capture path for locally known customers only
   - Pending local transfer visibility and manual replay surface
+  - **Phase 6 mobile capture polish:** root **`new-transfer-page`**; **`TransferComputedSummary`**
+    renders **after** the form and **before** the pending list; **`TransferFormSection`** groups
+    **customer / pricing / notes / submit** steps, **pre-submit strip** + optional
+    **`amountDisplayLabel`** / **`globalRateDisplayLabel`**; **`NewTransferHeader`** uses
+    **`new-transfer-page-hero`** — presentation in **`src/index.css`**
 - `src/pages/TransferDetailsPage.jsx`
   - One-transfer follow-up workspace
   - Internal sectioned navigation for:
@@ -104,7 +180,11 @@ Protected shell:
     - Payments
     - Payment History
     - Print
-  - Short-label mobile tab bar plus desktop segmented row
+  - **`app-section-*`** navigation: row vs stack tab variants; mobile compact
+    mode matches other sectioned pages
+  - **Phase 7 mobile refinement:** root **`transfer-details-page`**; **`PageHeader`**
+    **`transfer-details-page-hero`**; **`TransferSummary`**
+    **`recordHeaderClassName="transfer-details-summary-identity"`** — presentation in **`src/index.css`**
   - Arabic section labels and operator copy restored after the sectioned-layout
     reorganization bugfix pass
   - Payment entry

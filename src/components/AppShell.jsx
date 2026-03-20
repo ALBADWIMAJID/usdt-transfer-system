@@ -205,7 +205,7 @@ function AppShell() {
           </div>
 
           <div className="sidebar-section">
-            <p className="sidebar-section-label">الأقسام الرئيسية</p>
+            <p className="sidebar-section-label desktop-only">الأقسام الرئيسية</p>
 
             <nav className="nav-links">
               {navigation.map((item) => {
@@ -309,6 +309,7 @@ function AppShell() {
                 to={item.to}
                 className={`bottom-nav-link${isActive ? ' active' : ''}`}
                 aria-current={isActive ? 'page' : undefined}
+                aria-label={item.label}
               >
                 <span className="bottom-nav-icon">
                   <Icon name={item.icon} />

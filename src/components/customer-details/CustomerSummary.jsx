@@ -15,6 +15,7 @@ function CustomerSummary({
   aside,
   highlightItems = [],
   items = [],
+  recordHeaderClassName = '',
 }) {
   if (errorMessage) {
     return <InlineMessage kind="error">{errorMessage}</InlineMessage>
@@ -41,7 +42,7 @@ function CustomerSummary({
         subtitleClassName="record-muted-strong"
         metaItems={metaItems}
         aside={aside}
-        className="inline-summary"
+        className={['inline-summary', recordHeaderClassName].filter(Boolean).join(' ')}
       />
 
       {highlightItems.length > 0 ? (

@@ -21,8 +21,9 @@ function CustomersList({
     <SectionCard
       title="صف متابعة العملاء"
       description="ابحث عن أي عميل بسرعة، ثم اعمل من القائمة حسب أولوية المتابعة: مراجعة مالية، تحصيل جزئي، ثم الملفات المفتوحة."
+      className="customers-list-section"
     >
-      <FilterBar>
+      <FilterBar className="customers-list-filter-bar">
         <SearchField
           id="customer_search"
           name="customer_search"

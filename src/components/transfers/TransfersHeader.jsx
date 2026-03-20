@@ -4,6 +4,7 @@ import PageHeader from '../ui/PageHeader.jsx'
 function TransfersHeader({ transferCountLabel, onRefresh }) {
   return (
     <PageHeader
+      className="transfers-queue-page-header"
       eyebrow="صف المتابعة المالية"
       title="قائمة عمل الحوالات"
       description="اعمل من هذه الصفحة كصف متابعة يومي: ابحث بسرعة، فرز حسب أولوية المتابعة، وافتح أي حوالة تحتاج تحصيلا أو مراجعة مالية."

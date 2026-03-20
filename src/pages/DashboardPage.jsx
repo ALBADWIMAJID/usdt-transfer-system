@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import DashboardAttentionSection from '../components/dashboard/DashboardAttentionSection.jsx'
 import DashboardFinancialSnapshotSection from '../components/dashboard/DashboardFinancialSnapshotSection.jsx'
+import DashboardMobileLite from '../components/dashboard/DashboardMobileLite.jsx'
 import DashboardQuickActions from '../components/dashboard/DashboardQuickActions.jsx'
 import DashboardRecentActivitySection from '../components/dashboard/DashboardRecentActivitySection.jsx'
 import DashboardWorkQueueSection from '../components/dashboard/DashboardWorkQueueSection.jsx'
@@ -14,6 +15,7 @@ import RecordCard from '../components/ui/RecordCard.jsx'
 import RecordHeader from '../components/ui/RecordHeader.jsx'
 import RetryBlock from '../components/ui/RetryBlock.jsx'
 import { useAuth } from '../context/auth-context.js'
+import useDashboardMobileLiteLayout from '../hooks/useDashboardMobileLiteLayout.js'
 import useNetworkStatus from '../hooks/useNetworkStatus.js'
 import useOfflineSnapshot from '../hooks/useOfflineSnapshot.js'
 import { DASHBOARD_SNAPSHOT_KEY } from '../lib/offline/cacheKeys.js'
@@ -371,6 +373,7 @@ function renderPaymentDrillDownItem(item, compact = false) {
 function DashboardPage() {
   const { configError, isConfigured } = useAuth()
   const { isOffline } = useNetworkStatus()
+  const dashboardMobileLite = useDashboardMobileLiteLayout()
   const { clearSnapshotState, markCachedSnapshot, markLiveSnapshot, snapshotState } =
     useOfflineSnapshot()
   const [stats, setStats] = useState(emptyDashboardStats)
@@ -1141,70 +1144,92 @@ function DashboardPage() {
       }
     : null
 
+  const lastUpdatedLabel = lastUpdatedAt ? `آخر تحديث: ${formatDate(lastUpdatedAt)}` : ''
+
   return (
     <>
-      <div className="stack dashboard-page">
-        <PageHeader
-          eyebrow="مركز العمليات المالية اليومية"
-          title="لوحة التشغيل المالي"
-          description="ابدأ يوم العمل من هنا: ماذا دُفع اليوم، ما المتبقي القائم، أين توجد المخاطر، وما الحوالات التي تحتاج حركة مباشرة الآن."
-          actions={
-            <>
-              <button type="button" className="button secondary" onClick={loadDashboard} disabled={loading}>
-                {loading ? 'جار التحديث...' : 'تحديث الآن'}
-              </button>
-              <Link className="button primary" to="/transfers/new">
-                إنشاء حوالة جديدة
-              </Link>
-            </>
-          }
-        >
-          {lastUpdatedAt ? <p className="support-text">آخر تحديث: {formatDate(lastUpdatedAt)}</p> : null}
-        </PageHeader>
-
-        <OfflineSnapshotNotice snapshotState={snapshotState} />
-
-        {!isConfigured ? <InlineMessage kind="error">{loadError}</InlineMessage> : null}
-        {isConfigured && loadError ? <RetryBlock message={loadError} onRetry={loadDashboard} /> : null}
-
-        <DashboardFinancialSnapshotSection
+      {dashboardMobileLite ? (
+        <DashboardMobileLite
+          loading={loading}
+          loadDashboard={loadDashboard}
+          lastUpdatedLabel={lastUpdatedLabel}
+          snapshotState={snapshotState}
+          isConfigured={isConfigured}
+          loadError={loadError}
           headlineCards={headlineCards}
-          supportingCards={supportingCards}
-          overviewCards={overviewCards}
-          note="يمكن النقر على المؤشرات الأساسية لفتح تفصيل مباشر يوضح السجلات التي تصنع هذا الرقم."
-        />
-
-        <DashboardAttentionSection
-          loading={loading}
-          summaryCards={urgentSummaryCards}
+          openDrillDown={openDrillDown}
           attentionItems={attentionItems}
-          onOpenAttentionPanel={() => openDrillDown('urgentAttention')}
-        />
-
-        <DashboardWorkQueueSection
-          loading={loading}
-          partialItems={queueItems.partial}
-          openItems={queueItems.open}
-          onOpenPartialDrillDown={() => openDrillDown('partial')}
-          onOpenOpenDrillDown={() => openDrillDown('open')}
-        />
-
-        <DashboardRecentActivitySection
-          loading={loading}
+          queueItems={queueItems}
           recentTransfers={recentTransfers}
           recentPayments={recentPayments}
-          paymentsSummary={
-            loading
-              ? 'جار تحميل حركة المدفوعات...'
-              : `اليوم تم تسجيل ${stats.todayPaymentCount ?? 0} دفعة بقيمة ${formatNumber(stats.todayPaidRub, 2)} RUB.`
-          }
-          transfersSummary="أحدث الحوالات التي دخلت النظام مع حالتها الحالية ورصيدها المفتوح."
-          onOpenPaymentsDrillDown={() => openDrillDown('recentPayments')}
-          onOpenTransfersDrillDown={() => openDrillDown('recentTransfers')}
+          quickActionItem={quickActionItem}
+          stats={stats}
+          buildTransfersQueueHref={buildTransfersQueueHref}
         />
+      ) : (
+        <div className="stack dashboard-page">
+          <PageHeader
+            eyebrow="مركز العمليات المالية اليومية"
+            title="لوحة التشغيل المالي"
+            description="ابدأ يوم العمل من هنا: ماذا دُفع اليوم، ما المتبقي القائم، أين توجد المخاطر، وما الحوالات التي تحتاج حركة مباشرة الآن."
+            actions={
+              <>
+                <button type="button" className="button secondary" onClick={loadDashboard} disabled={loading}>
+                  {loading ? 'جار التحديث...' : 'تحديث الآن'}
+                </button>
+                <Link className="button primary" to="/transfers/new">
+                  إنشاء حوالة جديدة
+                </Link>
+              </>
+            }
+          >
+            {lastUpdatedAt ? <p className="support-text">آخر تحديث: {formatDate(lastUpdatedAt)}</p> : null}
+          </PageHeader>
 
-        <DashboardQuickActions latestTransfer={recentTransfers[0]} nextActionItem={quickActionItem} />
-      </div>
+          <OfflineSnapshotNotice snapshotState={snapshotState} />
+
+          {!isConfigured ? <InlineMessage kind="error">{loadError}</InlineMessage> : null}
+          {isConfigured && loadError ? <RetryBlock message={loadError} onRetry={loadDashboard} /> : null}
+
+          <DashboardFinancialSnapshotSection
+            headlineCards={headlineCards}
+            supportingCards={supportingCards}
+            overviewCards={overviewCards}
+            note="يمكن النقر على المؤشرات الأساسية لفتح تفصيل مباشر يوضح السجلات التي تصنع هذا الرقم."
+          />
+
+          <DashboardAttentionSection
+            loading={loading}
+            summaryCards={urgentSummaryCards}
+            attentionItems={attentionItems}
+            onOpenAttentionPanel={() => openDrillDown('urgentAttention')}
+          />
+
+          <DashboardWorkQueueSection
+            loading={loading}
+            partialItems={queueItems.partial}
+            openItems={queueItems.open}
+            onOpenPartialDrillDown={() => openDrillDown('partial')}
+            onOpenOpenDrillDown={() => openDrillDown('open')}
+          />
+
+          <DashboardRecentActivitySection
+            loading={loading}
+            recentTransfers={recentTransfers}
+            recentPayments={recentPayments}
+            paymentsSummary={
+              loading
+                ? 'جار تحميل حركة المدفوعات...'
+                : `اليوم تم تسجيل ${stats.todayPaymentCount ?? 0} دفعة بقيمة ${formatNumber(stats.todayPaidRub, 2)} RUB.`
+            }
+            transfersSummary="أحدث الحوالات التي دخلت النظام مع حالتها الحالية ورصيدها المفتوح."
+            onOpenPaymentsDrillDown={() => openDrillDown('recentPayments')}
+            onOpenTransfersDrillDown={() => openDrillDown('recentTransfers')}
+          />
+
+          <DashboardQuickActions latestTransfer={recentTransfers[0]} nextActionItem={quickActionItem} />
+        </div>
+      )}
 
       <OperationsDrillDownSheet
         key={activeDrillDownKey || 'closed'}

@@ -48,9 +48,13 @@ function PaymentForm({
         ) : null}
       </div>
 
-      <form className="form-grid payment-action-form" onSubmit={onSubmit}>
+      <form className="form-grid payment-action-form transfer-payment-action-form" onSubmit={onSubmit}>
         <div className="payment-form-row">
-          <FieldShell label="المبلغ بالروبل" htmlFor="amount_rub">
+          <FieldShell
+            label="المبلغ بالروبل"
+            htmlFor="amount_rub"
+            className="transfer-payment-amount-field"
+          >
             <input
               id="amount_rub"
               name="amount_rub"
@@ -94,9 +98,11 @@ function PaymentForm({
 
         {remainingHelpText ? <p className={remainingHelpClassName}>{remainingHelpText}</p> : null}
 
-        <button type="submit" className="button primary payment-submit-button" disabled={disabled}>
-          {submitting ? 'جار الحفظ...' : submitLabel}
-        </button>
+        <div className="transfer-payment-submit-slot">
+          <button type="submit" className="button primary payment-submit-button" disabled={disabled}>
+            {submitting ? 'جار الحفظ...' : submitLabel}
+          </button>
+        </div>
       </form>
     </>
   )

@@ -531,7 +531,7 @@ function NewTransferPage() {
     : 'يبقى سير العمل مبسطا للمشغل، ويتم تخصيص رقم المرجع تلقائيا عند إنشاء الحوالة.'
 
   return (
-    <div className="stack">
+    <div className="stack new-transfer-page">
       <NewTransferHeader onRefresh={handleCustomerRefresh} />
 
       <OfflineSnapshotNotice snapshotState={snapshotState} />
@@ -556,13 +556,24 @@ function NewTransferPage() {
         showNoCustomersWarning={showNoCustomersWarning}
         valueBeforePercentageLabel={valueBeforePercentageLabel}
         valueAfterPercentageLabel={valueAfterPercentageLabel}
+        amountDisplayLabel={parsedAmount === null ? '' : formatNumber(parsedAmount, 2)}
+        globalRateDisplayLabel={parsedGlobalRate === null ? '' : formatNumber(parsedGlobalRate, 4)}
+      />
+
+      <TransferComputedSummary
+        customerName={selectedCustomer?.full_name || 'اختر عميلا'}
+        amountLabel={formatNumber(parsedAmount, 2)}
+        globalRateLabel={formatNumber(parsedGlobalRate, 4)}
+        valueBeforePercentageLabel={formatNumber(valueBeforePercentage, 2)}
+        percentageLabel={`${formatNumber(parsedPercentage, 2)}%`}
+        valueAfterPercentageLabel={formatNumber(valueAfterPercentage, 2)}
       />
 
       {pendingTransfersLoading || pendingTransferCount > 0 ? (
         <SectionCard
           title="حوالات محلية بانتظار الإرسال"
           description="هذه الحوالات محفوظة داخل المتصفح فقط. لا تعتبر مؤكدة من الخادم ولا تدخل في الطباعة قبل نجاح المزامنة."
-          className="pending-transfer-section"
+          className="pending-transfer-section new-transfer-pending-section"
         >
           <PendingMutationNotice
             activeCount={pendingTransferCount}
@@ -643,15 +654,6 @@ function NewTransferPage() {
           )}
         </SectionCard>
       ) : null}
-
-      <TransferComputedSummary
-        customerName={selectedCustomer?.full_name || 'اختر عميلا'}
-        amountLabel={formatNumber(parsedAmount, 2)}
-        globalRateLabel={formatNumber(parsedGlobalRate, 4)}
-        valueBeforePercentageLabel={formatNumber(valueBeforePercentage, 2)}
-        percentageLabel={`${formatNumber(parsedPercentage, 2)}%`}
-        valueAfterPercentageLabel={formatNumber(valueAfterPercentage, 2)}
-      />
     </div>
   )
 }

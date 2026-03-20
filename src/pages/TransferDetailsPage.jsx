@@ -1192,7 +1192,7 @@ function TransferDetailsPage() {
         eyebrow="الحوالة"
         title={transfer?.reference_number || (transferId ? `حوالة #${transferId}` : 'حوالة')}
         description={pageDescription}
-        className="no-print"
+        className="no-print transfer-details-page-hero"
         actions={
           <>
             <Link className="button secondary" to="/transfers">
@@ -1219,8 +1219,8 @@ function TransferDetailsPage() {
 
       <OfflineSnapshotNotice className="no-print" snapshotState={snapshotState} />
 
-      <div className="transfer-details-section-nav-shell no-print">
-        <nav className="transfer-details-section-nav" aria-label="أقسام صفحة الحوالة">
+      <div className="app-section-nav-shell no-print">
+        <nav className="app-section-nav" aria-label="أقسام صفحة الحوالة">
           {TRANSFER_DETAILS_SECTIONS.map((section) => {
             const isActiveSection = activeSection === section.key
 
@@ -1228,14 +1228,16 @@ function TransferDetailsPage() {
               <button
                 key={section.key}
                 type="button"
-                className={['transfer-details-section-button', isActiveSection ? 'active' : '']
+                className={['app-section-tab app-section-tab--stack', isActiveSection ? 'active' : '']
                   .filter(Boolean)
                   .join(' ')}
                 aria-pressed={isActiveSection}
                 onClick={() => handleSectionChange(section.key)}
               >
-                <strong>{section.label}</strong>
-                <small>{section.description}</small>
+                <span className="app-section-tab-copy">
+                  <strong>{section.label}</strong>
+                  <small>{section.description}</small>
+                </span>
               </button>
             )
           })}
@@ -1245,18 +1247,18 @@ function TransferDetailsPage() {
       {hiddenPaymentStateNotice ? (
         <InlineMessage
           kind={hiddenPaymentStateKind}
-          className="no-print transfer-details-section-inline-status"
+          className="no-print app-section-inline-status"
         >
           {hiddenPaymentStateNotice}
         </InlineMessage>
       ) : null}
 
-      <div className="transfer-details-section-workspace no-print">
+      <div className="app-section-workspace no-print">
         <SectionCard
           title="لوحة المتابعة المالية"
           description="افهم وضع الحوالة خلال ثوان: المرجع، العميل، الرصيد الحالي، وما الخطوة التشغيلية التالية."
           className={[
-            'transfer-details-section-panel',
+            'app-section-panel',
             'transfer-details-summary-section',
             activeSection === 'summary' ? 'is-active' : '',
           ]
@@ -1271,6 +1273,7 @@ function TransferDetailsPage() {
             customerName={displayCustomerName}
             status={transfer?.status || ''}
             metaItems={[]}
+            recordHeaderClassName="transfer-details-summary-identity"
             asideChildren={
               <RecordMeta
                 label="تاريخ الإنشاء"
@@ -1298,7 +1301,7 @@ function TransferDetailsPage() {
           title="الوضع المالي الحالي"
           description="يتم احتساب الرصيد من مبلغ التسوية وجميع المدفوعات الجزئية المسجلة على الحوالة."
           className={[
-            'transfer-details-section-panel',
+            'app-section-panel',
             'transfer-details-balance-section',
             activeSection === 'summary' ? 'is-active' : '',
           ]
@@ -1329,7 +1332,7 @@ function TransferDetailsPage() {
           title="إجراء التحصيل"
           description="هذه هي منطقة الإجراء الأساسية لتسجيل الحركة المالية التالية على الحوالة."
           className={[
-            'transfer-details-section-panel',
+            'app-section-panel',
             'transfer-details-action-section',
             activeSection === 'payments' ? 'is-active' : '',
           ]
@@ -1368,7 +1371,7 @@ function TransferDetailsPage() {
           title="سجل التحصيل والحركة المالية"
           description="يعرض الحركات من الأحدث إلى الأقدم مع إبراز آخر دفعة مسجلة لتسهيل المتابعة اليومية."
           className={[
-            'transfer-details-section-panel',
+            'app-section-panel',
             'transfer-details-history-section',
             activeSection === 'history' ? 'is-active' : '',
           ]
@@ -1394,7 +1397,7 @@ function TransferDetailsPage() {
             title="تفاصيل الحوالة والتسعير"
             description="مرجع الحوالة وبيانات التسعير والملاحظات الداخلية عند الحاجة إلى مراجعة أعمق."
             className={[
-              'transfer-details-section-panel',
+              'app-section-panel',
               'transfer-details-secondary-section',
               activeSection === 'summary' ? 'is-active' : '',
             ]
@@ -1424,7 +1427,7 @@ function TransferDetailsPage() {
           title="قفل البيانات الأساسية"
           description="يجب اعتبار القيم الأساسية للحوالة مقفلة بعد تسجيل أي دفعات عليها."
           className={[
-            'transfer-details-section-panel',
+            'app-section-panel',
             'transfer-details-lock-section',
             activeSection === 'summary' ? 'is-active' : '',
           ]

@@ -19,6 +19,7 @@ function CustomersFormSection({
     <SectionCard
       title="إنشاء ملف عميل"
       description={description}
+      className="customers-form-section"
     >
       <FormMessages
         items={[
@@ -28,7 +29,7 @@ function CustomersFormSection({
         ]}
       />
 
-      <form className="form-grid" onSubmit={onSubmit}>
+      <form className="form-grid customers-create-form" onSubmit={onSubmit}>
         <FieldShell label="الاسم الكامل" htmlFor="full_name">
           <input
             id="full_name"

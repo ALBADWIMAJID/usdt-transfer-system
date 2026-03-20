@@ -739,8 +739,8 @@ function TransfersPage() {
       <InlineMessage kind="info">{dashboardContextMessage}</InlineMessage>
       <OfflineSnapshotNotice snapshotState={snapshotState} />
 
-      <div className="customer-details-section-nav-shell">
-        <nav className="customer-details-section-nav" aria-label="أقسام صفحة الحوالات">
+      <div className="app-section-nav-shell">
+        <nav className="app-section-nav app-section-nav--two" aria-label="أقسام صفحة الحوالات">
           {sectionNavItems.map((section) => {
             const isActiveSection = activeSection === section.key
 
@@ -749,7 +749,7 @@ function TransfersPage() {
                 key={section.key}
                 type="button"
                 className={[
-                  'customer-details-section-button',
+                  'app-section-tab app-section-tab--row',
                   isActiveSection ? 'active' : '',
                 ]
                   .filter(Boolean)
@@ -757,14 +757,14 @@ function TransfersPage() {
                 aria-pressed={isActiveSection}
                 onClick={() => setActiveSection(section.key)}
               >
-                <span className="customer-details-section-button-copy">
+                <span className="app-section-tab-copy">
                   <strong>{section.label}</strong>
                   <small>{section.description}</small>
                 </span>
                 <span
                   className={[
-                    'customer-details-section-button-count',
-                    `customer-details-section-button-count--${section.tone}`,
+                    'app-section-tab-count',
+                    `app-section-tab-count--${section.tone}`,
                   ].join(' ')}
                 >
                   {section.countLabel}
@@ -775,12 +775,12 @@ function TransfersPage() {
         </nav>
       </div>
 
-      <div className="transfer-details-section-workspace">
+      <div className="app-section-workspace">
         <SectionCard
           title="مؤشرات صف الحوالات"
           description="أرقام وأداء صف الحوالات في نظرة واحدة."
           className={[
-            'transfer-details-section-panel',
+            'app-section-panel',
             activeSection === 'summary' ? 'is-active' : '',
           ]
             .filter(Boolean)
@@ -794,7 +794,7 @@ function TransfersPage() {
           title="صف المتابعة"
           description="استخدم البحث والتصفية والعرض التشغيلي للوصول بسرعة إلى الحوالات التي تحتاج حركة اليوم."
           className={[
-            'transfer-details-section-panel',
+            'app-section-panel',
             'transfers-queue-panel',
             activeSection === 'queue' ? 'is-active' : '',
           ]

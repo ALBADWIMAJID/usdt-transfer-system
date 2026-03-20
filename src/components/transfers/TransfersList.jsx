@@ -1,3 +1,4 @@
+import useTransfersQueueCompactCards from '../../hooks/useTransfersQueueCompactCards.js'
 import ListStateSwitcher from '../ui/ListStateSwitcher.jsx'
 import TransferQueueGroup from './TransferQueueGroup.jsx'
 
@@ -9,6 +10,8 @@ function TransfersList({
   groups,
   onRetry,
 }) {
+  const compactCards = useTransfersQueueCompactCards()
+
   return (
     <ListStateSwitcher
       errorMessage={errorMessage}
@@ -30,6 +33,7 @@ function TransfersList({
             count={group.items.length}
             tone={group.tone}
             transfers={group.items}
+            compactCards={compactCards}
           />
         ))}
       </div>

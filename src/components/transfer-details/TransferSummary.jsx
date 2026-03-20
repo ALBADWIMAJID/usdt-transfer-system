@@ -15,6 +15,7 @@ function TransferSummary({
   asideChildren = null,
   highlightItems = [],
   items = [],
+  recordHeaderClassName = '',
 }) {
   if (errorMessage) {
     return <InlineMessage kind="error">{errorMessage}</InlineMessage>
@@ -41,7 +42,7 @@ function TransferSummary({
             {asideChildren}
           </>
         }
-        className="inline-summary"
+        className={['inline-summary', recordHeaderClassName].filter(Boolean).join(' ')}
       />
 
       {highlightItems.length > 0 ? (
