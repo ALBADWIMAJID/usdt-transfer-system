@@ -70,7 +70,7 @@ function PrintStatement({
           </article>
 
           <article className="statement-card">
-            <h3>ملخص التسعير</h3>
+            <h3 className="statement-section-heading--pricing">ملخص التسعير</h3>
             <DetailList rows={pricingRows} className="statement-list" rowClassName="statement-row" />
           </article>
         </div>

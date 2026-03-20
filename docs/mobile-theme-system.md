@@ -57,6 +57,7 @@ This document is the **single source of truth** for the product’s **visual dir
 | `--theme-sidebar-footer-bg` / `--theme-auth-highlight-chip-bg` | **Sidebar footer** wash; **auth** highlight chips |
 | `--theme-sync-calm-bg` | **Sync / calm** banner neutral fill |
 | `--theme-sheet-shadow-up` | **Bottom sheet** elevation (mobile `operations-sheet-panel`, upward shadow) |
+| `--theme-sheet-backdrop-scrim` / `--theme-sheet-backdrop-blur` | **T4.2:** **Operations drill-down** sheet **backdrop** (desktop values; **≤960px** aliases to **`--mobile-backdrop-scrim`** + **`--mobile-scrim-blur`**) |
 | `--theme-overlay-*` | Hover / press overlays for segmented controls & chrome |
 | `--theme-accent-*` | Non-brand accent surfaces (tints from brand) |
 | `--theme-button-primary-bg` / `--theme-on-primary` | **`.button.primary`** gradient (or solid stack) + **on-primary** label color |
@@ -129,7 +130,7 @@ Use these tokens for **new** rules; existing rules may still use `rem` until mig
 | `--type-row-metadata-*` | Secondary line / meta |
 | `--type-chip-*` | Chips, small badges |
 | `--type-button-*` | Primary/secondary button label rhythm |
-| `--type-helper-*` | Helper, banner body, hints |
+| `--type-helper-*` | Helper, banner body, hints; **T4.2:** **`.field .support-text`** |
 
 **Mobile:** `@media (max-width: 960px)` may **override** `--type-page-title-size`, **`--type-value-emphasis-size`**, and others for smaller viewports — one place, not scattered literals (**T4.1** adds emphasis scaling at **960 / 720 / 540px**).
 
@@ -333,6 +334,86 @@ engines allow; **typography** contract complete on **`data-theme="dark"`**; **ph
 
 **Light theme:** only **shared metric typography** + **mobile token/density** adjustments above (no dark-only
 redesign).
+
+## 23. Native controls + menu surfaces — final consistency (T4.2)
+
+**Goal:** one **control family** across forms (new transfer, payment, filters, customer flows, operations sheet):
+native **`<select>`** / **`<option>`** / **`optgroup`**, **date/time** inputs, **text** fields, **textarea**, and
+**readonly** computed rows read as the same visual language in **light** and **dark**, without custom select
+widgets or logic changes.
+
+**Implemented in `src/index.css`:**
+
+- **Light + dark:** **`color-scheme`** reinforced on **`.field`** controls (light explicit; dark unchanged from
+  T4.1); **`select option`** + **`optgroup`** use **`--theme-surface-strong`**, **`--theme-text-primary`** /
+  **`--theme-text-secondary`**, **`--type-chip-weight`** (browser-dependent for dropdown painting).
+- **Dark only:** **WebKit/Blink** **`::-webkit-calendar-picker-indicator`** filter on **`.field`** **date** /
+  **datetime-local** / **time** / **month** so picker icons stay visible on tinted fields.
+- **Shared `.field` rhythm:** labels on **`--type-row-title-*`** (desktop) / **`--type-row-metadata-size`** +
+  **`--type-chip-weight`** (≤960px); values on **`--type-row-title-size`** + **`--type-row-metadata-leading`**;
+  slightly **denser** desktop control height (**48px** min, padding trim); **textarea** **`resize: vertical`** +
+  shorter default min-height; **readonly** copy uses **`--theme-text-secondary`**; **`.field .support-text`**
+  uses **`--type-helper-*`** + **`--theme-text-tertiary`**.
+- **RTL/LTR:** **`datetime-local`**, **`time`**, **`month`** added to the shared LTR input list (same as **date**).
+- **Theme preference chrome:** **`.theme-preference-*`** label/button sizes align with **`--type-chip-*`**.
+- **Operations sheet list well:** **`.operations-sheet-body`** — hairline **`--theme-border-default`** + fill
+  **`--theme-surface-soft`** so the scrollable list sits in a deliberate **inset** vs the panel chrome.
+- **Mobile density + touch:** **transfers** filter bar controls use **`--type-row-*`** + **`max(42px,
+  var(--touch-target-min))`**; **operations sheet** search row / actions (≤960px and ≤540px) no longer use
+  **36–38px** min-heights — **`max(40px, var(--touch-target-min))`**; **≤540px** generic **`.field` / `.button`**
+  min-height respects **`--touch-target-min`**.
+
+**Not changed:** routing, auth, business rules, Supabase, offline/print behavior, or custom **`<select>`**
+implementations (still native).
+
+**T4.2 follow-up (same pass, CSS-only refinements):**
+
+- **Sheet scrim tokens:** **`--theme-sheet-backdrop-scrim`** + **`--theme-sheet-backdrop-blur`** replace a hardcoded
+  **`.operations-sheet-backdrop`** fill; **≤960px** light/dark **`:root`** alias them to **`--mobile-backdrop-scrim`**
+  and **`--mobile-scrim-blur`** so the drill-down sheet matches **drawer** scrim language.
+- **Light `accent-color`:** **`var(--brand-primary)`** on **`:root[data-theme='light']`** (parity with dark) for native
+  control accents where the engine respects it.
+- **Control family:** **`.field select`** **`cursor: pointer`** + **`padding-inline-end`** for chevron affordance
+  (**T4.3** replaces the native arrow with a themed **SVG** while keeping native menus); **`:disabled`** states
+  (**opacity** + **tertiary** text); **light** **WebKit** **calendar** indicator **opacity**
+  (parity with dark inverted affordance).
+- **Operations sheet copy:** description + meta lines use **`--type-helper-*`** and **`--type-row-metadata-*`** /
+  **`--type-chip-weight`**; mobile bulk **0.78rem** override **removed** for sheet meta so tokens win.
+- **Customers list filter (≤960px):** **`.customers-list-filter-bar`** fields aligned with **transfers** filter
+  **touch** + **`--type-row-*`** rhythm.
+
+## 24. Select shell, autofill, spinners, sheet lip — final illusion (T4.3)
+
+**Goal:** remove the last **obvious browser-default** cues on high-traffic controls without replacing native
+**`<select>`** / date pickers or changing logic.
+
+**Implemented in `src/index.css`:**
+
+- **`.field select`:** **`appearance: none`** (WebKit/Gecko) + **theme-tinted SVG chevron** on **`background-image`**
+  (light stroke **`#62748a`**, dark **`#aabace`**) so the **closed** control matches the field family; native
+  option sheet behavior unchanged.
+- **Mobile ≤960px:** same chevron re-applied after the mobile **`.field`** **`background`** shorthand (which would
+  otherwise drop **`background-image`**); dark theme override preserved.
+- **Light `color-scheme` parity:** global **`input` / `select` / `textarea`** (excluding checkbox/radio/range/file/
+  hidden/button types) mirror the **T4.1** dark rule so stray controls outside **`.field`** still prefer **light**
+  native widgets when **`data-theme="light"`**.
+- **`.field input[type='number']`:** **WebKit** spin buttons hidden + **`-moz-appearance: textfield`** / **`appearance: textfield`**
+  so amount/rate fields read as typographic inputs.
+- **`.field input:-webkit-autofill`:** **`box-shadow`** fill + **`-webkit-text-fill-color`** / **`caret-color`** so
+  autofill (e.g. login) matches **`--theme-surface-strong`** and primary text in **light** and **dark**.
+- **`.operations-sheet-body`:** subtle **`inset`** highlight (**`--theme-inset-highlight-soft`**) under the top border
+  so the scrollable list well aligns visually with the sheet chrome.
+- **WebKit/Blink date & time interiors:** **`::-webkit-datetime-edit*`** segments use **`--theme-text-primary`** /
+  **`--theme-text-tertiary`** and trimmed wrapper padding so inline date/time chrome matches typographic fields.
+- **Calendar / clock affordance:** **`::-webkit-calendar-picker-indicator`** uses **`cursor: pointer`** (light + dark)
+  alongside existing opacity / invert tuning.
+- **`.field select option`:** empty-value and **`:disabled`** options use **`--theme-text-tertiary`** (native menu
+  unchanged).
+- **`.operations-sheet-actions`:** top **hairline** + matching **`inset`** lip so the search / view-all row separates
+  cleanly from summary and list (**`.operations-sheet-subtitle`** on **`--theme-text-secondary`**).
+
+**Still engine-limited:** native **`<select>`** dropdown painting, **date/time** popovers, and **Firefox** autofill
+styling may not fully match WebKit.
 
 ## Related docs
 

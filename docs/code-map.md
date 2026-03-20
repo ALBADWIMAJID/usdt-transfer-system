@@ -39,7 +39,13 @@
     **`--theme-*`** / **`--type-*`** / **`--mobile-*`** where rolled out; **`data-theme="dark"`** shares the
     same selectors with dark token values (**T3** §18, **T3.6** §20); **T4** §21 — final **iOS-like mobile chrome**
     (top bar, tab bar, drawer, trays, sheet grabbers, shared blur tokens); **T4.1** §22 — dark surface lift, **`color-scheme`**
-    / **`option`** hints, complete dark **`--type-*`**, mobile control solid fill + density
+    / **`option`** hints, complete dark **`--type-*`**, mobile control solid fill + density; **T4.2** §23 — native
+    **    control/menu** surface parity (light+dark **`option`/`optgroup`**, field typography tokens, sheet body well,
+    **tokenized** **`.operations-sheet-backdrop`** via **`--theme-sheet-backdrop-*`**, date-picker icons light+dark,
+    touch-safe sheet/filter min-heights, customers mobile filter parity with transfers); **T4.3** §24 — **`.field
+    select`** **appearance:none** + SVG chevron (light/dark), **number** spinner removal, **autofill** surface match,
+    light global **`color-scheme`**, **operations-sheet** body + actions inset/hairline, **WebKit** date/time edit
+    interiors, calendar **`cursor:pointer`**, **select** placeholder/disabled **option** hints
   - **Phase 9:** **`--touch-target-min`**, shared mobile **`status-banner`** / **`empty-state`** /
     **`loading-state`** / **`sync-status-banner`** rhythm, calmer hover motion, **`prefers-reduced-motion`**
     block, safe-area padding tweaks

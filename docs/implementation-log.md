@@ -1,5 +1,106 @@
 # Implementation Log
 
+## 2026-03-20 — T4.3 follow-up: date/time interior + sheet actions + select hints
+
+Scope: **CSS-only** — extends **T4.3** without logic, routes, schema, auth, offline, or print changes. Further reduce
+**WebKit/Blink**-visible chrome on **date/time** fields; tighten **operations sheet** action strip vs summary/list;
+soften **select** placeholder/disabled option copy in the native menu.
+
+Files changed:
+
+- `src/index.css` — **WebKit** **`::-webkit-datetime-edit*`** on **`.field`** **date** / **datetime-local** / **time** /
+  **month**; **`cursor: pointer`** on calendar/clock indicators (light + dark, incl. **`:not([data-theme])`** light
+  block repair); **`.field select option[value='']`** + **`option:disabled`** → **`--theme-text-tertiary`**;
+  **`.operations-sheet-actions`** top border + inset lip; **`.operations-sheet-subtitle`** → **`--theme-text-secondary`**
+- `docs/mobile-theme-system.md` — **§24** bullets
+- `docs/code-map.md`, `docs/project-current-state.md`, `docs/implementation-log.md`,
+  `docs/last-change-summary.md`
+
+Verification:
+
+- `npm run lint` — passed
+- `npm run build` — passed
+
+Suggested commit message:
+
+- `T4.3 High-impact control replacement and final illusion fix`
+
+## 2026-03-20 — T4.3 High-impact control shell + final illusion fix
+
+Scope: **CSS-only** — no business logic, routes, schema, auth, offline, or print changes. Tighten **native-adjacent**
+controls and one sheet surface so fewer **browser-default** moments break the premium mobile illusion.
+
+Files changed:
+
+- `src/index.css` — **T4.3:** **`.field select`** **`appearance: none`** + **theme-colored SVG chevron** (light/dark);
+  **≤960px** re-apply chevron after mobile field **`background`** shorthand + dark override; **light** global
+  **`color-scheme: light`** on **`input`/`select`/`textarea`** (same exclusions as dark **T4.1**); **`.field
+  input[type=number]`** spinner removal (**WebKit** + **Moz** **`textfield`**); **`-webkit-autofill`** fill aligned to
+  **`--theme-surface-strong`** + primary text/caret; **`.operations-sheet-body`** **`inset`** lip
+  (**`--theme-inset-highlight-soft`**)
+- `docs/mobile-theme-system.md` — **§24 T4.3** (control illusion pass)
+- `docs/code-map.md`, `docs/project-current-state.md`, `docs/implementation-log.md`,
+  `docs/last-change-summary.md`
+
+Verification:
+
+- `npm run lint` — passed
+- `npm run build` — passed
+
+Suggested commit message:
+
+- `T4.3 High-impact control replacement and final illusion fix`
+
+## 2026-03-20 — T4.2 follow-up: sheet scrim tokens + control parity
+
+Scope: extend **T4.2** without logic/routes/offline changes — **tokenized** operations-sheet **backdrop**, **light**
+**`accent-color`**, **select/disabled/calendar** polish, **operations sheet** helper typography on **`--type-*`**,
+**customers** mobile filter fields aligned with **transfers**, mobile cascade fix (sheet meta no longer forced to
+**0.78rem** bulk rule).
+
+Files changed:
+
+- `src/index.css` — **`--theme-sheet-backdrop-scrim`**, **`--theme-sheet-backdrop-blur`** (light/dark **`:root`**;
+  **≤960px** aliases); **`.operations-sheet-backdrop`** + sheet **description/meta/labels** tokens; **`.field select`**
+  / **`:disabled`**; light **calendar** indicator; **customers** **`.customers-list-filter-bar`** fields; mobile
+  **`.field select`** padding; removed **operations-sheet** selectors from generic mobile **0.78rem** block
+- `docs/mobile-theme-system.md` — §4 token row, §23 **T4.2 follow-up**
+- `docs/code-map.md`, `docs/project-current-state.md`, `docs/implementation-log.md`,
+  `docs/last-change-summary.md`
+
+Verification:
+
+- `npm run lint` — passed
+- `npm run build` — passed
+
+Suggested commit message:
+
+- `T4.2 Native controls and final visual consistency pass`
+
+## 2026-03-20 — T4.2 Native controls + final visual consistency pass
+
+Requested scope:
+- **Control-layer** polish only: **selects**, **native menus**, **date/time**, **inputs/textarea**, **sheet** scroll
+  bodies, **filters**, **theme preference** segments; **light + dark** readable; **no** logic, routes, schema, offline,
+  or page redesign.
+
+Files changed:
+- `src/index.css` — **T4.2:** light **`color-scheme`** on **`.field`**; **`option`/`optgroup`** surfaces (light+dark);
+  dark **WebKit** calendar indicator filter; **`.field`** label/value/**support-text**/readonly/**textarea** on **`--type-*`**
+  + theme colors; **LTR** list + **`datetime-local`/`time`/`month`**; **`.operations-sheet-body`** inset well;
+  **`.theme-preference-*`** on **`--type-chip-*`**; mobile **transfers filter** + **operations sheet** search/actions
+  **`--type-row-*`** + **`max(..., var(--touch-target-min))`**; **≤540px** field/button min-height respects touch token
+- `docs/mobile-theme-system.md` — **§23 T4.2**, **`--type-helper-*`** row note
+- `docs/code-map.md`, `docs/project-current-state.md`, `docs/implementation-log.md`,
+  `docs/last-change-summary.md`
+
+Verification:
+- `npm run lint` — passed
+- `npm run build` — passed
+
+Suggested commit message:
+- `T4.2 Native controls and final visual consistency pass`
+
 ## 2026-03-20 — T4.1 Dark surface fix + typography & density normalization
 
 Requested scope:

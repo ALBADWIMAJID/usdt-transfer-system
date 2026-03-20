@@ -123,6 +123,15 @@ work (per `docs/usdt-mobile-app-like-ui-plan.md`).
 - **T4.1 (dark + type + density):** lifted dark **canvas/surfaces**, **`color-scheme` / `option`** hints, full dark
   **`--type-*`**, solid **mobile** control fill, **`--type-value-emphasis-size`** at **960/720/540px**, shared KPI
   metrics on tokens, tighter **≤960px** cards/forms/lists; see **`docs/mobile-theme-system.md`** §22.
+- **T4.2 (controls + menus):** shared **`.field`** / **native select** surface parity (**light+dark** **`option`/`optgroup`**),
+  **date/time** picker affordance (**light** opacity + **dark** filter), **operations sheet** body **well** +
+  **backdrop** tokens (**`--theme-sheet-backdrop-*`**, mobile-scrim aliases), **theme preference** chip type
+  alignment, **touch-safe** sheet/filter min-heights, **customers** mobile list filter aligned with **transfers**;
+  see **`docs/mobile-theme-system.md`** §23.
+- **T4.3 (control illusion):** **`.field select`** **appearance:none** + theme **SVG chevron**, **number** spinners
+  suppressed, **`-webkit-autofill`** matched to surfaces, **light** global **`color-scheme`** on native controls,
+  **operations-sheet** body + actions chrome, **WebKit** date/time edit interiors + calendar **pointer** cursor,
+  **select** placeholder/disabled **option** hints — see **`docs/mobile-theme-system.md`** §24.
 
 ## Current UI Organization Notes
 
@@ -192,6 +201,13 @@ Latest mobile UI transformation progress:
 - **T4.1 complete:** dark **surface** lift, **native control** theme hints, **typography** normalization (incl. full
   dark **`--type-*`**), **mobile density** pass — see **`docs/last-change-summary.md`** and
   **`docs/mobile-theme-system.md`** §22
+- **T4.2 complete:** **native controls**, **opened menu/select** surface hints, **form family** typography, **sheet**
+  list **well**, **touch** floor on narrow sheet/filter rows — see **`docs/last-change-summary.md`** and
+  **`docs/mobile-theme-system.md`** §23
+- **T4.3 complete:** **select** closed-state **shell** (**appearance:none** + SVG chevron), **number** spinner removal,
+  **autofill** surface match, **light** global **`color-scheme`**, **operations-sheet** body + actions chrome,
+  **WebKit** date/time interiors + calendar **pointer** cursor, **select** **option** hints — see
+  **`docs/last-change-summary.md`** and **`docs/mobile-theme-system.md`** §24
 - Mobile visual system: **Payvo-inspired fintech theme** + **documented theme system**
   (`docs/mobile-theme-system.md`) and **light/dark token architecture** (`data-theme`, `--theme-*`,
   `--type-*`); **dark** mode is a first-class polished appearance for major surfaces (residual literals may

@@ -2,37 +2,32 @@
 
 Task completed:
 
-- **T4.1 — Dark surface fix + typography & density normalization:** calmer, less black-heavy **dark** stacks;
-  **native-ish** control theming where engines allow; **unified metric typography** via **`--type-value-emphasis-*`**;
-  **denser** phone cards, forms, lists, and tabs while keeping **touch targets**.
+- **T4.3 — High-impact control replacement & final illusion fix** (baseline + follow-up, **CSS/tokens only**):
+  - **Closed `<select>`:** **`appearance: none`** + **SVG chevron** (light/dark), re-applied under **≤960px** after the
+    mobile **`.field`** **`background`** shorthand.
+  - **Numbers:** WebKit spinner removal + Firefox **`textfield`** appearance on **`.field`** amount/rate inputs.
+  - **Autofill:** **`-webkit-autofill`** matched to **`--theme-surface-strong`** + primary text/caret (login fields).
+  - **Light parity:** global **`color-scheme: light`** on native **`input` / `select` / `textarea`** (same type
+    exclusions as dark **T4.1**).
+  - **Operations sheet:** **`.operations-sheet-body`** top **inset** lip; **`.operations-sheet-actions`** top
+    **hairline** + inset lip so the search/view-all row reads as one chrome stack with summary + list;
+    **`.operations-sheet-subtitle`** on **`--theme-text-secondary`**.
+  - **Follow-up:** **WebKit** **date/time/month** **`::-webkit-datetime-edit*`** interiors on theme tokens; calendar /
+    clock **`::-webkit-calendar-picker-indicator`** **`cursor: pointer`** (and consolidated **`:not([data-theme])`**
+    light calendar block); **`.field select`** **`option[value='']`** + **`:disabled`** → **`--theme-text-tertiary`**
+    inside the native menu.
 
-**No** business logic, routes, schema, auth, offline, or print flow changes.
-
-## Scope implemented
-
-- **Dark `:root`:** lifted **`--theme-bg-app`**, body gradient, **`--theme-surface-*`**, borders, elevated/page-shell/chrome
-  plates, list row fill, **lite KPI** gradients; **`accent-color: var(--brand-primary)`**; **complete `--type-*` set** for
-  dark (fixes missing-token **`var()`** fallthrough).
-- **Global dark rules:** **`color-scheme: dark`** on **`.field`** inputs and common text-like **`input` / `select` /
-  `textarea`**; **`select option`** uses **`--theme-surface-strong`** + **`--theme-text-primary`** (limited by browser).
-- **≤960px dark:** **`--theme-mobile-control-fill: var(--theme-surface-strong)`** (solid); brighter **`--mobile-canvas-*`**
-  and **`--mobile-surface-*`** content stack.
-- **≤960px typography:** **`--type-value-emphasis-size`** overrides at **960 / 720 / 540px** (light + dark).
-- **Shared components:** **`.stat-value`**, **`.dashboard-snapshot-value`**, **`.operations-sheet-total strong`**,
-  **`.customers-portfolio-summary .stat-value`** → token-based sizes; operations sheet totals use **`calc(var(--type-value-emphasis-size) * …)`**
-  on narrow widths.
-- **≤960px density:** tighter **page cards**, **record/info** cards, **form-grid** / **field** rhythm, **textarea**
-  min-height, **section tabs**, **status banner**, queue/portfolio **groups**, **record lists**, **Dashboard Lite KPI**
-  padding.
+**No** business logic, routes, schema, auth, offline, or print flow changes. **No** custom select component — native
+dropdowns and date/time **popovers** remain **engine-drawn**.
 
 ## Files changed
 
 - `src/index.css`
-- `docs/mobile-theme-system.md` — §9 mobile type note, **§22 T4.1**
-- `docs/code-map.md` — `index.css` bullet (T4.1)
+- `docs/mobile-theme-system.md` — **§24 T4.3**
+- `docs/code-map.md`
+- `docs/project-current-state.md`
 - `docs/implementation-log.md`
 - `docs/last-change-summary.md` (this file)
-- `docs/project-current-state.md`
 
 ## Verification
 
@@ -41,4 +36,4 @@ Task completed:
 
 ## Suggested commit message
 
-`T4.1 Dark surface fix and typography density normalization`
+`T4.3 High-impact control replacement and final illusion fix`
