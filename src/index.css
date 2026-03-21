@@ -696,7 +696,7 @@ input[type='password'],
 .offline-snapshot-footnote {
   margin: 0;
   color: inherit;
-  font-size: 0.84rem;
+  font-size: 0.5625rem;
   line-height: 1.5;
 }
 
@@ -747,7 +747,7 @@ input[type='password'],
 .offline-snapshot-meta-text {
   color: inherit;
   opacity: 0.86;
-  font-size: 0.76rem;
+  font-size: 0.5625rem;
 }
 
 .empty-state {
@@ -3754,21 +3754,32 @@ a.dashboard-mobile-lite-tertiary {
   width: 130px;
 }
 
-.transfer-details-page .transfer-summary-grid--highlight > .info-card:nth-child(2) {
-  width: 129px;
-}
-
-.transfer-details-page .transfer-summary-grid--highlight > .info-card:nth-child(2) .info-card-value--metric {
+.transfer-details-page
+  .transfer-summary-grid--highlight
+  > .info-card:nth-child(1).info-card--accent
+  .info-card-value--metric {
   font-size: 9px;
 }
 
+.transfer-details-page .transfer-summary-grid--highlight > .info-card:nth-child(2) {
+  width: 129px;
+  padding-left: 18px;
+  padding-right: 18px;
+  margin-left: 180px;
+  margin-right: 180px;
+}
+
 .transfer-details-page .transfer-summary-grid--highlight > .info-card:nth-child(3).info-card--danger {
-  height: 54px;
+  width: 147px;
+  height: 85px;
   padding-top: 0;
   padding-bottom: 0;
   padding-left: 35px;
   padding-right: 35px;
-  margin: -61px 78px;
+  margin-top: -92px;
+  margin-bottom: -92px;
+  margin-left: 78px;
+  margin-right: 78px;
 }
 
 .transfer-details-page
@@ -6400,22 +6411,30 @@ a:hover article {
     width: 130px;
   }
 
-  .transfer-details-page .transfer-summary-grid--highlight > .info-card:nth-child(2) {
-    width: 129px;
-  }
-
-  .transfer-details-page .transfer-summary-grid--highlight > .info-card:nth-child(2) .info-card-value.info-card-value--metric {
+  .transfer-details-page
+    .transfer-summary-grid--highlight
+    > .info-card:nth-child(1).info-card--accent
+    .info-card-value.info-card-value--metric {
     font-size: 9px;
   }
 
+  .transfer-details-page .transfer-summary-grid--highlight > .info-card:nth-child(2) {
+    width: 129px;
+    padding-left: 18px;
+    padding-right: 18px;
+    margin-left: 180px;
+    margin-right: 180px;
+  }
+
   .transfer-details-page .transfer-summary-grid--highlight > .info-card:nth-child(3).info-card--danger {
-    height: 54px;
+    width: 147px;
+    height: 85px;
     padding-top: 0;
     padding-bottom: 0;
     padding-left: 35px;
     padding-right: 35px;
-    margin-top: -61px;
-    margin-bottom: -61px;
+    margin-top: -92px;
+    margin-bottom: -92px;
     margin-left: 78px;
     margin-right: 78px;
   }
