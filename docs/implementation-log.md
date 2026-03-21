@@ -1,5 +1,204 @@
 # Implementation Log
 
+## 2026-03-21 - Conservative transfer edit workflow in TransferDetails
+
+Scope: TransferDetails only. Adds an online-only transfer edit flow that reuses the current creation-style pricing
+inputs before any confirmed payment exists, then automatically narrows to `status` and `notes` only once confirmed
+payments are present. `reference_number` and `created_at` remain read-only, financial/customer fields stay locked after
+payments, and the page patches the loaded transfer state immediately after a successful save without changing payment
+history or totals logic.
+
+Files changed:
+
+- `src/pages/TransferDetailsPage.jsx` - adds transfer edit state, safe edit-scope derivation, customer-option loading
+  for broader pre-payment edits, an inline edit form on the summary tab, and an online-only `transfers` update flow
+- `docs/implementation-log.md`
+- `docs/last-change-summary.md`
+
+Verification:
+
+- `npm run lint` - passed
+- `npm run build` - passed
+
+## 2026-03-21 - Payment correction Phase D corrected replacement-payment flow
+
+Scope: TransferDetails only. Extends the Phase C void workflow so a voided confirmed payment can lead into a compact
+online-only corrected replacement form that inserts a new confirmed `transfer_payments` row while keeping the original
+payment row and void record untouched. Totals and overpayment continue to derive from active confirmed payments only,
+and local pending/blocked/failed items remain outside the correction flow.
+
+Files changed:
+
+- `src/pages/TransferDetailsPage.jsx` - adds replacement-payment form state, prefill helpers, online-only replacement
+  submit flow with preserved `paid_at`, immediate local payment-state patching, and a lightweight session-only visual
+  tie between a voided payment and its newly recorded replacement
+- `docs/implementation-log.md`
+- `docs/last-change-summary.md`
+
+Verification:
+
+- `npm run lint` - passed
+- `npm run build` - passed
+
+## 2026-03-21 - Payment correction Phase C TransferDetails void workflow
+
+Scope: TransferDetails only. Reuses the Phase B active-vs-voided payment derivation already loaded on the page, marks
+voided confirmed payment rows in history, and adds a compact inline online-only `transfer_payment_voids` insert flow
+for eligible confirmed server payments. Original payment rows remain unchanged, local pending/blocked/failed items stay
+outside the void workflow, and no dashboard/customer/transfers behavior changes were added in this phase.
+
+Files changed:
+
+- `src/components/transfer-details/PaymentList.jsx` - adds a small `extraContent` rendering slot for confirmed payment
+  rows so TransferDetails can attach inline void state and form UI without redesigning the list component
+- `src/pages/TransferDetailsPage.jsx` - adds payment-void reason metadata, transfer-scoped void eligibility guards,
+  per-payment voided state presentation, a compact inline void form for active confirmed rows, and an online-only
+  insert flow that patches `paymentVoidRows` locally after save
+- `docs/implementation-log.md`
+- `docs/last-change-summary.md`
+
+Verification:
+
+- `npm run lint` - passed
+- `npm run build` - passed
+
+## 2026-03-21 - Payment correction Phase B active-vs-voided payment derivation
+
+Scope: shared read-side adoption only. Adds a reusable helper that derives active vs voided confirmed payments from
+`transfer_payments` plus `transfer_payment_voids`, and updates payment-derived totals, balances, overpayment math, and
+customer-facing print totals to exclude voided confirmed payments. No payment void UI, correction UI, mutation flow,
+offline queue change, or replay behavior change in this phase.
+
+Files changed:
+
+- `src/lib/transfer-payment-state.js` - adds shared payment-void mapping plus active-payment derivation helpers
+- `src/pages/TransferDetailsPage.jsx` - loads transfer-scoped payment void rows, persists them in the transfer snapshot,
+  derives totals from active confirmed payments only, and sends active-only payment rows/totals to print while leaving
+  the on-page history list unchanged
+- `src/pages/DashboardPage.jsx` - loads payment void rows for dashboard transfer sets and switches payment-derived stats
+  and recent payment activity to active confirmed payments only
+- `src/pages/TransfersPage.jsx` - loads payment void rows for listed transfers and switches transfer paid totals to
+  active confirmed payments only
+- `src/pages/CustomerDetailsPage.jsx` - loads payment void rows for the customer transfer set, persists them in the
+  customer snapshot, and switches totals/activity/overpayment math to active confirmed payments only
+- `src/pages/CustomersPage.jsx` - loads payment void rows for the portfolio transfer set and switches customer rollups
+  and recent payment activity to active confirmed payments only
+- `docs/implementation-log.md`
+- `docs/last-change-summary.md`
+
+Verification:
+
+- `npm run lint` - passed
+- `npm run build` - passed
+
+## 2026-03-21 - Payment correction Phase A schema support
+
+Scope: schema foundation only. Adds the append-only `transfer_payment_voids` table for future safe payment-correction
+work without changing confirmed payment rows, UI behavior, totals, dashboard logic, or offline semantics.
+
+Files changed:
+
+- `supabase/migrations/20260321_add_transfer_payment_voids.sql` - creates `transfer_payment_voids` plus the required
+  unique `payment_id` index and `(transfer_id, created_at desc)` lookup index
+- `supabase/baselines/current_app_contract_snapshot.sql` - records the new table and indexes in the current contract
+  snapshot
+- `docs/implementation-log.md`
+- `docs/last-change-summary.md`
+
+Verification:
+
+- `rg -n "transfer_payment_voids" supabase docs` - confirms migration, baseline, and doc references exist
+- no application code changed in this phase
+
+## 2026-03-21 - Overpayment resolution Phase D operational surface adoption
+
+Scope: operational surfaces only. Loads the latest overpayment-resolution row for dashboard, transfers, customer
+details, and customers transfer sets; derives unresolved vs resolved overpayment state with the shared helper; and
+uses unresolved-only logic for urgent/problem buckets. Raw payment truth, transfer totals, and raw negative-balance
+financial displays remain unchanged in this phase.
+
+Files changed:
+
+- `src/lib/transfer-overpayment.js` - adds a latest-resolution mapping helper and shared select fields for
+  transfer-overpayment-resolution rows
+- `src/pages/DashboardPage.jsx` - loads latest resolution rows for dashboard transfers and switches urgent overpayment
+  buckets, drill-downs, and queue danger state to unresolved-only logic
+- `src/pages/TransfersPage.jsx` - loads latest resolution rows for listed transfers and keeps only unresolved
+  overpayments in urgent/problem filters and queue buckets while allowing resolved overpayments to fall back to a
+  neutral historical state
+- `src/pages/CustomerDetailsPage.jsx` - loads latest resolution rows for the customer's transfers and updates
+  follow-up counts/groups so resolved overpayments no longer keep customer-level danger tone
+- `src/pages/CustomersPage.jsx` - loads latest resolution rows for portfolio transfers and updates customer rollups,
+  recent activity, and alert counts so only unresolved overpayments remain operational issues
+- `docs/implementation-log.md`
+- `docs/last-change-summary.md`
+
+Verification:
+
+- `npm run lint` - passed
+- `npm run build` - passed
+
+## 2026-03-21 - Overpayment resolution Phase C TransferDetails workflow
+
+Scope: TransferDetails only. Loads the latest overpayment-resolution row for the viewed transfer, derives resolved vs
+unresolved overpayment state with the shared helper, and adds a compact inline resolve form with an online-only insert
+flow. Payment totals, payment history, dashboard behavior, transfers buckets, and customer surfaces remain unchanged in
+this phase.
+
+Files changed:
+
+- `src/pages/TransferDetailsPage.jsx` - loads the latest `transfer_overpayment_resolutions` row, persists it into the
+  transfer snapshot for read fallback, shows resolved vs unresolved overpayment state, and adds an inline
+  resolve-overpayment form with conservative offline and pending-payment guards
+- `docs/implementation-log.md`
+- `docs/last-change-summary.md`
+
+Verification:
+
+- `npm run lint` - passed
+- `npm run build` - passed
+
+## 2026-03-21 - Overpayment resolution Phase B shared derivation helper
+
+Scope: shared computation only. Adds a reusable overpayment-state helper that derives `remainingRub`,
+`overpaidAmountRub`, `isOverpaid`, `isResolvedOverpaid`, and `isUnresolvedOverpaid` from the payable amount,
+confirmed paid total, and the latest resolution row. No resolution UI, dashboard behavior, or mutation flow changes in
+this phase.
+
+Files changed:
+
+- `src/lib/transfer-overpayment.js` - adds the shared overpayment derivation helper plus tolerance-based amount
+  comparison for future resolution matching
+- `src/pages/TransferDetailsPage.jsx` - adopts the shared helper for current overpayment math without changing visible
+  behavior; still passes `latestResolution: null` in Phase B
+- `docs/implementation-log.md`
+- `docs/last-change-summary.md`
+
+Verification:
+
+- `npm run lint` - passed
+- inline Node check of `deriveTransferOverpaymentState()` scenarios - passed
+
+## 2026-03-21 - Overpayment resolution Phase A schema support
+
+Scope: schema foundation only. Adds the append-only `transfer_overpayment_resolutions` table for future
+overpayment-resolution tracking without changing transfer/payment truth, UI behavior, dashboard logic, or offline
+semantics.
+
+Files changed:
+
+- `supabase/migrations/20260321_add_transfer_overpayment_resolutions.sql` - creates
+  `transfer_overpayment_resolutions` plus a `(transfer_id, created_at desc)` index for latest-resolution lookups
+- `supabase/baselines/current_app_contract_snapshot.sql` - records the new table and index in the current contract
+  snapshot
+- `docs/implementation-log.md`
+- `docs/last-change-summary.md`
+
+Verification:
+
+- `rg -n "transfer_overpayment_resolutions" supabase docs` - confirms migration, baseline, and doc references exist
+- no application code changed in this phase
+
 ## 2026-03-20 - Safe customer archive and delete workflow
 
 Scope: customer lifecycle only. Adds conservative customer archive/delete handling from `CustomerDetailsPage`, keeps

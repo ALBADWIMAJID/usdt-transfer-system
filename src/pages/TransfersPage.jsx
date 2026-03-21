@@ -20,6 +20,16 @@ import {
   withLiveReadTimeout,
 } from '../lib/offline/readCache.js'
 import {
+  buildLatestOverpaymentResolutionMap,
+  deriveTransferOverpaymentState,
+  TRANSFER_OVERPAYMENT_RESOLUTION_SELECT,
+} from '../lib/transfer-overpayment.js'
+import {
+  buildActivePaymentTotalsByTransfer,
+  deriveConfirmedPaymentState,
+  TRANSFER_PAYMENT_VOID_SELECT,
+} from '../lib/transfer-payment-state.js'
+import {
   matchesTransferStatusFilter,
   TRANSFER_STATUS_FILTER_OPTIONS,
 } from '../lib/transfer-ui.js'
@@ -57,10 +67,6 @@ function getValidFilterValue(rawValue, options, fallback = 'all') {
   }
 
   return options.some((option) => option.value === normalizedValue) ? normalizedValue : fallback
-}
-
-function roundCurrency(value) {
-  return Math.round((value + Number.EPSILON) * 100) / 100
 }
 
 function formatNumber(value, digits = 2) {
@@ -144,7 +150,7 @@ function isCancelledStatus(status) {
 }
 
 function getQueuePriority(transfer) {
-  if (transfer.isOverpaid) {
+  if (transfer.isUnresolvedOverpaid) {
     return 0
   }
 
@@ -165,11 +171,11 @@ function matchesQueueFilter(transfer, queueFilter) {
   }
 
   if (queueFilter === 'needs_follow_up') {
-    return transfer.isOverpaid || transfer.hasOutstanding
+    return transfer.isUnresolvedOverpaid || transfer.hasOutstanding
   }
 
   if (queueFilter === 'overpaid') {
-    return transfer.isOverpaid
+    return transfer.isUnresolvedOverpaid
   }
 
   if (queueFilter === 'partial_outstanding') {
@@ -208,7 +214,7 @@ function getRemainingCardClassName(transfer) {
 }
 
 function getQueueMeta(transfer) {
-  if (transfer.isOverpaid) {
+  if (transfer.isUnresolvedOverpaid) {
     return {
       eyebrow: 'أولوية مالية',
       queueLabel: 'فوق المطلوب',
@@ -218,6 +224,19 @@ function getQueueMeta(transfer) {
         Math.abs(transfer.remainingRub),
         2
       )} RUB. تحتاج هذه الحوالة إلى مراجعة مالية مباشرة.`,
+    }
+  }
+
+  if (transfer.isResolvedOverpaid) {
+    return {
+      eyebrow: 'زيادة معالجة',
+      queueLabel: 'معالجة مسجلة',
+      queueClassName: 'queue-chip--neutral',
+      cardClassName: '',
+      followUpNote: `يظل الرصيد الحالي سالبا تاريخيا بمقدار ${formatNumber(
+        Math.abs(transfer.remainingRub),
+        2
+      )} RUB، لكن تم تسجيل معالجة تشغيلية مطابقة لهذه الزيادة.`,
     }
   }
 
@@ -364,7 +383,10 @@ function TransfersPage() {
                 'id, reference_number, customer_id, usdt_amount, payable_rub, status, created_at'
               )
               .order('created_at', { ascending: false }),
-            supabase.schema('public').from('transfer_payments').select('transfer_id, amount_rub'),
+            supabase
+              .schema('public')
+              .from('transfer_payments')
+              .select('id, transfer_id, amount_rub'),
           ]),
           {
             timeoutMessage: 'تعذر إكمال تحميل صف الحوالات في الوقت المتوقع.',
@@ -390,17 +412,83 @@ function TransfersPage() {
 
         const transfersData = transfersResult.data ?? []
         const paymentsData = paymentsResult.data ?? []
-        const paymentTotalsByTransfer = {}
+        const transferIds = transfersData.map((transfer) => transfer.id).filter(Boolean)
+        let paymentVoidRows = []
 
-        paymentsData.forEach((payment) => {
-          if (!payment.transfer_id) {
+        if (transferIds.length > 0) {
+          const { data: nextPaymentVoidRows, error: paymentVoidsError } = await withLiveReadTimeout(
+            supabase
+              .schema('public')
+              .from('transfer_payment_voids')
+              .select(TRANSFER_PAYMENT_VOID_SELECT)
+              .in('transfer_id', transferIds)
+              .order('created_at', { ascending: false })
+              .order('id', { ascending: false }),
+            {
+              timeoutMessage:
+                'تعذر إكمال تحميل حالات إلغاء الدفعات المؤكدة للحوالات في الوقت المتوقع.',
+            }
+          )
+
+          if (!isMounted) {
             return
           }
 
-          paymentTotalsByTransfer[payment.transfer_id] = roundCurrency(
-            (paymentTotalsByTransfer[payment.transfer_id] || 0) + (Number(payment.amount_rub) || 0)
-          )
+          if (paymentVoidsError) {
+            const preferSnapshot =
+              isOffline || isBrowserOffline() || isLikelyOfflineReadFailure(paymentVoidsError)
+            await hydrateFromSnapshot({
+              fallbackErrorMessage: preferSnapshot ? '' : paymentVoidsError.message,
+            })
+            return
+          }
+
+          paymentVoidRows = nextPaymentVoidRows ?? []
+        }
+
+        const { activePayments } = deriveConfirmedPaymentState({
+          payments: paymentsData,
+          paymentVoids: paymentVoidRows,
         })
+        const paymentTotalsByTransfer = buildActivePaymentTotalsByTransfer(activePayments)
+
+        let latestOverpaymentResolutionByTransferId = {}
+
+        if (transferIds.length > 0) {
+          const {
+            data: overpaymentResolutionRows,
+            error: overpaymentResolutionError,
+          } = await withLiveReadTimeout(
+            supabase
+              .schema('public')
+              .from('transfer_overpayment_resolutions')
+              .select(TRANSFER_OVERPAYMENT_RESOLUTION_SELECT)
+              .in('transfer_id', transferIds)
+              .order('created_at', { ascending: false })
+              .order('id', { ascending: false }),
+            {
+              timeoutMessage:
+                'تعذر إكمال تحميل حالات معالجة زيادة الدفع للحوالات في الوقت المتوقع.',
+            }
+          )
+
+          if (!isMounted) {
+            return
+          }
+
+          if (overpaymentResolutionError) {
+            const preferSnapshot =
+              isOffline || isBrowserOffline() || isLikelyOfflineReadFailure(overpaymentResolutionError)
+            await hydrateFromSnapshot({
+              fallbackErrorMessage: preferSnapshot ? '' : overpaymentResolutionError.message,
+            })
+            return
+          }
+
+          latestOverpaymentResolutionByTransferId = buildLatestOverpaymentResolutionMap(
+            overpaymentResolutionRows ?? []
+          )
+        }
 
         const customerIds = [
           ...new Set(transfersData.map((transfer) => transfer.customer_id).filter(Boolean)),
@@ -437,10 +525,21 @@ function TransfersPage() {
           const customerName = customerNames[transfer.customer_id] || 'عميل غير متاح'
           const payableRub = Number(transfer.payable_rub) || 0
           const totalPaidRub = paymentTotalsByTransfer[transfer.id] || 0
-          const remainingRub = roundCurrency(payableRub - totalPaidRub)
+          const latestOverpaymentResolution =
+            latestOverpaymentResolutionByTransferId[transfer.id] || null
+          const {
+            remainingRub,
+            isOverpaid,
+            overpaidAmountRub,
+            isResolvedOverpaid,
+            isUnresolvedOverpaid,
+          } = deriveTransferOverpaymentState({
+            payableRub,
+            confirmedPaidRub: totalPaidRub,
+            latestResolution: latestOverpaymentResolution,
+          })
           const isOpen = isOpenStatus(transfer.status)
           const isPartial = isPartialStatus(transfer.status)
-          const isOverpaid = remainingRub < -0.009
           const hasOutstanding = remainingRub > 0.009
           const queueMeta = getQueueMeta({
             ...transfer,
@@ -450,6 +549,8 @@ function TransfersPage() {
             isOpen,
             isPartial,
             isOverpaid,
+            isResolvedOverpaid,
+            isUnresolvedOverpaid,
             hasOutstanding,
           })
 
@@ -483,7 +584,11 @@ function TransfersPage() {
             isOpen,
             isPartial,
             isOverpaid,
+            isResolvedOverpaid,
+            isUnresolvedOverpaid,
+            overpaidAmountRub,
             hasOutstanding,
+            latestOverpaymentResolution,
             ...queueMeta,
           }
         })
@@ -568,7 +673,7 @@ function TransfersPage() {
       title: 'أولوية عاجلة',
       description: 'الحوالات الأعلى خطورة ماليا، وعلى رأسها الحوالات فوق المطلوب.',
       tone: 'danger',
-      items: prioritizedTransfers.filter((transfer) => transfer.isOverpaid),
+      items: prioritizedTransfers.filter((transfer) => transfer.isUnresolvedOverpaid),
     },
     {
       key: 'partial',
@@ -576,7 +681,8 @@ function TransfersPage() {
       description: 'حوالات بدأ تحصيلها وما زالت تحتاج متابعة مالية حتى الإغلاق.',
       tone: 'warning',
       items: prioritizedTransfers.filter(
-        (transfer) => transfer.isPartial && transfer.hasOutstanding && !transfer.isOverpaid
+        (transfer) =>
+          transfer.isPartial && transfer.hasOutstanding && !transfer.isUnresolvedOverpaid
       ),
     },
     {
@@ -585,7 +691,7 @@ function TransfersPage() {
       description: 'حوالات مفتوحة لم يبدأ عليها التحصيل بعد وما زال رصيدها كاملا أو شبه كاملا.',
       tone: 'neutral',
       items: prioritizedTransfers.filter(
-        (transfer) => transfer.isOpen && transfer.hasOutstanding && !transfer.isOverpaid
+        (transfer) => transfer.isOpen && transfer.hasOutstanding && !transfer.isUnresolvedOverpaid
       ),
     },
     {
@@ -595,7 +701,7 @@ function TransfersPage() {
       tone: 'default',
       items: prioritizedTransfers.filter(
         (transfer) =>
-          !transfer.isOverpaid &&
+          !transfer.isUnresolvedOverpaid &&
           !(transfer.isPartial && transfer.hasOutstanding) &&
           !(transfer.isOpen && transfer.hasOutstanding)
       ),
@@ -616,7 +722,7 @@ function TransfersPage() {
       : 'تم فتح صف الحوالات من لوحة التشغيل مع تهيئة متابعة جاهزة. يمكنك تعديل البحث والتصفية أو فتح أي حوالة مباشرة.'
     : ''
   const actionableTransfers = prioritizedTransfers.filter(
-    (transfer) => transfer.hasOutstanding || transfer.isOverpaid
+    (transfer) => transfer.hasOutstanding || transfer.isUnresolvedOverpaid
   )
   const summaryCards = [
     {
@@ -660,9 +766,13 @@ function TransfersPage() {
     {
       key: 'overpaid',
       label: 'فوق المطلوب',
-      value: loading ? '...' : prioritizedTransfers.filter((transfer) => transfer.isOverpaid).length,
+      value: loading
+        ? '...'
+        : prioritizedTransfers.filter((transfer) => transfer.isUnresolvedOverpaid).length,
       copy: 'تحتاج مراجعة مالية مباشرة.',
-      tone: prioritizedTransfers.some((transfer) => transfer.isOverpaid) ? 'danger' : 'success',
+      tone: prioritizedTransfers.some((transfer) => transfer.isUnresolvedOverpaid)
+        ? 'danger'
+        : 'success',
       onClick: () => {
         setStatusFilter('all')
         setQueueFilter('overpaid')

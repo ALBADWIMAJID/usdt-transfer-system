@@ -28,6 +28,17 @@ import {
   saveReadSnapshot,
   withLiveReadTimeout,
 } from '../lib/offline/readCache.js'
+import {
+  buildLatestOverpaymentResolutionMap,
+  deriveTransferOverpaymentState,
+  TRANSFER_OVERPAYMENT_RESOLUTION_SELECT,
+} from '../lib/transfer-overpayment.js'
+import {
+  buildActivePaymentTotalsByTransfer,
+  buildLatestActivePaymentByTransfer,
+  deriveConfirmedPaymentState,
+  TRANSFER_PAYMENT_VOID_SELECT,
+} from '../lib/transfer-payment-state.js'
 import { getPaymentMethodLabel, getTransferStatusMeta } from '../lib/transfer-ui.js'
 import {
   createEmptyCustomerForm,
@@ -199,6 +210,16 @@ function getCustomerPriorityRank(customer) {
     return 0
   }
 
+  if (customer.hasResolvedOverpaymentHistory) {
+    return {
+      eyebrow: 'زيادة معالجة',
+      queueLabel: 'معالجة مسجلة',
+      queueClassName: 'queue-chip--neutral',
+      cardClassName: 'customer-portfolio-card--success',
+      followUpNote: `يوجد ${customer.resolvedOverpaidCount} حوالة برصيد سالب تاريخي تمت معالجتها تشغيلها بإجمالي زيادة ${customer.resolvedOverpaidAmountRubLabel}. لا تظهر هذه الحالة ضمن التنبيهات العاجلة الحالية.`,
+    }
+  }
+
   if (customer.partialCount > 0) {
     return 1
   }
@@ -237,7 +258,13 @@ function compareArchivedCustomers(left, right) {
   return String(left?.name || '').localeCompare(String(right?.name || ''), 'ar')
 }
 
-function getStateSummary({ totalTransfers, overpaidCount, partialCount, openAwaitingCount }) {
+function getStateSummary({
+  totalTransfers,
+  overpaidCount,
+  partialCount,
+  openAwaitingCount,
+  resolvedOverpaidCount = 0,
+}) {
   if (!totalTransfers) {
     return 'بدون حوالات بعد'
   }
@@ -254,6 +281,10 @@ function getStateSummary({ totalTransfers, overpaidCount, partialCount, openAwai
 
   if (openAwaitingCount > 0) {
     parts.push(`${openAwaitingCount} مفتوحة`)
+  }
+
+  if (parts.length === 0 && resolvedOverpaidCount > 0) {
+    return `${resolvedOverpaidCount} معالجة مسجلة`
   }
 
   if (parts.length === 0) {
@@ -330,12 +361,15 @@ function buildBaseCustomerEntry(customer, index) {
     archivedAt: customer.archived_at || '',
     totalTransfers: 0,
     overpaidCount: 0,
+    resolvedOverpaidCount: 0,
     partialCount: 0,
     openAwaitingCount: 0,
     hasOverpaid: false,
+    hasResolvedOverpaymentHistory: false,
     isArchived: Boolean(customer.is_archived),
     outstandingRubLabel: '--',
     overpaidAmountRubLabel: '--',
+    resolvedOverpaidAmountRubLabel: '--',
   })
 
   return {
@@ -358,11 +392,15 @@ function buildBaseCustomerEntry(customer, index) {
     outstandingRubLabel: '--',
     overpaidAmountRub: 0,
     overpaidAmountRubLabel: '--',
+    resolvedOverpaidAmountRub: 0,
+    resolvedOverpaidAmountRubLabel: '--',
     openCount: 0,
     partialCount: 0,
     openAwaitingCount: 0,
     overpaidCount: 0,
+    resolvedOverpaidCount: 0,
     hasOverpaid: false,
+    hasResolvedOverpaymentHistory: false,
     hasActiveCollection: false,
     needsFollowUp: false,
     hasActivityToday: false,
@@ -614,39 +652,138 @@ function CustomersPage() {
 
         const transfers = transfersResult.data ?? []
         const payments = paymentsResult.data ?? []
+        const transferIds = transfers.map((transfer) => transfer.id).filter(Boolean)
         const transferMap = {}
-        const paymentTotalsByTransfer = {}
-        const latestPaymentByTransfer = {}
         const paymentsByCustomerId = {}
+        let paymentVoidRows = []
 
-        payments.forEach((payment) => {
-          if (!payment.transfer_id) {
+        let latestOverpaymentResolutionByTransferId = {}
+
+        if (transferIds.length > 0) {
+          const { data: nextPaymentVoidRows, error: paymentVoidsError } = await withLiveReadTimeout(
+            supabase
+              .schema('public')
+              .from('transfer_payment_voids')
+              .select(TRANSFER_PAYMENT_VOID_SELECT)
+              .in('transfer_id', transferIds)
+              .order('created_at', { ascending: false })
+              .order('id', { ascending: false }),
+            {
+              timeoutMessage:
+                'تعذر إكمال تحميل حالات إلغاء الدفعات المؤكدة لمحفظة العملاء في الوقت المتوقع.',
+            }
+          )
+
+          if (!isMounted) {
             return
           }
 
-          const activityAt = payment.paid_at || payment.created_at
-          paymentTotalsByTransfer[payment.transfer_id] = roundCurrency(
-            (paymentTotalsByTransfer[payment.transfer_id] || 0) + (Number(payment.amount_rub) || 0)
+          if (paymentVoidsError) {
+            const preferSnapshot =
+              isOffline || isBrowserOffline() || isLikelyOfflineReadFailure(paymentVoidsError)
+
+            if (preferSnapshot) {
+              await hydrateFromSnapshot()
+              return
+            }
+
+            setCustomers(activeBaseEntries)
+            setArchivedCustomers(archivedBaseEntries)
+            setAttentionCustomers([])
+            setRecentActivityItems([])
+            setPortfolioStats({
+              ...emptyPortfolioStats,
+              totalCustomers: activeBaseEntries.length,
+            })
+            setPortfolioFilter('all')
+            setPortfolioWarning(
+              paymentVoidsError.message ||
+                'تم تحميل العملاء، لكن تعذر بناء حالات إلغاء الدفعات المؤكدة حاليا.'
+            )
+            setLoading(false)
+            return
+          }
+
+          paymentVoidRows = nextPaymentVoidRows ?? []
+        }
+
+        const { activePayments } = deriveConfirmedPaymentState({
+          payments,
+          paymentVoids: paymentVoidRows,
+        })
+        const paymentTotalsByTransfer = buildActivePaymentTotalsByTransfer(activePayments)
+        const latestPaymentByTransfer = buildLatestActivePaymentByTransfer(activePayments)
+
+        if (transferIds.length > 0) {
+          const {
+            data: overpaymentResolutionRows,
+            error: overpaymentResolutionError,
+          } = await withLiveReadTimeout(
+            supabase
+              .schema('public')
+              .from('transfer_overpayment_resolutions')
+              .select(TRANSFER_OVERPAYMENT_RESOLUTION_SELECT)
+              .in('transfer_id', transferIds)
+              .order('created_at', { ascending: false })
+              .order('id', { ascending: false }),
+            {
+              timeoutMessage:
+                'تعذر إكمال تحميل حالات معالجة زيادة الدفع لمحفظة العملاء في الوقت المتوقع.',
+            }
           )
 
-          const currentLatest = latestPaymentByTransfer[payment.transfer_id]
-          const nextTimestamp = parseDateValue(activityAt)?.getTime() || 0
-          const currentTimestamp = parseDateValue(currentLatest?.activityAt)?.getTime() || 0
-
-          if (!currentLatest || nextTimestamp >= currentTimestamp) {
-            latestPaymentByTransfer[payment.transfer_id] = {
-              ...payment,
-              activityAt,
-            }
+          if (!isMounted) {
+            return
           }
-        })
+
+          if (overpaymentResolutionError) {
+            const preferSnapshot =
+              isOffline || isBrowserOffline() || isLikelyOfflineReadFailure(overpaymentResolutionError)
+
+            if (preferSnapshot) {
+              await hydrateFromSnapshot()
+              return
+            }
+
+            setCustomers(activeBaseEntries)
+            setArchivedCustomers(archivedBaseEntries)
+            setAttentionCustomers([])
+            setRecentActivityItems([])
+            setPortfolioStats({
+              ...emptyPortfolioStats,
+              totalCustomers: activeBaseEntries.length,
+            })
+            setPortfolioFilter('all')
+            setPortfolioWarning(
+              overpaymentResolutionError.message ||
+                'تم تحميل العملاء، لكن تعذر بناء مؤشرات معالجة زيادة الدفع حاليا.'
+            )
+            setLoading(false)
+            return
+          }
+
+          latestOverpaymentResolutionByTransferId = buildLatestOverpaymentResolutionMap(
+            overpaymentResolutionRows ?? []
+          )
+        }
 
         const transferRecords = transfers.map((transfer) => {
           const payableRub = Number(transfer.payable_rub) || 0
           const totalPaidRub = paymentTotalsByTransfer[transfer.id] || 0
-          const remainingRub = roundCurrency(payableRub - totalPaidRub)
+          const latestOverpaymentResolution =
+            latestOverpaymentResolutionByTransferId[transfer.id] || null
+          const {
+            remainingRub,
+            isOverpaid,
+            overpaidAmountRub,
+            isResolvedOverpaid,
+            isUnresolvedOverpaid,
+          } = deriveTransferOverpaymentState({
+            payableRub,
+            confirmedPaidRub: totalPaidRub,
+            latestResolution: latestOverpaymentResolution,
+          })
           const normalizedStatus = normalizeStatus(transfer.status)
-          const isOverpaid = remainingRub < -0.009
           const isPartialOutstanding = isPartialStatus(normalizedStatus) && remainingRub > 0.009
           const isOpenOutstanding = isOpenStatus(normalizedStatus) && remainingRub > 0.009
           const latestPayment = latestPaymentByTransfer[transfer.id] || null
@@ -658,9 +795,13 @@ function CustomersPage() {
             remainingRub,
             normalizedStatus,
             isOverpaid,
+            isResolvedOverpaid,
+            isUnresolvedOverpaid,
+            overpaidAmountRub,
             isPartialOutstanding,
             isOpenOutstanding,
             latestPayment,
+            latestOverpaymentResolution,
           }
 
           transferMap[transfer.id] = record
@@ -710,7 +851,15 @@ function CustomersPage() {
           )
           const overpaidAmountRub = roundCurrency(
             customerTransfers.reduce(
-              (sum, transfer) => sum + (transfer.isOverpaid ? Math.abs(transfer.remainingRub) : 0),
+              (sum, transfer) =>
+                sum + (transfer.isUnresolvedOverpaid ? transfer.overpaidAmountRub : 0),
+              0
+            )
+          )
+          const resolvedOverpaidAmountRub = roundCurrency(
+            customerTransfers.reduce(
+              (sum, transfer) =>
+                sum + (transfer.isResolvedOverpaid ? transfer.overpaidAmountRub : 0),
               0
             )
           )
@@ -718,12 +867,20 @@ function CustomersPage() {
           const openAwaitingCount = customerTransfers.filter(
             (transfer) => transfer.isOpenOutstanding
           ).length
-          const overpaidCount = customerTransfers.filter((transfer) => transfer.isOverpaid).length
+          const overpaidCount = customerTransfers.filter(
+            (transfer) => transfer.isUnresolvedOverpaid
+          ).length
+          const resolvedOverpaidCount = customerTransfers.filter(
+            (transfer) => transfer.isResolvedOverpaid
+          ).length
           const followUpTransfersCount = customerTransfers.filter(
             (transfer) =>
-              transfer.isOverpaid || transfer.isPartialOutstanding || transfer.isOpenOutstanding
+              transfer.isUnresolvedOverpaid ||
+              transfer.isPartialOutstanding ||
+              transfer.isOpenOutstanding
           ).length
           const hasOverpaid = overpaidCount > 0
+          const hasResolvedOverpaymentHistory = resolvedOverpaidCount > 0
           const hasActiveCollection = partialCount > 0 || openAwaitingCount > 0
           const needsFollowUp = hasOverpaid || hasActiveCollection
           const latestTransfer = [...customerTransfers].sort(
@@ -761,6 +918,7 @@ function CustomersPage() {
             overpaidCount,
             partialCount,
             openAwaitingCount,
+            resolvedOverpaidCount,
           })
           const baseEntry = {
             archivedAt: customer.archived_at || '',
@@ -784,10 +942,17 @@ function CustomersPage() {
             overpaidAmountRub,
             overpaidAmountRubLabel:
               overpaidAmountRub > 0.009 ? `${formatNumber(overpaidAmountRub, 2)} RUB` : 'لا يوجد',
+            resolvedOverpaidAmountRub,
+            resolvedOverpaidAmountRubLabel:
+              resolvedOverpaidAmountRub > 0.009
+                ? `${formatNumber(resolvedOverpaidAmountRub, 2)} RUB`
+                : 'لا يوجد',
             partialCount,
             openAwaitingCount,
             overpaidCount,
+            resolvedOverpaidCount,
             hasOverpaid,
+            hasResolvedOverpaymentHistory,
             hasActiveCollection,
             needsFollowUp,
             hasActivityToday,
@@ -812,8 +977,8 @@ function CustomersPage() {
         .filter((customer) => customer.isArchived)
         .sort(compareArchivedCustomers)
 
-      const portfolioActivityItems = [
-        ...payments
+        const portfolioActivityItems = [
+        ...activePayments
           .map((payment) => {
             const transfer = transferMap[payment.transfer_id]
 
@@ -844,7 +1009,9 @@ function CustomersPage() {
                 { label: 'وسيلة الدفع', value: methodLabel },
               ],
               badgeLabel: 'دفعة',
-              badgeClassName: transfer.isOverpaid ? 'activity-chip--danger' : 'activity-chip--warning',
+              badgeClassName: transfer.isUnresolvedOverpaid
+                ? 'activity-chip--danger'
+                : 'activity-chip--warning',
               timeLabel: formatDate(activityAt),
               noteText: payment.note || '',
               cardClassName: 'customer-activity-card--payment',
@@ -880,15 +1047,21 @@ function CustomersPage() {
                 { label: 'الحالة', value: statusMeta.label },
                 { label: 'المبلغ النهائي', value: `${formatNumber(transfer.payableRub, 2)} RUB`, ltr: true },
               ],
-              badgeLabel: transfer.isOverpaid ? 'مراجعة' : 'حوالة',
-              badgeClassName: transfer.isOverpaid
+              badgeLabel: transfer.isUnresolvedOverpaid
+                ? 'مراجعة'
+                : transfer.isResolvedOverpaid
+                  ? 'معالجة'
+                  : 'حوالة',
+              badgeClassName: transfer.isUnresolvedOverpaid
                 ? 'activity-chip--danger'
                 : transfer.isPartialOutstanding || transfer.isOpenOutstanding
                   ? 'activity-chip--warning'
                   : 'activity-chip--success',
               timeLabel: formatDate(transfer.created_at),
-              noteText: transfer.isOverpaid
+              noteText: transfer.isUnresolvedOverpaid
                 ? `توجد زيادة دفع على هذه الحوالة بمقدار ${formatNumber(Math.abs(transfer.remainingRub), 2)} RUB.`
+                : transfer.isResolvedOverpaid
+                  ? `توجد زيادة دفع تاريخية على هذه الحوالة بمقدار ${formatNumber(Math.abs(transfer.remainingRub), 2)} RUB، لكن تمت معالجتها تشغيلها بالفعل.`
                 : transfer.isPartialOutstanding || transfer.isOpenOutstanding
                   ? `ما زال على هذه الحوالة رصيد مفتوح مقداره ${formatNumber(Math.max(transfer.remainingRub, 0), 2)} RUB.`
                   : '',

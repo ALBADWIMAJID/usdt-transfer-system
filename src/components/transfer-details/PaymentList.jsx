@@ -51,6 +51,8 @@ function renderPaymentCard(payment, { isLocalOnly = false } = {}) {
       <p className="record-note record-note--compact payment-entry-note detail-mobile-light">
         {payment.noteText}
       </p>
+
+      {payment.extraContent ? payment.extraContent : null}
     </RecordCard>
   )
 }

@@ -36,6 +36,16 @@ import {
   withLiveReadTimeout,
 } from '../lib/offline/readCache.js'
 import {
+  buildLatestOverpaymentResolutionMap,
+  deriveTransferOverpaymentState,
+  TRANSFER_OVERPAYMENT_RESOLUTION_SELECT,
+} from '../lib/transfer-overpayment.js'
+import {
+  buildActivePaymentTotalsByTransfer,
+  deriveConfirmedPaymentState,
+  TRANSFER_PAYMENT_VOID_SELECT,
+} from '../lib/transfer-payment-state.js'
+import {
   TRANSFER_STATUS_FILTER_OPTIONS,
   getPaymentMethodLabel,
   getTransferStatusMeta,
@@ -143,7 +153,7 @@ function roundCurrency(value) {
 }
 
 function getTransferPriority(entry) {
-  if (entry.isOverpaid) {
+  if (entry.isUnresolvedOverpaid) {
     return 0
   }
 
@@ -177,6 +187,7 @@ function CustomerDetailsPage() {
   const [paymentTotalsLoading, setPaymentTotalsLoading] = useState(Boolean(isConfigured))
   const [paymentTotalsError, setPaymentTotalsError] = useState(isConfigured ? '' : configError)
   const [customerPayments, setCustomerPayments] = useState([])
+  const [paymentVoidRows, setPaymentVoidRows] = useState([])
   const [totalPaidRub, setTotalPaidRub] = useState(0)
   const customerSnapshotKey = getCustomerDetailsSnapshotKey(customerId)
   const [activeSection, setActiveSection] = useState('overview')
@@ -246,6 +257,42 @@ function CustomerDetailsPage() {
           }
         )
 
+        /*
+        const transferIds = (data ?? []).map((transfer) => transfer.id).filter(Boolean)
+        const overpaymentResolutionTransferIds =
+          transferIds.length > 0
+            ? transferIds
+            : ['00000000-0000-0000-0000-000000000000']
+        const overpaymentResolutionTransferIds =
+          transferIds.length > 0
+            ? transferIds
+            : ['00000000-0000-0000-0000-000000000000']
+        const overpaymentResolutionTransferIds =
+          transferIds.length > 0
+            ? transferIds
+            : ['00000000-0000-0000-0000-000000000000']
+        const overpaymentResolutionTransferIds =
+          transferIds.length > 0
+            ? transferIds
+            : ['00000000-0000-0000-0000-000000000000']
+        const {
+          data: overpaymentResolutionRows,
+          error: overpaymentResolutionError,
+        } = await withLiveReadTimeout(
+          supabase
+            .schema('public')
+            .from('transfer_overpayment_resolutions')
+            .select(TRANSFER_OVERPAYMENT_RESOLUTION_SELECT)
+            .in('transfer_id', overpaymentResolutionTransferIds)
+            .order('created_at', { ascending: false })
+            .order('id', { ascending: false }),
+          {
+            timeoutMessage:
+              'تعذر إكمال تحميل حالات معالجة زيادة الدفع لهذا العميل في الوقت المتوقع.',
+          }
+        )
+
+        */
         if (!isMounted) {
           return
         }
@@ -314,6 +361,7 @@ function CustomerDetailsPage() {
       setPaymentTotalsLoading(true)
       setPaymentTotalsError('')
       setCustomerPayments([])
+      setPaymentVoidRows([])
       setTotalPaidRub(0)
 
       const snapshot = await loadReadSnapshot(customerSnapshotKey)
@@ -334,6 +382,7 @@ function CustomerDetailsPage() {
 
       setTransfers(snapshot.data.transfers || [])
       setCustomerPayments(snapshot.data.customerPayments || [])
+      setPaymentVoidRows(snapshot.data.paymentVoidRows || [])
       setTotalPaidRub(Number(snapshot.data.totalPaidRub) || 0)
       setTransfersError('')
       setPaymentTotalsError('')
@@ -348,6 +397,7 @@ function CustomerDetailsPage() {
       setPaymentTotalsLoading(true)
       setPaymentTotalsError('')
       setCustomerPayments([])
+      setPaymentVoidRows([])
       setTotalPaidRub(0)
 
       try {
@@ -360,6 +410,29 @@ function CustomerDetailsPage() {
             .order('created_at', { ascending: false }),
           {
             timeoutMessage: 'تعذر إكمال تحميل حوالات هذا العميل في الوقت المتوقع.',
+          }
+        )
+
+        const transferIds = (data ?? []).map((transfer) => transfer.id).filter(Boolean)
+        const overpaymentResolutionTransferIds =
+          transferIds.length > 0
+            ? transferIds
+            : ['00000000-0000-0000-0000-000000000000']
+
+        const {
+          data: overpaymentResolutionRows,
+          error: overpaymentResolutionError,
+        } = await withLiveReadTimeout(
+          supabase
+            .schema('public')
+            .from('transfer_overpayment_resolutions')
+            .select(TRANSFER_OVERPAYMENT_RESOLUTION_SELECT)
+            .in('transfer_id', overpaymentResolutionTransferIds)
+            .order('created_at', { ascending: false })
+            .order('id', { ascending: false }),
+          {
+            timeoutMessage:
+              'تعذر إكمال تحميل حالات معالجة زيادة الدفع لهذا العميل في الوقت المتوقع.',
           }
         )
 
@@ -379,10 +452,10 @@ function CustomerDetailsPage() {
         setTransfers(nextTransfers)
         setTransfersLoading(false)
 
-        const transferIds = nextTransfers.map((transfer) => transfer.id).filter(Boolean)
-
         if (transferIds.length === 0) {
           setCustomerPayments([])
+          setPaymentVoidRows([])
+          setTotalPaidRub(0)
           setPaymentTotalsLoading(false)
           return
         }
@@ -400,6 +473,19 @@ function CustomerDetailsPage() {
           }
         )
 
+        const { data: paymentVoidData, error: paymentVoidsError } = await withLiveReadTimeout(
+          supabase
+            .schema('public')
+            .from('transfer_payment_voids')
+            .select(TRANSFER_PAYMENT_VOID_SELECT)
+            .in('transfer_id', transferIds)
+            .order('created_at', { ascending: false })
+            .order('id', { ascending: false }),
+          {
+            timeoutMessage: 'تعذر إكمال تحميل حالات إلغاء الدفعات المؤكدة لهذا العميل في الوقت المتوقع.',
+          }
+        )
+
         if (!isMounted) {
           return
         }
@@ -413,6 +499,7 @@ function CustomerDetailsPage() {
           }
 
           setCustomerPayments([])
+          setPaymentVoidRows([])
           setPaymentTotalsError(
             'تعذر تحميل سجل المدفوعات لهذا العميل. سيتم عرض الإجماليات المالية عند نجاح تحميلها.'
           )
@@ -420,13 +507,64 @@ function CustomerDetailsPage() {
           return
         }
 
-        const nextPayments = paymentsData ?? []
-        const nextTotalPaidRub = roundCurrency(
-          nextPayments.reduce((total, payment) => total + (Number(payment.amount_rub) || 0), 0)
-        )
+        if (paymentVoidsError) {
+          const preferSnapshot =
+            isOffline || isBrowserOffline() || isLikelyOfflineReadFailure(paymentVoidsError)
 
+          if (preferSnapshot) {
+            await hydrateTransfersFromSnapshot()
+            return
+          }
+
+          setCustomerPayments([])
+          setPaymentVoidRows([])
+          setPaymentTotalsError(
+            'تعذر تحميل حالات إلغاء الدفعات المؤكدة لهذا العميل. سيجري عرض الإجماليات المالية عند اكتمالها.'
+          )
+          setPaymentTotalsLoading(false)
+          return
+        }
+
+        if (overpaymentResolutionError) {
+          const preferSnapshot =
+            isOffline || isBrowserOffline() || isLikelyOfflineReadFailure(overpaymentResolutionError)
+
+          if (preferSnapshot) {
+            await hydrateTransfersFromSnapshot()
+            return
+          }
+
+          setTransfers([])
+          setTransfersError(
+            overpaymentResolutionError.message ||
+              'تعذر تحميل حالات معالجة زيادة الدفع لهذا العميل في الوقت الحالي.'
+          )
+          setCustomerPayments([])
+          setPaymentVoidRows([])
+          setTotalPaidRub(0)
+          setTransfersLoading(false)
+          setPaymentTotalsLoading(false)
+          return
+        }
+
+        const nextPayments = paymentsData ?? []
+        const nextPaymentVoidRows = paymentVoidData ?? []
+        const { totalActivePaidRub } = deriveConfirmedPaymentState({
+          payments: nextPayments,
+          paymentVoids: nextPaymentVoidRows,
+        })
+        const latestOverpaymentResolutionByTransferId = buildLatestOverpaymentResolutionMap(
+          overpaymentResolutionRows ?? []
+        )
+        const nextTransfersWithOverpaymentResolution = nextTransfers.map((transfer) => ({
+          ...transfer,
+          latestOverpaymentResolution: latestOverpaymentResolutionByTransferId[transfer.id] || null,
+        }))
+
+        setTransfers(nextTransfersWithOverpaymentResolution)
         setCustomerPayments(nextPayments)
-        setTotalPaidRub(nextTotalPaidRub)
+        setPaymentVoidRows(nextPaymentVoidRows)
+        setTotalPaidRub(totalActivePaidRub)
         setPaymentTotalsLoading(false)
       } catch (error) {
         if (!isMounted) {
@@ -482,6 +620,7 @@ function CustomerDetailsPage() {
         data: {
           customer,
           customerPayments,
+          paymentVoidRows,
           totalPaidRub,
           transfers,
         },
@@ -509,6 +648,7 @@ function CustomerDetailsPage() {
     customerSnapshotKey,
     isOffline,
     markLiveSnapshot,
+    paymentVoidRows,
     paymentTotalsError,
     paymentTotalsLoading,
     totalPaidRub,
@@ -517,12 +657,13 @@ function CustomerDetailsPage() {
     transfersLoading,
   ])
 
-  const paymentsByTransfer = customerPayments.reduce((map, payment) => {
-    const transferKey = payment.transfer_id
-    const current = map.get(transferKey) || 0
-    map.set(transferKey, roundCurrency(current + (Number(payment.amount_rub) || 0)))
-    return map
-  }, new Map())
+  const { activePayments: activeCustomerPayments } = deriveConfirmedPaymentState({
+    payments: customerPayments,
+    paymentVoids: paymentVoidRows,
+  })
+  const paymentsByTransfer = new Map(
+    Object.entries(buildActivePaymentTotalsByTransfer(activeCustomerPayments))
+  )
 
   const totalsReady = !paymentTotalsLoading && !paymentTotalsError
   const customerUnavailable = customerNotFound || Boolean(customerError)
@@ -800,11 +941,16 @@ function CustomerDetailsPage() {
     .map((transfer) => {
       const normalizedStatus = String(transfer.status || '').toLowerCase()
       const transferPaidRub = totalsReady ? paymentsByTransfer.get(transfer.id) || 0 : null
-      const remainingRub =
-        totalsReady && transfer.payable_rub !== null && transfer.payable_rub !== undefined
-          ? roundCurrency(Number(transfer.payable_rub) - transferPaidRub)
-          : null
-      const isOverpaid = remainingRub !== null && remainingRub < -0.009
+      const {
+        remainingRub,
+        isOverpaid,
+        isResolvedOverpaid,
+        isUnresolvedOverpaid,
+      } = deriveTransferOverpaymentState({
+        payableRub: transfer.payable_rub,
+        confirmedPaidRub: transferPaidRub,
+        latestResolution: transfer.latestOverpaymentResolution || null,
+      })
       const isSettled =
         remainingRub !== null ? Math.abs(remainingRub) <= 0.009 : normalizedStatus === 'paid'
       const isPartialFollowUp =
@@ -814,8 +960,12 @@ function CustomerDetailsPage() {
       const isOpenFollowUp =
         remainingRub !== null ? transferPaidRub <= 0.009 && remainingRub > 0.009 : normalizedStatus === 'open'
 
-      const queueLabel = isOverpaid
+      const queueLabel = isUnresolvedOverpaid
         ? 'مراجعة مالية'
+        : isResolvedOverpaid
+          ? 'معالجة مسجلة'
+        : isResolvedOverpaid
+          ? `يوجد رصيد سالب تاريخي على هذه الحوالة بمقدار ${formatNumber(Math.abs(remainingRub), 2)} RUB، لكن تمت معالجة هذه الزيادة تشغيلها بالفعل.`
         : isPartialFollowUp
           ? 'تحصيل جزئي'
           : isOpenFollowUp
@@ -824,15 +974,17 @@ function CustomerDetailsPage() {
               ? 'مستقرة'
               : 'متابعة عادية'
 
-      const queueClassName = isOverpaid
+      const queueClassName = isUnresolvedOverpaid
         ? 'queue-chip--danger'
+        : isResolvedOverpaid
+          ? 'queue-chip--neutral'
         : isPartialFollowUp
           ? 'queue-chip--warning'
           : isOpenFollowUp
             ? 'queue-chip--neutral'
             : 'queue-chip--success'
 
-      const cardClassName = isOverpaid
+      const cardClassName = isUnresolvedOverpaid
         ? 'transfer-queue-card--danger'
         : isPartialFollowUp
           ? 'transfer-queue-card--warning'
@@ -854,7 +1006,7 @@ function CustomerDetailsPage() {
           ? 'info-card-value--success'
           : 'info-card-value--metric'
 
-      const followUpNote = isOverpaid
+      const followUpNote = isUnresolvedOverpaid
         ? `يوجد رصيد سالب على هذه الحوالة بمقدار ${formatNumber(Math.abs(remainingRub), 2)} RUB ويتطلب مراجعة.`
         : isPartialFollowUp
           ? `تم تحصيل ${formatNumber(transferPaidRub, 2)} RUB وما زال المتبقي ${formatNumber(remainingRub, 2)} RUB.`
@@ -863,6 +1015,11 @@ function CustomerDetailsPage() {
             : isSettled
               ? 'هذه الحوالة تبدو مستقرة حاليا ولا تتطلب متابعة مالية عاجلة.'
               : 'حوالة للمتابعة العامة والرجوع إلى التفاصيل عند الحاجة.'
+
+      const operationalQueueLabel = isResolvedOverpaid ? 'معالجة مسجلة' : queueLabel
+      const operationalFollowUpNote = isResolvedOverpaid
+        ? `يوجد رصيد سالب تاريخي على هذه الحوالة بمقدار ${formatNumber(Math.abs(remainingRub), 2)} RUB، لكن تمت معالجة هذه الزيادة تشغيلها بالفعل.`
+        : followUpNote
 
       return {
         id: transfer.id ?? transfer.created_at,
@@ -888,11 +1045,13 @@ function CustomerDetailsPage() {
                 : `${formatNumber(remainingRub, 2)} RUB`,
         remainingCardClassName,
         remainingValueClassName,
-        queueLabel,
+        queueLabel: operationalQueueLabel,
         queueClassName,
         cardClassName,
-        followUpNote,
+        followUpNote: operationalFollowUpNote,
         isOverpaid,
+        isResolvedOverpaid,
+        isUnresolvedOverpaid,
         isPartialFollowUp,
         isOpenFollowUp,
         isSettled,
@@ -920,7 +1079,9 @@ function CustomerDetailsPage() {
   const totalsAreSettled = totalsReady && Math.abs(totalRemainingRub) <= 0.009
   const openTransfersCount = enrichedTransfers.filter((transfer) => transfer.isOpenFollowUp).length
   const partialTransfersCount = enrichedTransfers.filter((transfer) => transfer.isPartialFollowUp).length
-  const overpaidTransfersCount = enrichedTransfers.filter((transfer) => transfer.isOverpaid).length
+  const overpaidTransfersCount = enrichedTransfers.filter(
+    (transfer) => transfer.isUnresolvedOverpaid
+  ).length
   const settledTransfersCount = enrichedTransfers.filter((transfer) => transfer.isSettled).length
   const activeTransfersCount = openTransfersCount + partialTransfersCount
   const canCreateTransfer = Boolean(customerId) && !customerUnavailable && !isArchivedCustomer
@@ -937,14 +1098,16 @@ function CustomerDetailsPage() {
       title: 'تحتاج مراجعة مالية عاجلة',
       description: 'هذه الحوالات تحمل زيادة دفع أو رصيدا سالبا وتتطلب تدخلا مباشرا.',
       tone: 'danger',
-      items: filteredTransfers.filter((transfer) => transfer.isOverpaid),
+      items: filteredTransfers.filter((transfer) => transfer.isUnresolvedOverpaid),
     },
     {
       key: 'partial',
       title: 'تحصيل جزئي قيد المتابعة',
       description: 'دفعات مسجلة وما زالت هذه الحوالات تحتاج استكمال التحصيل.',
       tone: 'warning',
-      items: filteredTransfers.filter((transfer) => !transfer.isOverpaid && transfer.isPartialFollowUp),
+      items: filteredTransfers.filter(
+        (transfer) => !transfer.isUnresolvedOverpaid && transfer.isPartialFollowUp
+      ),
     },
     {
       key: 'open',
@@ -953,7 +1116,7 @@ function CustomerDetailsPage() {
       tone: 'default',
       items: filteredTransfers.filter(
         (transfer) =>
-          !transfer.isOverpaid && !transfer.isPartialFollowUp && transfer.isOpenFollowUp
+          !transfer.isUnresolvedOverpaid && !transfer.isPartialFollowUp && transfer.isOpenFollowUp
       ),
     },
     {
@@ -963,13 +1126,15 @@ function CustomerDetailsPage() {
       tone: 'default',
       items: filteredTransfers.filter(
         (transfer) =>
-          !transfer.isOverpaid && !transfer.isPartialFollowUp && !transfer.isOpenFollowUp
+          !transfer.isUnresolvedOverpaid &&
+          !transfer.isPartialFollowUp &&
+          !transfer.isOpenFollowUp
       ),
     },
   ].filter((group) => group.items.length > 0)
 
   const recentActivityItems = [
-    ...customerPayments.map((payment) => {
+    ...activeCustomerPayments.map((payment) => {
       const matchingTransfer = transfers.find((transfer) => transfer.id === payment.transfer_id)
       const referenceNumber =
         matchingTransfer?.reference_number || (payment.transfer_id ? `حوالة #${payment.transfer_id}` : 'حوالة')

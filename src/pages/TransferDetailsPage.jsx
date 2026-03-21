@@ -6,6 +6,7 @@ import PaymentList from '../components/transfer-details/PaymentList.jsx'
 import PrintStatement from '../components/transfer-details/PrintStatement.jsx'
 import TransferFollowUpPanel from '../components/transfer-details/TransferFollowUpPanel.jsx'
 import TransferSummary from '../components/transfer-details/TransferSummary.jsx'
+import FieldShell from '../components/ui/FieldShell.jsx'
 import InfoCard from '../components/ui/InfoCard.jsx'
 import InfoGrid from '../components/ui/InfoGrid.jsx'
 import InlineMessage from '../components/ui/InlineMessage.jsx'
@@ -13,6 +14,7 @@ import OfflineSnapshotNotice from '../components/ui/OfflineSnapshotNotice.jsx'
 import PageHeader from '../components/ui/PageHeader.jsx'
 import PendingMutationNotice from '../components/ui/PendingMutationNotice.jsx'
 import RecordMeta from '../components/ui/RecordMeta.jsx'
+import ReadonlyField from '../components/ui/ReadonlyField.jsx'
 import SectionCard from '../components/ui/SectionCard.jsx'
 import { useAuth } from '../context/auth-context.js'
 import useNetworkStatus from '../hooks/useNetworkStatus.js'
@@ -29,6 +31,11 @@ import {
   saveReadSnapshot,
   withLiveReadTimeout,
 } from '../lib/offline/readCache.js'
+import { deriveTransferOverpaymentState } from '../lib/transfer-overpayment.js'
+import {
+  deriveConfirmedPaymentState,
+  TRANSFER_PAYMENT_VOID_SELECT,
+} from '../lib/transfer-payment-state.js'
 import { getPaymentMethodLabel, getTransferStatusMeta } from '../lib/transfer-ui.js'
 import { supabase } from '../lib/supabase.js'
 
@@ -46,6 +53,52 @@ const emptyPaymentForm = {
   amount_rub: '',
   payment_method: '',
   note: '',
+}
+
+const OVERPAYMENT_RESOLUTION_TYPE_OPTIONS = [
+  { value: 'recovered', label: 'تم الاسترداد' },
+  { value: 'offset_outside_system', label: 'تمت التسوية خارج النظام' },
+  { value: 'other', label: 'أخرى' },
+]
+
+const emptyOverpaymentResolutionForm = {
+  resolution_type: '',
+  note: '',
+}
+
+const PAYMENT_VOID_REASON_TYPE_OPTIONS = [
+  { value: 'entered_in_error', label: 'أُدخلت بالخطأ' },
+  { value: 'duplicate_entry', label: 'إدخال مكرر' },
+  { value: 'wrong_transfer', label: 'سجلت على حوالة خاطئة' },
+  { value: 'other', label: 'أخرى' },
+]
+
+const emptyPaymentVoidForm = {
+  void_reason_type: '',
+  note: '',
+}
+
+const emptyReplacementPaymentForm = {
+  amount_rub: '',
+  payment_method: '',
+  note: '',
+  paid_at: '',
+}
+
+const TRANSFER_STATUS_EDIT_OPTIONS = [
+  { value: 'open', label: getTransferStatusMeta('open').label },
+  { value: 'partial', label: getTransferStatusMeta('partial').label },
+  { value: 'paid', label: getTransferStatusMeta('paid').label },
+  { value: 'cancelled', label: getTransferStatusMeta('cancelled').label },
+]
+
+const emptyTransferEditForm = {
+  customer_id: '',
+  amount: '',
+  global_rate: '',
+  percentage: '0',
+  status: 'open',
+  notes: '',
 }
 
 function formatNumber(value, digits = 2) {
@@ -82,12 +135,137 @@ function formatDate(value) {
   }).format(parsedDate)
 }
 
+function formatDateTimeLocalInput(value) {
+  if (!value) {
+    return ''
+  }
+
+  const parsedDate = new Date(value)
+
+  if (Number.isNaN(parsedDate.getTime())) {
+    return ''
+  }
+
+  const pad = (part) => String(part).padStart(2, '0')
+
+  return `${parsedDate.getFullYear()}-${pad(parsedDate.getMonth() + 1)}-${pad(parsedDate.getDate())}T${pad(parsedDate.getHours())}:${pad(parsedDate.getMinutes())}`
+}
+
+function normalizeDateTimeLocalInput(value) {
+  if (!value) {
+    return ''
+  }
+
+  const parsedDate = new Date(value)
+
+  if (Number.isNaN(parsedDate.getTime())) {
+    return ''
+  }
+
+  return parsedDate.toISOString()
+}
+
 function roundCurrency(value) {
   return Math.round((value + Number.EPSILON) * 100) / 100
 }
 
 function roundRate(value) {
   return Math.round((value + Number.EPSILON) * 1000000) / 1000000
+}
+
+function parseOptionalNumber(value) {
+  if (value === null || value === undefined || value === '') {
+    return null
+  }
+
+  const parsedValue = Number(value)
+
+  return Number.isFinite(parsedValue) ? parsedValue : null
+}
+
+function formatOptionalNumberInput(value) {
+  const numericValue = Number(value)
+
+  return Number.isFinite(numericValue) ? String(numericValue) : ''
+}
+
+function formatOptionalRateInput(value) {
+  const numericValue = Number(value)
+
+  return Number.isFinite(numericValue) ? String(roundRate(numericValue)) : ''
+}
+
+function createTransferEditForm(transfer) {
+  if (!transfer) {
+    return emptyTransferEditForm
+  }
+
+  return {
+    customer_id: String(transfer.customer_id || ''),
+    amount: formatOptionalNumberInput(transfer.usdt_amount),
+    global_rate: formatOptionalRateInput(transfer.market_rate),
+    percentage:
+      transfer.commission_pct === null || transfer.commission_pct === undefined
+        ? '0'
+        : formatOptionalNumberInput(transfer.commission_pct),
+    status: String(transfer.status || 'open'),
+    notes: String(transfer.notes || ''),
+  }
+}
+
+function normalizeTransferCustomerOptions(customers = [], currentTransfer = null, currentCustomerName = '') {
+  const customerMap = new Map()
+  const currentCustomerId = String(currentTransfer?.customer_id || '').trim()
+
+  customers.forEach((customer) => {
+    const customerId = String(customer?.id || '').trim()
+    const customerName = String(customer?.full_name || '').trim()
+
+    if (!customerId || !customerName) {
+      return
+    }
+
+    if (customer?.is_archived && customerId !== currentCustomerId) {
+      return
+    }
+
+    customerMap.set(customerId, {
+      full_name: customerName,
+      id: customerId,
+      isArchived: Boolean(customer?.is_archived),
+    })
+  })
+
+  if (currentCustomerId && !customerMap.has(currentCustomerId)) {
+    customerMap.set(currentCustomerId, {
+      full_name: currentCustomerName || 'العميل الحالي',
+      id: currentCustomerId,
+      isArchived: true,
+    })
+  }
+
+  return Array.from(customerMap.values()).sort((left, right) =>
+    left.full_name.localeCompare(right.full_name, 'ar')
+  )
+}
+
+function buildTransferStatusEditOptions(currentStatus) {
+  const normalizedCurrentStatus = String(currentStatus || '').trim().toLowerCase()
+
+  if (
+    !normalizedCurrentStatus ||
+    TRANSFER_STATUS_EDIT_OPTIONS.some((option) => option.value === normalizedCurrentStatus)
+  ) {
+    return TRANSFER_STATUS_EDIT_OPTIONS
+  }
+
+  return [
+    ...TRANSFER_STATUS_EDIT_OPTIONS,
+    {
+      value: normalizedCurrentStatus,
+      label: getTransferStatusMeta(normalizedCurrentStatus).label,
+    },
+  ]
 }
 
 function extractPaymentMethod(payment) {
@@ -104,6 +282,85 @@ function extractPaymentNote(payment) {
   return note
 }
 
+function buildReplacementPaymentForm(payment) {
+  return {
+    amount_rub: Number.isFinite(Number(payment?.amount_rub))
+      ? String(roundCurrency(Number(payment.amount_rub)))
+      : '',
+    payment_method: String(payment?.payment_method || ''),
+    note: String(payment?.note || ''),
+    paid_at: formatDateTimeLocalInput(payment?.paid_at || payment?.created_at || ''),
+  }
+}
+
+function getConfirmedPaymentActivityTime(payment) {
+  const activityValue = payment?.paid_at || payment?.created_at
+  const parsedDate = activityValue ? new Date(activityValue) : null
+
+  if (!parsedDate || Number.isNaN(parsedDate.getTime())) {
+    return 0
+  }
+
+  return parsedDate.getTime()
+}
+
+function getConfirmedPaymentCreatedTime(payment) {
+  const createdValue = payment?.created_at
+  const parsedDate = createdValue ? new Date(createdValue) : null
+
+  if (!parsedDate || Number.isNaN(parsedDate.getTime())) {
+    return 0
+  }
+
+  return parsedDate.getTime()
+}
+
+function sortConfirmedPaymentsDescending(paymentRows = []) {
+  return [...paymentRows].sort((nextPayment, currentPayment) => {
+    const nextActivityTime = getConfirmedPaymentActivityTime(nextPayment)
+    const currentActivityTime = getConfirmedPaymentActivityTime(currentPayment)
+
+    if (nextActivityTime !== currentActivityTime) {
+      return currentActivityTime - nextActivityTime
+    }
+
+    const nextCreatedTime = getConfirmedPaymentCreatedTime(nextPayment)
+    const currentCreatedTime = getConfirmedPaymentCreatedTime(currentPayment)
+
+    if (nextCreatedTime !== currentCreatedTime) {
+      return currentCreatedTime - nextCreatedTime
+    }
+
+    return String(currentPayment?.id || '').localeCompare(String(nextPayment?.id || ''))
+  })
+}
+
+function getOverpaymentResolutionTypeLabel(value) {
+  const normalizedValue = String(value || '').trim().toLowerCase()
+
+  if (!normalizedValue) {
+    return '--'
+  }
+
+  return (
+    OVERPAYMENT_RESOLUTION_TYPE_OPTIONS.find((option) => option.value === normalizedValue)?.label ||
+    value
+  )
+}
+
+function getPaymentVoidReasonTypeLabel(value) {
+  const normalizedValue = String(value || '').trim().toLowerCase()
+
+  if (!normalizedValue) {
+    return '--'
+  }
+
+  return (
+    PAYMENT_VOID_REASON_TYPE_OPTIONS.find((option) => option.value === normalizedValue)?.label ||
+    value
+  )
+}
+
 function getTransferDetailsSnapshotData(snapshot) {
   if (!snapshot?.data || typeof snapshot.data !== 'object') {
     return {}
@@ -118,6 +375,14 @@ function hasSavedTransferSnapshot(snapshotData) {
 
 function hasSavedPaymentsSnapshot(snapshotData) {
   return Array.isArray(snapshotData?.payments) || snapshotData?.hasPaymentsSnapshot === true
+}
+
+function hasSavedPaymentVoidsSnapshot(snapshotData) {
+  return Array.isArray(snapshotData?.paymentVoidRows) || snapshotData?.hasPaymentVoidsSnapshot === true
+}
+
+function hasSavedOverpaymentResolutionSnapshot(snapshotData) {
+  return snapshotData?.hasOverpaymentResolutionSnapshot === true
 }
 
 const TRANSFER_DETAILS_SECTIONS = [
@@ -139,7 +404,16 @@ function TransferDetailsPage() {
   const [transferLoading, setTransferLoading] = useState(Boolean(isConfigured))
   const [transferError, setTransferError] = useState(isConfigured ? '' : configError)
   const [customerName, setCustomerName] = useState('')
+  const [isEditingTransfer, setIsEditingTransfer] = useState(false)
+  const [transferEditForm, setTransferEditForm] = useState(emptyTransferEditForm)
+  const [transferEditSubmitting, setTransferEditSubmitting] = useState(false)
+  const [transferEditSubmitError, setTransferEditSubmitError] = useState('')
+  const [transferEditSubmitSuccess, setTransferEditSubmitSuccess] = useState('')
+  const [transferCustomerOptions, setTransferCustomerOptions] = useState([])
+  const [transferCustomerOptionsLoading, setTransferCustomerOptionsLoading] = useState(false)
+  const [transferCustomerOptionsError, setTransferCustomerOptionsError] = useState('')
   const [payments, setPayments] = useState([])
+  const [paymentVoidRows, setPaymentVoidRows] = useState([])
   const [paymentsLoading, setPaymentsLoading] = useState(Boolean(isConfigured))
   const [paymentsError, setPaymentsError] = useState(isConfigured ? '' : configError)
   const [paymentsRefreshKey, setPaymentsRefreshKey] = useState(0)
@@ -147,6 +421,31 @@ function TransferDetailsPage() {
   const [paymentSubmitting, setPaymentSubmitting] = useState(false)
   const [paymentSubmitError, setPaymentSubmitError] = useState('')
   const [paymentSubmitSuccess, setPaymentSubmitSuccess] = useState('')
+  const [paymentVoidForm, setPaymentVoidForm] = useState(emptyPaymentVoidForm)
+  const [paymentVoidFormPaymentId, setPaymentVoidFormPaymentId] = useState('')
+  const [paymentVoidSubmitting, setPaymentVoidSubmitting] = useState(false)
+  const [paymentVoidSubmitError, setPaymentVoidSubmitError] = useState('')
+  const [paymentVoidSubmitSuccess, setPaymentVoidSubmitSuccess] = useState('')
+  const [replacementPaymentForm, setReplacementPaymentForm] = useState(emptyReplacementPaymentForm)
+  const [replacementPaymentFormPaymentId, setReplacementPaymentFormPaymentId] = useState('')
+  const [replacementPaymentSubmitting, setReplacementPaymentSubmitting] = useState(false)
+  const [replacementPaymentSubmitError, setReplacementPaymentSubmitError] = useState('')
+  const [replacementPaymentSubmitSuccess, setReplacementPaymentSubmitSuccess] = useState('')
+  const [replacementPaymentLinks, setReplacementPaymentLinks] = useState({})
+  const [latestOverpaymentResolution, setLatestOverpaymentResolution] = useState(null)
+  const [overpaymentResolutionLoading, setOverpaymentResolutionLoading] = useState(Boolean(isConfigured))
+  const [overpaymentResolutionLoaded, setOverpaymentResolutionLoaded] = useState(false)
+  const [overpaymentResolutionError, setOverpaymentResolutionError] = useState(
+    isConfigured ? '' : configError
+  )
+  const [overpaymentResolutionRefreshKey, setOverpaymentResolutionRefreshKey] = useState(0)
+  const [overpaymentResolutionForm, setOverpaymentResolutionForm] = useState(
+    emptyOverpaymentResolutionForm
+  )
+  const [overpaymentResolutionFormOpen, setOverpaymentResolutionFormOpen] = useState(false)
+  const [overpaymentResolutionSubmitting, setOverpaymentResolutionSubmitting] = useState(false)
+  const [overpaymentResolutionSubmitError, setOverpaymentResolutionSubmitError] = useState('')
+  const [overpaymentResolutionSubmitSuccess, setOverpaymentResolutionSubmitSuccess] = useState('')
   const previousPendingCountRef = useRef(0)
   const snapshotPersistQueueRef = useRef(Promise.resolve(null))
   const transferSnapshotKey = getTransferDetailsSnapshotKey(transferId)
@@ -173,6 +472,25 @@ function TransferDetailsPage() {
       }
     })
   }
+
+  useEffect(() => {
+    setIsEditingTransfer(false)
+    setTransferEditForm(emptyTransferEditForm)
+    setTransferEditSubmitting(false)
+    setTransferEditSubmitError('')
+    setTransferEditSubmitSuccess('')
+    setTransferCustomerOptions([])
+    setTransferCustomerOptionsLoading(false)
+    setTransferCustomerOptionsError('')
+  }, [transferId])
+
+  useEffect(() => {
+    if (isEditingTransfer) {
+      return
+    }
+
+    setTransferEditForm(createTransferEditForm(transfer))
+  }, [isEditingTransfer, transfer])
 
   useEffect(() => {
     if (!isConfigured || !supabase || !transferId) {
@@ -332,22 +650,25 @@ function TransferDetailsPage() {
       const snapshotData = getTransferDetailsSnapshotData(snapshot)
       const hasTransferSnapshot = hasSavedTransferSnapshot(snapshotData)
       const hasPaymentsSnapshot = hasSavedPaymentsSnapshot(snapshotData)
+      const hasPaymentVoidsSnapshot = hasSavedPaymentVoidsSnapshot(snapshotData)
 
       if (!isMounted) {
         return
       }
 
-      if (!hasPaymentsSnapshot) {
+      if (!hasPaymentsSnapshot || !hasPaymentVoidsSnapshot) {
         if (hasTransferSnapshot) {
           markCachedSnapshot(snapshot?.savedAt || '')
         }
         setPayments([])
+        setPaymentVoidRows([])
         setPaymentsError(fallbackErrorMessage || getOfflineSnapshotMissingMessage('لمدفوعات هذه الحوالة'))
         setPaymentsLoading(false)
         return false
       }
 
       setPayments(Array.isArray(snapshotData.payments) ? snapshotData.payments : [])
+      setPaymentVoidRows(Array.isArray(snapshotData.paymentVoidRows) ? snapshotData.paymentVoidRows : [])
       setPaymentsError('')
       setPaymentsLoading(false)
       markCachedSnapshot(snapshot.savedAt)
@@ -384,7 +705,34 @@ function TransferDetailsPage() {
           return
         }
 
+        const { data: paymentVoidData, error: paymentVoidsError } = await withLiveReadTimeout(
+          supabase
+            .schema('public')
+            .from('transfer_payment_voids')
+            .select(TRANSFER_PAYMENT_VOID_SELECT)
+            .eq('transfer_id', transferId)
+            .order('created_at', { ascending: false })
+            .order('id', { ascending: false }),
+          {
+            timeoutMessage: 'تعذر إكمال تحميل حالات إلغاء الدفعات المؤكدة لهذه الحوالة في الوقت المتوقع.',
+          }
+        )
+
+        if (!isMounted) {
+          return
+        }
+
+        if (paymentVoidsError) {
+          const preferSnapshot =
+            isOffline || isBrowserOffline() || isLikelyOfflineReadFailure(paymentVoidsError)
+          await hydratePaymentsFromSnapshot({
+            fallbackErrorMessage: preferSnapshot ? '' : paymentVoidsError.message,
+          })
+          return
+        }
+
         setPayments(data ?? [])
+        setPaymentVoidRows(paymentVoidData ?? [])
         setPaymentsLoading(false)
       } catch (error) {
         if (!isMounted) {
@@ -410,8 +758,128 @@ function TransferDetailsPage() {
     }
   }, [isConfigured, isOffline, markCachedSnapshot, paymentsRefreshKey, transferId, transferSnapshotKey])
 
+  useEffect(() => {
+    if (!isConfigured || !supabase || !transferId) {
+      return undefined
+    }
+
+    let isMounted = true
+
+    const hydrateOverpaymentResolutionFromSnapshot = async (options = {}) => {
+      const { fallbackErrorMessage = '' } = options
+
+      setOverpaymentResolutionLoading(true)
+      setOverpaymentResolutionError('')
+      setOverpaymentResolutionLoaded(false)
+
+      const snapshot = await loadReadSnapshot(transferSnapshotKey)
+      const snapshotData = getTransferDetailsSnapshotData(snapshot)
+      const hasTransferSnapshot = hasSavedTransferSnapshot(snapshotData)
+      const hasOverpaymentResolutionSnapshot = hasSavedOverpaymentResolutionSnapshot(snapshotData)
+
+      if (!isMounted) {
+        return
+      }
+
+      if (!hasOverpaymentResolutionSnapshot) {
+        if (hasTransferSnapshot) {
+          markCachedSnapshot(snapshot?.savedAt || '')
+        }
+
+        setLatestOverpaymentResolution(null)
+        setOverpaymentResolutionLoaded(false)
+        setOverpaymentResolutionError(
+          fallbackErrorMessage ||
+            getOfflineSnapshotMissingMessage('لآخر معالجة زيادة الدفع على هذه الحوالة')
+        )
+        setOverpaymentResolutionLoading(false)
+        return false
+      }
+
+      setLatestOverpaymentResolution(snapshotData.latestOverpaymentResolution || null)
+      setOverpaymentResolutionLoaded(true)
+      setOverpaymentResolutionError('')
+      setOverpaymentResolutionLoading(false)
+      markCachedSnapshot(snapshot.savedAt)
+      return true
+    }
+
+    const loadLatestOverpaymentResolution = async () => {
+      setOverpaymentResolutionLoading(true)
+      setOverpaymentResolutionError('')
+      setOverpaymentResolutionLoaded(false)
+
+      try {
+        const { data, error } = await withLiveReadTimeout(
+          supabase
+            .schema('public')
+            .from('transfer_overpayment_resolutions')
+            .select('id, transfer_id, resolution_type, resolved_overpaid_amount_rub, note, created_at')
+            .eq('transfer_id', transferId)
+            .order('created_at', { ascending: false })
+            .order('id', { ascending: false })
+            .limit(1)
+            .maybeSingle(),
+          {
+            timeoutMessage:
+              'تعذر إكمال تحميل آخر معالجة زيادة دفع لهذه الحوالة في الوقت المتوقع.',
+          }
+        )
+
+        if (!isMounted) {
+          return
+        }
+
+        if (error) {
+          const preferSnapshot = isOffline || isBrowserOffline() || isLikelyOfflineReadFailure(error)
+
+          await hydrateOverpaymentResolutionFromSnapshot({
+            fallbackErrorMessage: preferSnapshot ? '' : error.message,
+          })
+          return
+        }
+
+        setLatestOverpaymentResolution(data ?? null)
+        setOverpaymentResolutionLoaded(true)
+        setOverpaymentResolutionError('')
+        setOverpaymentResolutionLoading(false)
+      } catch (error) {
+        if (!isMounted) {
+          return
+        }
+
+        const preferSnapshot = isOffline || isBrowserOffline() || isLikelyOfflineReadFailure(error)
+
+        await hydrateOverpaymentResolutionFromSnapshot({
+          fallbackErrorMessage: preferSnapshot ? '' : error.message,
+        })
+      }
+    }
+
+    if (isOffline) {
+      hydrateOverpaymentResolutionFromSnapshot()
+    } else {
+      loadLatestOverpaymentResolution()
+    }
+
+    return () => {
+      isMounted = false
+    }
+  }, [
+    isConfigured,
+    isOffline,
+    markCachedSnapshot,
+    overpaymentResolutionRefreshKey,
+    transferId,
+    transferSnapshotKey,
+  ])
+
   const handlePaymentsRefresh = () => {
     setPaymentsRefreshKey((current) => current + 1)
+  }
+
+  const handleOverpaymentResolutionRefresh = () => {
+    setOverpaymentResolutionRefreshKey((current) => current + 1)
   }
 
   useEffect(() => {
@@ -507,13 +975,15 @@ function TransferDetailsPage() {
             key: transferSnapshotKey,
             scope: `transfer-details:${transferId}`,
             type: 'transfer_details',
-            data: {
-              ...currentData,
-              hasPaymentsSnapshot: true,
-              payments,
-              paymentsSavedAt: nextPaymentsSavedAt,
-            },
-          })
+              data: {
+                ...currentData,
+                hasPaymentsSnapshot: true,
+                hasPaymentVoidsSnapshot: true,
+                payments,
+                paymentVoidRows,
+                paymentsSavedAt: nextPaymentsSavedAt,
+              },
+            })
         })
 
       const savedSnapshot = await snapshotPersistQueueRef.current
@@ -536,9 +1006,125 @@ function TransferDetailsPage() {
     payments,
     paymentsError,
     paymentsLoading,
+    paymentVoidRows,
     transferId,
     transferSnapshotKey,
   ])
+
+  useEffect(() => {
+    if (
+      isOffline ||
+      !transferId ||
+      overpaymentResolutionLoading ||
+      overpaymentResolutionError ||
+      !overpaymentResolutionLoaded
+    ) {
+      return
+    }
+
+    let isMounted = true
+
+    const persistOverpaymentResolutionSnapshot = async () => {
+      const nextOverpaymentResolutionSavedAt = new Date().toISOString()
+
+      snapshotPersistQueueRef.current = snapshotPersistQueueRef.current
+        .catch(() => null)
+        .then(async () => {
+          const currentSnapshot = await loadReadSnapshot(transferSnapshotKey)
+          const currentData = getTransferDetailsSnapshotData(currentSnapshot)
+
+          return saveReadSnapshot({
+            key: transferSnapshotKey,
+            scope: `transfer-details:${transferId}`,
+            type: 'transfer_details',
+            data: {
+              ...currentData,
+              hasOverpaymentResolutionSnapshot: true,
+              latestOverpaymentResolution,
+              overpaymentResolutionSavedAt: nextOverpaymentResolutionSavedAt,
+            },
+          })
+        })
+
+      const savedSnapshot = await snapshotPersistQueueRef.current
+
+      if (!isMounted) {
+        return
+      }
+
+      markLiveSnapshot(savedSnapshot?.savedAt || '')
+    }
+
+    persistOverpaymentResolutionSnapshot()
+
+    return () => {
+      isMounted = false
+    }
+  }, [
+    isOffline,
+    latestOverpaymentResolution,
+    markLiveSnapshot,
+    overpaymentResolutionError,
+    overpaymentResolutionLoaded,
+    overpaymentResolutionLoading,
+    transferId,
+    transferSnapshotKey,
+  ])
+
+  useEffect(() => {
+    const resetOverpaymentResolutionState = () => {
+      setLatestOverpaymentResolution(null)
+      setOverpaymentResolutionLoading(Boolean(isConfigured))
+      setOverpaymentResolutionLoaded(false)
+      setOverpaymentResolutionError(isConfigured ? '' : configError)
+      setOverpaymentResolutionForm(emptyOverpaymentResolutionForm)
+      setOverpaymentResolutionFormOpen(false)
+      setOverpaymentResolutionSubmitError('')
+      setOverpaymentResolutionSubmitSuccess('')
+    }
+
+    if (typeof queueMicrotask === 'function') {
+      queueMicrotask(resetOverpaymentResolutionState)
+      return
+    }
+
+    Promise.resolve().then(resetOverpaymentResolutionState)
+  }, [configError, isConfigured, transferId])
+
+  useEffect(() => {
+    const resetPaymentVoidState = () => {
+      setPaymentVoidForm(emptyPaymentVoidForm)
+      setPaymentVoidFormPaymentId('')
+      setPaymentVoidSubmitting(false)
+      setPaymentVoidSubmitError('')
+      setPaymentVoidSubmitSuccess('')
+    }
+
+    if (typeof queueMicrotask === 'function') {
+      queueMicrotask(resetPaymentVoidState)
+      return
+    }
+
+    Promise.resolve().then(resetPaymentVoidState)
+  }, [transferId])
+
+  useEffect(() => {
+    const resetReplacementPaymentState = () => {
+      setReplacementPaymentForm(emptyReplacementPaymentForm)
+      setReplacementPaymentFormPaymentId('')
+      setReplacementPaymentSubmitting(false)
+      setReplacementPaymentSubmitError('')
+      setReplacementPaymentSubmitSuccess('')
+      setReplacementPaymentLinks({})
+    }
+
+    if (typeof queueMicrotask === 'function') {
+      queueMicrotask(resetReplacementPaymentState)
+      return
+    }
+
+    Promise.resolve().then(resetReplacementPaymentState)
+  }, [transferId])
 
   const handlePaymentChange = (event) => {
     const { name, value } = event.target
@@ -549,17 +1135,117 @@ function TransferDetailsPage() {
     }))
   }
 
+  const handlePaymentVoidFormChange = (event) => {
+    const { name, value } = event.target
+
+    setPaymentVoidForm((current) => ({
+      ...current,
+      [name]: value,
+    }))
+
+    if (paymentVoidSubmitError) {
+      setPaymentVoidSubmitError('')
+    }
+
+    if (paymentVoidSubmitSuccess) {
+      setPaymentVoidSubmitSuccess('')
+    }
+  }
+
+  const handleReplacementPaymentFormChange = (event) => {
+    const { name, value } = event.target
+
+    setReplacementPaymentForm((current) => ({
+      ...current,
+      [name]: value,
+    }))
+
+    if (replacementPaymentSubmitError) {
+      setReplacementPaymentSubmitError('')
+    }
+
+    if (replacementPaymentSubmitSuccess) {
+      setReplacementPaymentSubmitSuccess('')
+    }
+  }
+
+  const handleOverpaymentResolutionFormChange = (event) => {
+    const { name, value } = event.target
+
+    setOverpaymentResolutionForm((current) => ({
+      ...current,
+      [name]: value,
+    }))
+
+    if (overpaymentResolutionSubmitError) {
+      setOverpaymentResolutionSubmitError('')
+    }
+
+    if (overpaymentResolutionSubmitSuccess) {
+      setOverpaymentResolutionSubmitSuccess('')
+    }
+  }
+
+  const handleTransferEditFormChange = (event) => {
+    const { name, value } = event.target
+
+    setTransferEditForm((current) => ({
+      ...current,
+      [name]: value,
+    }))
+
+    if (transferEditSubmitError) {
+      setTransferEditSubmitError('')
+    }
+
+    if (transferEditSubmitSuccess) {
+      setTransferEditSubmitSuccess('')
+    }
+  }
+
+  const handleCloseTransferEdit = () => {
+    setIsEditingTransfer(false)
+    setTransferEditSubmitting(false)
+    setTransferEditSubmitError('')
+    setTransferEditSubmitSuccess('')
+    setTransferEditForm(createTransferEditForm(transfer))
+  }
+
+  const handleOpenTransferEdit = () => {
+    if (!transfer || transferEditActionDisabledReason) {
+      return
+    }
+
+    handleSectionChange('summary')
+    setIsEditingTransfer(true)
+    setTransferEditSubmitting(false)
+    setTransferEditSubmitError('')
+    setTransferEditSubmitSuccess('')
+    setTransferEditForm(createTransferEditForm(transfer))
+  }
+
   const hasResolvedPayments = !paymentsLoading && !paymentsError
-  const totalPaidRub = hasResolvedPayments
-    ? roundCurrency(payments.reduce((total, payment) => total + (Number(payment.amount_rub) || 0), 0))
-    : null
-  const remainingRub =
-    hasResolvedPayments &&
-    transfer &&
-    transfer.payable_rub !== null &&
-    transfer.payable_rub !== undefined
-      ? roundCurrency(Number(transfer.payable_rub) - totalPaidRub)
-      : null
+  const {
+    activePayments,
+    latestActivePayment,
+    totalActivePaidRub,
+    latestPaymentVoidByPaymentId,
+  } = deriveConfirmedPaymentState({
+    payments,
+    paymentVoids: paymentVoidRows,
+  })
+  const totalPaidRub = hasResolvedPayments ? totalActivePaidRub : null
+  const {
+    remainingRub,
+    isOverpaid,
+    overpaidAmountRub,
+    isResolvedOverpaid,
+    isUnresolvedOverpaid,
+  } = deriveTransferOverpaymentState({
+    payableRub: transfer?.payable_rub,
+    confirmedPaidRub: totalPaidRub,
+    latestResolution: latestOverpaymentResolution,
+  })
   const valueBeforePercentage =
     transfer && transfer.gross_rub !== null && transfer.gross_rub !== undefined
       ? roundCurrency(Number(transfer.gross_rub))
@@ -584,9 +1270,7 @@ function TransferDetailsPage() {
         ? roundRate(valueAfterPercentage / Number(transfer.usdt_amount))
         : null
   const isSettled = remainingRub !== null && Math.abs(remainingRub) <= 0.009
-  const isOverpaid = remainingRub !== null && remainingRub < -0.009
-  const overpaidAmountRub = isOverpaid ? roundCurrency(Math.abs(remainingRub)) : 0
-  const hasPayments = hasResolvedPayments && payments.length > 0
+  const hasPayments = hasResolvedPayments && activePayments.length > 0
   const normalizedStatus = String(transfer?.status || '').toLowerCase()
   const isCancelled = normalizedStatus === 'cancelled' || normalizedStatus === 'canceled'
   const remainingMessage =
@@ -622,6 +1306,499 @@ function TransferDetailsPage() {
   const handlePrint = () => {
     if (typeof window !== 'undefined') {
       window.print()
+    }
+  }
+
+  const handleOpenPaymentVoidForm = (paymentId) => {
+    if (!paymentId) {
+      return
+    }
+
+    setReplacementPaymentFormPaymentId('')
+    setReplacementPaymentForm(emptyReplacementPaymentForm)
+    setReplacementPaymentSubmitError('')
+    setPaymentVoidFormPaymentId(paymentId)
+    setPaymentVoidForm(emptyPaymentVoidForm)
+    setPaymentVoidSubmitError('')
+    setPaymentVoidSubmitSuccess('')
+  }
+
+  const handleCancelPaymentVoidForm = () => {
+    setPaymentVoidFormPaymentId('')
+    setPaymentVoidForm(emptyPaymentVoidForm)
+    setPaymentVoidSubmitError('')
+  }
+
+  const handleOpenReplacementPaymentForm = (payment) => {
+    if (!payment?.id) {
+      return
+    }
+
+    setPaymentVoidFormPaymentId('')
+    setPaymentVoidSubmitError('')
+    setReplacementPaymentFormPaymentId(payment.id)
+    setReplacementPaymentForm(buildReplacementPaymentForm(payment))
+    setReplacementPaymentSubmitError('')
+    setReplacementPaymentSubmitSuccess('')
+  }
+
+  const handleCancelReplacementPaymentForm = () => {
+    setReplacementPaymentFormPaymentId('')
+    setReplacementPaymentForm(emptyReplacementPaymentForm)
+    setReplacementPaymentSubmitError('')
+  }
+
+  const handleReplacementPaymentSubmit = async (event) => {
+    event.preventDefault()
+    setReplacementPaymentSubmitError('')
+    setReplacementPaymentSubmitSuccess('')
+
+    if (!isConfigured || !supabase) {
+      setReplacementPaymentSubmitError(configError)
+      return
+    }
+
+    if (!transferId || !transfer) {
+      setReplacementPaymentSubmitError('معرّف الحوالة غير متاح حاليا لتسجيل دفعة بديلة مصححة.')
+      return
+    }
+
+    if (!replacementPaymentFormPaymentId) {
+      setReplacementPaymentSubmitError('اختر دفعة ملغاة صالحة قبل تسجيل الدفعة البديلة.')
+      return
+    }
+
+    if (replacementPaymentActionDisabledReason) {
+      setReplacementPaymentSubmitError(replacementPaymentActionDisabledReason)
+      return
+    }
+
+    const targetPayment = payments.find((payment) => payment?.id === replacementPaymentFormPaymentId)
+
+    if (!targetPayment?.id) {
+      setReplacementPaymentSubmitError('تعذر العثور على الدفعة الملغاة المطلوبة داخل السجل الحالي.')
+      return
+    }
+
+    if (!latestPaymentVoidByPaymentId[targetPayment.id]) {
+      setReplacementPaymentSubmitError('لا يمكن تسجيل دفعة بديلة إلا بعد إلغاء الدفعة الأصلية أولا.')
+      return
+    }
+
+    if (replacementPaymentLinks[targetPayment.id]) {
+      setReplacementPaymentSubmitError('تم تسجيل دفعة بديلة من هذه البطاقة بالفعل في هذه الجلسة.')
+      return
+    }
+
+    const amountRub = Number(replacementPaymentForm.amount_rub)
+    const paymentMethod = replacementPaymentForm.payment_method.trim()
+    const noteValue = replacementPaymentForm.note.trim()
+    const paidAtIso = normalizeDateTimeLocalInput(replacementPaymentForm.paid_at)
+
+    if (!Number.isFinite(amountRub) || amountRub <= 0) {
+      setReplacementPaymentSubmitError('يجب أن يكون مبلغ الدفعة البديلة أكبر من صفر.')
+      return
+    }
+
+    if (!paymentMethod) {
+      setReplacementPaymentSubmitError('يرجى اختيار وسيلة التحصيل للدفعة البديلة.')
+      return
+    }
+
+    if (!paidAtIso) {
+      setReplacementPaymentSubmitError('يرجى تحديد وقت اقتصادي صالح للدفعة البديلة.')
+      return
+    }
+
+    setReplacementPaymentSubmitting(true)
+
+    const payload = {
+      transfer_id: transferId,
+      amount_rub: roundCurrency(amountRub),
+      payment_method: paymentMethod,
+      note: noteValue || null,
+      paid_at: paidAtIso,
+    }
+
+    const { data, error: insertError } = await supabase
+      .schema('public')
+      .from('transfer_payments')
+      .insert([payload])
+      .select('id, amount_rub, payment_method, note, paid_at, created_at')
+      .single()
+
+    if (insertError) {
+      setReplacementPaymentSubmitError(insertError.message)
+      setReplacementPaymentSubmitting(false)
+      return
+    }
+
+    const savedReplacementPayment = data || {
+      id: '',
+      ...payload,
+      created_at: new Date().toISOString(),
+    }
+
+    setPayments((current) => sortConfirmedPaymentsDescending([savedReplacementPayment, ...current]))
+    setReplacementPaymentLinks((current) => ({
+      ...current,
+      [targetPayment.id]: savedReplacementPayment.id,
+    }))
+    setReplacementPaymentSubmitting(false)
+    setReplacementPaymentForm(emptyReplacementPaymentForm)
+    setReplacementPaymentFormPaymentId('')
+    setReplacementPaymentSubmitSuccess(
+      `تم تسجيل دفعة بديلة مصححة بقيمة ${formatNumber(savedReplacementPayment.amount_rub, 2)} RUB بنجاح.`
+    )
+  }
+
+  const handlePaymentVoidSubmit = async (event) => {
+    event.preventDefault()
+    setPaymentVoidSubmitError('')
+    setPaymentVoidSubmitSuccess('')
+
+    if (!isConfigured || !supabase) {
+      setPaymentVoidSubmitError(configError)
+      return
+    }
+
+    if (!transferId || !transfer) {
+      setPaymentVoidSubmitError('معرّف الحوالة غير متاح حاليا لاعتماد إلغاء دفعة مؤكدة.')
+      return
+    }
+
+    if (!paymentVoidFormPaymentId) {
+      setPaymentVoidSubmitError('اختر دفعة مؤكدة صالحة قبل تسجيل الإلغاء.')
+      return
+    }
+
+    if (paymentVoidActionDisabledReason) {
+      setPaymentVoidSubmitError(paymentVoidActionDisabledReason)
+      return
+    }
+
+    const targetPayment = payments.find((payment) => payment?.id === paymentVoidFormPaymentId)
+
+    if (!targetPayment?.id) {
+      setPaymentVoidSubmitError('تعذر العثور على الدفعة المؤكدة المطلوبة داخل السجل الحالي.')
+      return
+    }
+
+    if (latestPaymentVoidByPaymentId[targetPayment.id]) {
+      setPaymentVoidSubmitError('تم تسجيل إلغاء لهذه الدفعة المؤكدة بالفعل.')
+      return
+    }
+
+    const voidReasonType = paymentVoidForm.void_reason_type.trim()
+    const note = paymentVoidForm.note.trim()
+
+    if (!voidReasonType) {
+      setPaymentVoidSubmitError('يرجى اختيار سبب واضح لإلغاء هذه الدفعة المؤكدة.')
+      return
+    }
+
+    if (!PAYMENT_VOID_REASON_TYPE_OPTIONS.some((option) => option.value === voidReasonType)) {
+      setPaymentVoidSubmitError('سبب الإلغاء المختار غير مدعوم في هذه المرحلة.')
+      return
+    }
+
+    if (!note) {
+      setPaymentVoidSubmitError('يرجى كتابة ملاحظة تفسيرية واضحة قبل حفظ إلغاء الدفعة.')
+      return
+    }
+
+    setPaymentVoidSubmitting(true)
+
+    const payload = {
+      payment_id: targetPayment.id,
+      transfer_id: transferId,
+      void_reason_type: voidReasonType,
+      note,
+    }
+
+    const { data, error: insertError } = await supabase
+      .schema('public')
+      .from('transfer_payment_voids')
+      .insert([payload])
+      .select(TRANSFER_PAYMENT_VOID_SELECT)
+      .single()
+
+    if (insertError) {
+      setPaymentVoidSubmitError(insertError.message)
+      setPaymentVoidSubmitting(false)
+      return
+    }
+
+    const savedPaymentVoid = data || {
+      id: '',
+      ...payload,
+      created_at: new Date().toISOString(),
+    }
+
+    setPaymentVoidRows((current) => [
+      savedPaymentVoid,
+      ...current.filter((paymentVoid) => paymentVoid?.payment_id !== savedPaymentVoid.payment_id),
+    ])
+    setPaymentVoidSubmitting(false)
+    setPaymentVoidForm(emptyPaymentVoidForm)
+    setPaymentVoidFormPaymentId('')
+    setPaymentVoidSubmitSuccess(
+      `تم إلغاء اعتماد الدفعة المؤكدة ${formatNumber(targetPayment.amount_rub, 2)} RUB بنجاح.`
+    )
+  }
+
+  const handleOpenOverpaymentResolutionForm = () => {
+    setOverpaymentResolutionFormOpen(true)
+    setOverpaymentResolutionSubmitError('')
+    setOverpaymentResolutionSubmitSuccess('')
+  }
+
+  const handleCancelOverpaymentResolutionForm = () => {
+    setOverpaymentResolutionFormOpen(false)
+    setOverpaymentResolutionForm(emptyOverpaymentResolutionForm)
+    setOverpaymentResolutionSubmitError('')
+  }
+
+  const handleOverpaymentResolutionSubmit = async (event) => {
+    event.preventDefault()
+    setOverpaymentResolutionSubmitError('')
+    setOverpaymentResolutionSubmitSuccess('')
+
+    if (!isConfigured || !supabase) {
+      setOverpaymentResolutionSubmitError(configError)
+      return
+    }
+
+    if (!transferId || !transfer) {
+      setOverpaymentResolutionSubmitError('معرّف الحوالة غير متاح حاليا لاعتماد معالجة الزيادة.')
+      return
+    }
+
+    if (isOffline) {
+      setOverpaymentResolutionSubmitError('تسجيل معالجة زيادة الدفع متاح أثناء الاتصال فقط حاليا.')
+      return
+    }
+
+    if (!isOverpaid) {
+      setOverpaymentResolutionSubmitError('هذه الحوالة لا تحمل حاليا زيادة دفع قابلة للمعالجة.')
+      return
+    }
+
+    if (hasResolvedCurrentOverpayment) {
+      setOverpaymentResolutionSubmitError('تم تسجيل معالجة مطابقة للزيادة الحالية بالفعل.')
+      return
+    }
+
+    if (overpaymentResolutionActionDisabledReason) {
+      setOverpaymentResolutionSubmitError(overpaymentResolutionActionDisabledReason)
+      return
+    }
+
+    const resolutionType = overpaymentResolutionForm.resolution_type.trim()
+    const note = overpaymentResolutionForm.note.trim()
+
+    if (!resolutionType) {
+      setOverpaymentResolutionSubmitError('يرجى اختيار نوع معالجة واضح للزيادة الحالية.')
+      return
+    }
+
+    if (!OVERPAYMENT_RESOLUTION_TYPE_OPTIONS.some((option) => option.value === resolutionType)) {
+      setOverpaymentResolutionSubmitError('نوع المعالجة المختار غير مدعوم في هذه المرحلة.')
+      return
+    }
+
+    if (!note) {
+      setOverpaymentResolutionSubmitError('يرجى كتابة ملاحظة تفسيرية واضحة قبل الحفظ.')
+      return
+    }
+
+    setOverpaymentResolutionSubmitting(true)
+
+    const payload = {
+      transfer_id: transferId,
+      resolution_type: resolutionType,
+      resolved_overpaid_amount_rub: overpaidAmountRub,
+      note,
+    }
+
+    const { data, error: insertError } = await supabase
+      .schema('public')
+      .from('transfer_overpayment_resolutions')
+      .insert([payload])
+      .select('id, transfer_id, resolution_type, resolved_overpaid_amount_rub, note, created_at')
+      .single()
+
+    if (insertError) {
+      setOverpaymentResolutionSubmitError(insertError.message)
+      setOverpaymentResolutionSubmitting(false)
+      return
+    }
+
+    const savedResolution = data || {
+      id: '',
+      ...payload,
+      created_at: new Date().toISOString(),
+    }
+
+    setLatestOverpaymentResolution(savedResolution)
+    setOverpaymentResolutionLoaded(true)
+    setOverpaymentResolutionError('')
+    setOverpaymentResolutionSubmitting(false)
+    setOverpaymentResolutionForm(emptyOverpaymentResolutionForm)
+    setOverpaymentResolutionFormOpen(false)
+    setOverpaymentResolutionSubmitSuccess(
+      `تم تسجيل معالجة زيادة الدفع كـ ${getOverpaymentResolutionTypeLabel(
+        savedResolution.resolution_type
+      )} بنجاح.`
+    )
+  }
+
+  const handleTransferEditSubmit = async (event) => {
+    event.preventDefault()
+    setTransferEditSubmitError('')
+    setTransferEditSubmitSuccess('')
+
+    if (isOffline) {
+      setTransferEditSubmitError('تعديل بيانات الحوالة متاح أثناء الاتصال فقط حاليا.')
+      return
+    }
+
+    if (!isConfigured || !supabase) {
+      setTransferEditSubmitError(configError || 'تعذر الاتصال بقاعدة البيانات حاليا.')
+      return
+    }
+
+    if (!transferId || !transfer) {
+      setTransferEditSubmitError('تعذر تحديد الحوالة المطلوب تعديلها حاليا.')
+      return
+    }
+
+    if (transferEditActionDisabledReason) {
+      setTransferEditSubmitError(transferEditActionDisabledReason)
+      return
+    }
+
+    const statusValue = String(transferEditForm.status || '').trim()
+    const notesValue = transferEditForm.notes.trim()
+
+    if (!statusValue) {
+      setTransferEditSubmitError('اختر حالة واضحة للحوالة قبل حفظ التعديلات.')
+      return
+    }
+
+    let payload = {
+      notes: notesValue || null,
+      status: statusValue,
+    }
+
+    if (canUseBroaderTransferEdit) {
+      const amountValue = parseOptionalNumber(transferEditForm.amount)
+      const marketRateValue = parseOptionalNumber(transferEditForm.global_rate)
+      const percentageInputValue = parseOptionalNumber(transferEditForm.percentage)
+      const percentageValue = percentageInputValue ?? 0
+
+      if (!transferEditForm.customer_id) {
+        setTransferEditSubmitError('اختر العميل قبل حفظ الحوالة المعدلة.')
+        return
+      }
+
+      if (amountValue === null || amountValue <= 0) {
+        setTransferEditSubmitError('أدخل كمية USDT أكبر من صفر.')
+        return
+      }
+
+      if (marketRateValue === null || marketRateValue <= 0) {
+        setTransferEditSubmitError('أدخل سعرا عاما أكبر من صفر.')
+        return
+      }
+
+      if (transferEditForm.percentage !== '' && percentageInputValue === null) {
+        setTransferEditSubmitError('أدخل نسبة صحيحة.')
+        return
+      }
+
+      if (percentageValue < 0) {
+        setTransferEditSubmitError('النسبة لا يمكن أن تكون سالبة.')
+        return
+      }
+
+      if (
+        transferEditValueBeforePercentage === null ||
+        transferEditValueAfterPercentage === null ||
+        transferEditClientRate === null ||
+        transferEditCommissionRub === null
+      ) {
+        setTransferEditSubmitError('أكمل حقول التسعير المطلوبة قبل حفظ التعديلات.')
+        return
+      }
+
+      payload = {
+        ...payload,
+        client_rate: transferEditClientRate,
+        commission_pct: percentageValue,
+        commission_rub: transferEditCommissionRub,
+        customer_id: transferEditForm.customer_id,
+        gross_rub: transferEditValueBeforePercentage,
+        market_rate: roundRate(marketRateValue),
+        payable_rub: transferEditValueAfterPercentage,
+        pricing_mode: 'hybrid',
+        usdt_amount: amountValue,
+      }
+    }
+
+    setTransferEditSubmitting(true)
+
+    try {
+      const { data, error } = await supabase
+        .schema('public')
+        .from('transfers')
+        .update(payload)
+        .eq('id', transferId)
+        .select(
+          'id, reference_number, customer_id, usdt_amount, market_rate, client_rate, pricing_mode, commission_pct, commission_rub, gross_rub, payable_rub, status, notes, created_at'
+        )
+        .maybeSingle()
+
+      if (error) {
+        throw error
+      }
+
+      if (!data) {
+        throw new Error('تعذر حفظ تعديلات الحوالة في الوقت الحالي.')
+      }
+
+      const nextCustomerName =
+        selectedTransferEditCustomerOption?.full_name ||
+        (data.customer_id === transfer.customer_id ? customerName : '') ||
+        customerName
+
+      setTransfer(data)
+      setCustomerName(nextCustomerName)
+      setTransferEditForm(createTransferEditForm(data))
+      setIsEditingTransfer(false)
+      setTransferEditSubmitSuccess(
+        canUseBroaderTransferEdit
+          ? 'تم تحديث بيانات الحوالة والتسعير بنجاح.'
+          : 'تم تحديث حالة الحوالة وملاحظاتها بنجاح.'
+      )
+    } catch (error) {
+      const isPaymentLockError = String(error?.message || '').includes(
+        'Core transfer fields are locked after payments exist'
+      )
+
+      if (isPaymentLockError) {
+        handlePaymentsRefresh()
+        setIsEditingTransfer(false)
+        setTransferEditSubmitError(
+          'أصبحت الحقول المالية مقفلة لأن الحوالة تحتوي الآن على دفعات مؤكدة. تم الاحتفاظ بالتاريخ المالي كما هو، ويمكن تعديل الحالة والملاحظات فقط بعد تحديث سجل الدفعات.'
+        )
+      } else {
+        setTransferEditSubmitError(
+          error?.message || 'تعذر حفظ تعديلات الحوالة في الوقت الحالي.'
+        )
+      }
+    } finally {
+      setTransferEditSubmitting(false)
     }
   }
 
@@ -762,21 +1939,223 @@ function TransferDetailsPage() {
   const displayCustomerName = customerName || 'عميل غير معروف'
   const transferCreatedAtLabel = formatDate(transfer?.created_at)
   const statusLabel = getTransferStatusMeta(transfer?.status).label
-  const latestPayment = hasResolvedPayments ? payments[0] || null : null
+  const latestPayment = hasResolvedPayments ? latestActivePayment || null : null
   const latestPaymentLabel = latestPayment ? formatDate(latestPayment.paid_at || latestPayment.created_at) : ''
   const latestPaymentMethod = latestPayment ? extractPaymentMethod(latestPayment) : ''
   const latestPaymentAmountValue = latestPayment
     ? `${formatNumber(latestPayment.amount_rub, 2)} RUB`
     : 'لا توجد حركة مالية مسجلة'
-  const paymentCountLabel = hasResolvedPayments ? `${payments.length} دفعة مسجلة` : 'سجل الدفعات غير مكتمل'
+  const paymentCountLabel = hasResolvedPayments ? `${activePayments.length} دفعة مسجلة` : 'سجل الدفعات غير مكتمل'
   const hasLocalPendingPayments = localPaymentCount > 0
+  const hasUnconfirmedLocalPayments =
+    localPaymentCount > 0 || blockedLocalPaymentCount > 0 || failedLocalPaymentCount > 0
+  const hasConfirmedServerPayments = !paymentsLoading && !paymentsError && payments.length > 0
+  const transferEditScopeKnown = !paymentsLoading && !paymentsError
+  const supportsBroaderTransferEdit =
+    !transfer?.pricing_mode || String(transfer.pricing_mode).trim().toLowerCase() === 'hybrid'
+  const broaderTransferEditBlockedByLocalPayments =
+    transferEditScopeKnown && !hasConfirmedServerPayments && hasUnconfirmedLocalPayments
+  const canUseBroaderTransferEdit =
+    transferEditScopeKnown &&
+    !hasConfirmedServerPayments &&
+    supportsBroaderTransferEdit &&
+    !broaderTransferEditBlockedByLocalPayments
+  const isRestrictedTransferEdit = transferEditScopeKnown && hasConfirmedServerPayments
+  const selectedTransferEditCustomerOption =
+    transferCustomerOptions.find((customer) => customer.id === transferEditForm.customer_id) || null
+  const transferStatusEditOptions = buildTransferStatusEditOptions(
+    transferEditForm.status || transfer?.status || 'open'
+  )
+  const transferEditParsedAmount = parseOptionalNumber(transferEditForm.amount)
+  const transferEditParsedMarketRate = parseOptionalNumber(transferEditForm.global_rate)
+  const transferEditParsedPercentageInput = parseOptionalNumber(transferEditForm.percentage)
+  const transferEditParsedPercentage = transferEditParsedPercentageInput ?? 0
+  const transferEditValueBeforePercentage =
+    transferEditParsedAmount !== null && transferEditParsedMarketRate !== null
+      ? roundCurrency(transferEditParsedAmount * transferEditParsedMarketRate)
+      : null
+  const transferEditValueAfterPercentage =
+    transferEditValueBeforePercentage !== null
+      ? roundCurrency(transferEditValueBeforePercentage * (1 + transferEditParsedPercentage / 100))
+      : null
+  const transferEditClientRate =
+    transferEditParsedMarketRate !== null
+      ? roundRate(transferEditParsedMarketRate * (1 + transferEditParsedPercentage / 100))
+      : null
+  const transferEditCommissionRub =
+    transferEditValueBeforePercentage !== null && transferEditValueAfterPercentage !== null
+      ? roundCurrency(transferEditValueAfterPercentage - transferEditValueBeforePercentage)
+      : null
+  const transferEditActionDisabledReason = isOffline
+    ? 'تعديل بيانات الحوالة متاح أثناء الاتصال فقط حاليا.'
+    : transferLoading
+      ? 'جار تحميل بيانات الحوالة قبل إتاحة التعديل.'
+      : transferError
+        ? 'لا يمكن فتح تعديل الحوالة لأن بياناتها الأساسية غير مكتملة حاليا.'
+        : paymentsLoading
+          ? 'جار التحقق من سجل الدفعات المؤكدة قبل تحديد نطاق التعديل المتاح.'
+          : paymentsError
+            ? 'لا يمكن اعتماد تعديل الحوالة لأن سجل الدفعات المؤكدة غير مكتمل حاليا.'
+            : !hasConfirmedServerPayments && !supportsBroaderTransferEdit
+              ? 'هذه الحوالة لا تستخدم وضع التسعير المدعوم في واجهة الإنشاء الحالية، لذلك لا يتاح تعديلها المباشر من هذه الشاشة.'
+              : broaderTransferEditBlockedByLocalPayments
+                ? failedLocalPaymentCount > 0
+                  ? `توجد ${failedLocalPaymentCount} دفعة محلية فشلت مزامنتها. راجعها أولا قبل تعديل بيانات الحوالة.`
+                  : blockedLocalPaymentCount > 0
+                    ? `توجد ${blockedLocalPaymentCount} دفعة محلية ما زالت بانتظار اعتماد حوالة مرتبطة. لا تعدل بيانات الحوالة قبل حسمها.`
+                    : `توجد ${localPaymentCount} دفعة محلية بانتظار الإرسال. لا تعدل بيانات الحوالة قبل مزامنتها.`
+                : ''
+  const paymentVoidActionDisabledReason = isOffline
+    ? 'إلغاء الدفعة المؤكدة متاح أثناء الاتصال فقط.'
+    : paymentsLoading
+      ? 'جار التحقق من سجل الدفعات المؤكدة قبل إتاحة الإلغاء.'
+      : paymentsError
+        ? 'لا يمكن اعتماد إلغاء دفعة لأن سجل الدفعات المؤكدة غير مكتمل حاليا.'
+        : hasUnconfirmedLocalPayments
+          ? failedLocalPaymentCount > 0
+            ? `توجد ${failedLocalPaymentCount} دفعة محلية فشلت مزامنتها. راجعها أولا قبل إلغاء دفعة مؤكدة.`
+            : blockedLocalPaymentCount > 0
+              ? `توجد ${blockedLocalPaymentCount} دفعة محلية ما زالت بانتظار اعتماد حوالة مرتبطة. لا تعتمد إلغاء دفعة مؤكدة قبل حسمها.`
+              : `توجد ${localPaymentCount} دفعة محلية بانتظار الإرسال. لا تعتمد إلغاء دفعة مؤكدة قبل مزامنتها.`
+          : ''
+  const replacementPaymentActionDisabledReason = isOffline
+    ? 'تسجيل الدفعة البديلة المصححة متاح أثناء الاتصال فقط.'
+    : paymentsLoading
+      ? 'جار التحقق من سجل الدفعات المؤكدة قبل إتاحة تسجيل الدفعة البديلة.'
+      : paymentsError
+        ? 'لا يمكن اعتماد دفعة بديلة لأن سجل الدفعات المؤكدة غير مكتمل حاليا.'
+        : hasUnconfirmedLocalPayments
+          ? failedLocalPaymentCount > 0
+            ? `توجد ${failedLocalPaymentCount} دفعة محلية فشلت مزامنتها. راجعها أولا قبل تسجيل دفعة بديلة.`
+            : blockedLocalPaymentCount > 0
+              ? `توجد ${blockedLocalPaymentCount} دفعة محلية ما زالت بانتظار اعتماد حوالة مرتبطة. لا تسجل دفعة بديلة قبل حسمها.`
+              : `توجد ${localPaymentCount} دفعة محلية بانتظار الإرسال. لا تسجل دفعة بديلة قبل مزامنتها.`
+          : ''
+  const hasEligibleConfirmedPaymentForVoid = payments.some(
+    (payment) => payment?.id && !latestPaymentVoidByPaymentId[payment.id]
+  )
+  const hasEligibleVoidedPaymentForReplacement = payments.some(
+    (payment) => payment?.id && latestPaymentVoidByPaymentId[payment.id]
+  )
   const localPendingAmountLabel =
     localPendingAmountRub > 0 ? `${formatNumber(localPendingAmountRub, 2)} RUB محلي` : ''
   const latestLocalPayment = pendingPayments[0] || null
   const hasPartialTransferOnlyOfflineState =
     Boolean(transfer) && !paymentsLoading && Boolean(paymentsError)
+  const overpaymentResolutionStateKnown =
+    overpaymentResolutionLoaded && !overpaymentResolutionLoading && !overpaymentResolutionError
+  const hasResolvedCurrentOverpayment =
+    isOverpaid && overpaymentResolutionStateKnown && isResolvedOverpaid
+  const hasUnresolvedCurrentOverpayment =
+    isOverpaid && overpaymentResolutionStateKnown && isUnresolvedOverpaid
+  const hasUnknownOverpaymentResolutionState = isOverpaid && !overpaymentResolutionStateKnown
+  const latestOverpaymentResolutionTypeLabel = latestOverpaymentResolution
+    ? getOverpaymentResolutionTypeLabel(latestOverpaymentResolution.resolution_type)
+    : '--'
+  const latestOverpaymentResolutionCreatedAtLabel = latestOverpaymentResolution
+    ? formatDate(latestOverpaymentResolution.created_at)
+    : '--'
+  const latestOverpaymentResolutionNote =
+    latestOverpaymentResolution?.note || 'لا توجد ملاحظة مسجلة على هذه المعالجة.'
+  const overpaymentResolutionRecordedAmountLabel = latestOverpaymentResolution
+    ? `${formatNumber(latestOverpaymentResolution.resolved_overpaid_amount_rub, 2)} RUB`
+    : '--'
+  const overpaymentResolutionActionDisabledReason = !isOverpaid
+    ? ''
+    : isOffline
+      ? 'تسجيل معالجة زيادة الدفع متاح أثناء الاتصال فقط.'
+      : paymentsLoading
+        ? 'جار التحقق من سجل الدفعات المؤكد قبل إتاحة المعالجة.'
+        : paymentsError
+          ? 'لا يمكن اعتماد معالجة جديدة لأن سجل الدفعات المؤكد غير مكتمل حاليا.'
+          : hasUnconfirmedLocalPayments
+            ? failedLocalPaymentCount > 0
+              ? `توجد ${failedLocalPaymentCount} دفعة محلية فشلت مزامنتها. راجعها أولا قبل اعتماد معالجة الزيادة الحالية.`
+              : blockedLocalPaymentCount > 0
+                ? `توجد ${blockedLocalPaymentCount} دفعة محلية ما زالت بانتظار اعتماد حوالة مرتبطة. لا تعتمد معالجة الزيادة قبل حسمها.`
+                : `توجد ${localPaymentCount} دفعة محلية بانتظار الإرسال. لا تعتمد معالجة الزيادة قبل مزامنتها.`
+            : overpaymentResolutionLoading
+              ? 'جار التحقق من آخر معالجة مسجلة لهذه الزيادة.'
+              : overpaymentResolutionError
+                ? `${overpaymentResolutionError} لا يمكن اعتماد معالجة جديدة قبل التحقق من آخر سجل.`
+                : ''
+
+  useEffect(() => {
+    if (!isEditingTransfer || !canUseBroaderTransferEdit) {
+      return undefined
+    }
+
+    if (!isConfigured || !supabase || !transfer) {
+      return undefined
+    }
+
+    let isMounted = true
+
+    const loadTransferCustomerOptions = async () => {
+      setTransferCustomerOptionsLoading(true)
+      setTransferCustomerOptionsError('')
+
+      try {
+        const { data, error } = await withLiveReadTimeout(
+          supabase
+            .schema('public')
+            .from('customers')
+            .select('id, full_name, is_archived')
+            .order('full_name', { ascending: true }),
+          {
+            timeoutMessage: 'تعذر إكمال تحميل قائمة العملاء لتعديل الحوالة في الوقت المتوقع.',
+          }
+        )
+
+        if (!isMounted) {
+          return
+        }
+
+        if (error) {
+          throw error
+        }
+
+        setTransferCustomerOptions(
+          normalizeTransferCustomerOptions(data ?? [], transfer, customerName)
+        )
+        setTransferCustomerOptionsLoading(false)
+      } catch (error) {
+        if (!isMounted) {
+          return
+        }
+
+        setTransferCustomerOptions(
+          normalizeTransferCustomerOptions([], transfer, customerName)
+        )
+        setTransferCustomerOptionsLoading(false)
+        setTransferCustomerOptionsError(
+          error?.message || 'تعذر تحميل قائمة العملاء لتعديل الحوالة حاليا.'
+        )
+      }
+    }
+
+    loadTransferCustomerOptions()
+
+    return () => {
+      isMounted = false
+    }
+  }, [
+    canUseBroaderTransferEdit,
+    customerName,
+    isConfigured,
+    isEditingTransfer,
+    transfer,
+  ])
+
+  const showOverpaymentResolutionForm =
+    overpaymentResolutionFormOpen && hasUnresolvedCurrentOverpayment
+
   const followUpState = isOverpaid
-    ? 'danger'
+    ? hasResolvedCurrentOverpayment
+      ? 'success'
+      : hasUnknownOverpaymentResolutionState
+        ? 'warning'
+        : 'danger'
     : isCancelled
       ? 'neutral'
       : hasPartialTransferOnlyOfflineState
@@ -791,9 +2170,13 @@ function TransferDetailsPage() {
     ? 'راجع بيانات الحوالة والمدفوعات والرصيد الحالي من شاشة تشغيل واحدة واضحة.'
     : hasPartialTransferOnlyOfflineState
       ? 'تفاصيل الحوالة الأساسية متاحة محليا، لكن سجل المدفوعات المؤكد غير متوفر حاليا. قد تكون الأرصدة والإجماليات غير مكتملة إلى أن يعود الاتصال أو يتوفر سجل محفوظ محليا.'
+    : hasResolvedCurrentOverpayment
+      ? `يوجد رصيد سالب تاريخي بمقدار ${formatNumber(overpaidAmountRub, 2)} RUB، لكن تم تسجيل معالجة هذه الزيادة كـ ${latestOverpaymentResolutionTypeLabel} بتاريخ ${latestOverpaymentResolutionCreatedAtLabel}.`
+    : hasUnknownOverpaymentResolutionState
+      ? `يوجد رصيد سالب بمقدار ${formatNumber(overpaidAmountRub, 2)} RUB، لكن تعذر التحقق من آخر معالجة مسجلة لهذه الزيادة حاليا.`
     : hasLocalPendingPayments && !hasPayments
       ? `توجد ${localPaymentCount} دفعة محفوظة محليا بانتظار الإرسال إلى الخادم. ستبقى منفصلة عن الإجماليات المؤكدة الحالية حتى تنجح المزامنة.`
-    : isOverpaid
+    : hasUnresolvedCurrentOverpayment
       ? `يوجد دفع زائد بمقدار ${formatNumber(overpaidAmountRub, 2)} RUB ويتطلب مراجعة فورية قبل أي إجراء إضافي.`
       : isCancelled
         ? 'الحوالة ملغاة. راجع سجل الدفعات وحالة الملف قبل أي إجراء جديد.'
@@ -861,7 +2244,11 @@ function TransferDetailsPage() {
     ? 'جاري تجهيز المتابعة'
     : hasPartialTransferOnlyOfflineState
       ? 'تفاصيل الحوالة متاحة لكن سجل الدفعات غير مكتمل'
-    : isOverpaid
+    : hasResolvedCurrentOverpayment
+      ? 'تمت معالجة زيادة الدفع الحالية'
+    : hasUnknownOverpaymentResolutionState
+      ? 'تعذر التحقق من معالجة الزيادة الحالية'
+    : hasUnresolvedCurrentOverpayment
       ? 'مراجعة مالية مطلوبة فورا'
       : isCancelled
         ? 'الملف متوقف حاليا'
@@ -877,7 +2264,11 @@ function TransferDetailsPage() {
     ? 'يتم تجهيز حالة المتابعة الحالية للحوالة.'
     : hasPartialTransferOnlyOfflineState
       ? 'تم استرجاع تفاصيل الحوالة، لكن سجل الدفعات المؤكد غير متوفر محليا حاليا. استخدم الشاشة كمرجع للحوالة نفسها، ثم حدّث سجل الدفعات عند عودة الاتصال أو بعد توفر نسخة محلية محفوظة.'
-    : isOverpaid
+    : hasResolvedCurrentOverpayment
+      ? `يبقى الرصيد الحالي سالبا تاريخيا بقيمة ${formatNumber(overpaidAmountRub, 2)} RUB، لكن تمت معالجة هذه الزيادة كـ ${latestOverpaymentResolutionTypeLabel} في ${latestOverpaymentResolutionCreatedAtLabel}. الملاحظة المسجلة: ${latestOverpaymentResolutionNote}`
+    : hasUnknownOverpaymentResolutionState
+      ? `يوجد رصيد سالب بمقدار ${formatNumber(overpaidAmountRub, 2)} RUB، لكن أحدث سجل معالجة غير متاح حاليا. أعد التحقق بعد عودة الاتصال أو تحديث الصفحة قبل اعتماد الحالة التشغيلية.`
+    : hasUnresolvedCurrentOverpayment
       ? `الرصيد الحالي سالب وهناك زيادة دفع بمقدار ${formatNumber(overpaidAmountRub, 2)} RUB. راجع التسويات والدفعات المسجلة قبل إضافة أي حركة جديدة.`
       : isCancelled
         ? 'الحوالة تحمل حالة إلغاء. أي حركة جديدة يجب أن تتم بعد مراجعة الملف وسجل الدفعات.'
@@ -892,7 +2283,11 @@ function TransferDetailsPage() {
   const followUpChips = [
     {
       label: 'حالة المتابعة',
-      value: isOverpaid
+      value: hasResolvedCurrentOverpayment
+        ? 'معالجة مسجلة'
+        : hasUnknownOverpaymentResolutionState
+          ? 'بحاجة إلى تحقق'
+        : hasUnresolvedCurrentOverpayment
         ? 'مراجعة فورية'
         : isCancelled
           ? 'ملف ملغى'
@@ -903,8 +2298,12 @@ function TransferDetailsPage() {
             : hasPayments
               ? 'استكمال التحصيل'
               : 'بانتظار أول دفعة',
-      className: isOverpaid
-        ? 'queue-chip--danger'
+      className: hasResolvedCurrentOverpayment
+        ? 'queue-chip--success'
+        : hasUnknownOverpaymentResolutionState
+          ? 'queue-chip--warning'
+        : hasUnresolvedCurrentOverpayment
+          ? 'queue-chip--danger'
         : isSettled
           ? 'queue-chip--success'
           : hasPartialTransferOnlyOfflineState
@@ -927,6 +2326,15 @@ function TransferDetailsPage() {
           : 'لا توجد',
       className: latestPayment ? '' : 'queue-chip--neutral',
     },
+    ...(hasResolvedCurrentOverpayment
+      ? [
+          {
+            label: 'نوع المعالجة',
+            value: latestOverpaymentResolutionTypeLabel,
+            className: 'queue-chip--success',
+          },
+        ]
+      : []),
     ...(hasLocalPendingPayments
       ? [
           {
@@ -944,7 +2352,11 @@ function TransferDetailsPage() {
   const followUpItems = [
     {
       title: 'الإجراء التالي',
-      value: isOverpaid
+      value: hasResolvedCurrentOverpayment
+        ? 'راقب فقط إذا تغيّر الرصيد الحالي'
+        : hasUnknownOverpaymentResolutionState
+          ? 'تحقق من آخر معالجة مسجلة'
+        : hasUnresolvedCurrentOverpayment
         ? 'أوقف التحصيل وراجع الملف'
         : isCancelled
           ? 'لا تضف حركة جديدة قبل المراجعة'
@@ -957,10 +2369,29 @@ function TransferDetailsPage() {
             : hasPayments
               ? 'سجّل دفعة متابعة بعد التحقق'
               : 'سجّل أول دفعة على الحوالة',
-      className: isOverpaid ? 'info-card--danger' : isSettled ? 'info-card--success' : 'info-card--accent',
+      className: hasResolvedCurrentOverpayment
+        ? 'info-card--success'
+        : hasUnknownOverpaymentResolutionState
+          ? 'info-card--accent'
+          : isOverpaid
+            ? 'info-card--danger'
+            : isSettled
+              ? 'info-card--success'
+              : 'info-card--accent',
       children: (
-        <p className={['support-text', isOverpaid ? 'text-danger' : ''].filter(Boolean).join(' ')}>
-          {isOverpaid
+        <p
+          className={[
+            'support-text',
+            hasUnresolvedCurrentOverpayment ? 'text-danger' : '',
+          ]
+            .filter(Boolean)
+            .join(' ')}
+        >
+          {hasResolvedCurrentOverpayment
+            ? 'تم تسجيل معالجة تشغيلية منفصلة لهذه الزيادة. سيعود الملف إلى حالة غير محسومة فقط إذا تغيّر مقدار الزيادة الحالية لاحقا.'
+            : hasUnknownOverpaymentResolutionState
+              ? 'تعذر التحقق من آخر معالجة مسجلة لهذه الزيادة حاليا. حدّث الصفحة أو أعد الاتصال قبل اعتماد الوضع التشغيلي النهائي.'
+            : hasUnresolvedCurrentOverpayment
             ? 'يوصى بمراجعة قيمة الحوالة وسجل الدفعات قبل أي إضافة جديدة.'
             : hasPartialTransferOnlyOfflineState
               ? 'تفاصيل الحوالة نفسها محفوظة، لكن سجل الدفعات المؤكد غير متوفر حاليا. لا تعتمد على الرصيد أو حالة القفل حتى يعود سجل الدفعات.'
@@ -1002,7 +2433,11 @@ function TransferDetailsPage() {
         <p className="support-text">
           {remainingRub === null
             ? 'سيظهر الرصيد بعد تحميل البيانات.'
-            : isOverpaid
+            : hasResolvedCurrentOverpayment
+              ? `يوجد رصيد سالب بقيمة ${formatNumber(overpaidAmountRub, 2)} RUB، لكن توجد معالجة مسجلة لهذه الزيادة.`
+              : hasUnknownOverpaymentResolutionState
+                ? `يوجد رصيد سالب بقيمة ${formatNumber(overpaidAmountRub, 2)} RUB، ولم يتم التحقق بعد من آخر معالجة مسجلة.`
+              : isOverpaid
               ? `يوجد رصيد سالب بقيمة ${formatNumber(overpaidAmountRub, 2)} RUB.`
               : isSettled
                 ? 'الرصيد الحالي صفر والحوالة مسددة.'
@@ -1013,6 +2448,297 @@ function TransferDetailsPage() {
   ]
 
   const paymentEntries = payments.map((payment, index) => ({
+    id: payment.id ?? `${payment.created_at}-${payment.amount_rub}`,
+    amountLabel: `${formatNumber(payment.amount_rub, 2)} RUB`,
+    methodLabel: extractPaymentMethod(payment),
+    paidAtLabel: formatDate(payment.paid_at),
+    createdAtLabel: formatDate(payment.created_at),
+    noteText: extractPaymentNote(payment),
+    activityLabel: index === 0 ? 'آخر تحصيل مسجل' : 'دفعة متابعة',
+    isLatest: index === 0,
+    badgeClassName: isOverpaid
+      ? 'activity-chip--danger'
+      : isSettled
+        ? 'activity-chip--success'
+        : 'activity-chip--warning',
+    className:
+      index === 0
+        ? isOverpaid
+          ? 'payment-entry--danger'
+          : isSettled
+            ? 'payment-entry--success'
+            : 'payment-entry--warning'
+        : '',
+  }))
+  const latestActivePaymentId = latestActivePayment?.id || ''
+  const paymentEntriesWithVoidState = paymentEntries.map((entry, index) => {
+    const payment = payments[index]
+    const paymentId = payment?.id || ''
+    const latestPaymentVoid = paymentId ? latestPaymentVoidByPaymentId[paymentId] || null : null
+    const replacementPaymentId = paymentId ? replacementPaymentLinks[paymentId] || '' : ''
+    const replacementPayment = replacementPaymentId
+      ? payments.find((candidatePayment) => candidatePayment?.id === replacementPaymentId) || null
+      : null
+    const isVoidedPayment = Boolean(latestPaymentVoid)
+    const isLatestActivePayment = Boolean(paymentId) && paymentId === latestActivePaymentId
+    const isVoidFormOpen = Boolean(paymentId) && paymentId === paymentVoidFormPaymentId && !isVoidedPayment
+    const isReplacementFormOpen =
+      Boolean(paymentId) && paymentId === replacementPaymentFormPaymentId && isVoidedPayment
+
+    return {
+      ...entry,
+      activityLabel: isVoidedPayment
+        ? 'دفعة مؤكدة ملغاة'
+        : isLatestActivePayment
+          ? 'آخر دفعة مؤكدة فعالة'
+          : 'دفعة متابعة',
+      isLatest: isLatestActivePayment,
+      badgeLabel: isVoidedPayment ? 'دفعة ملغاة' : '',
+      badgeClassName: isVoidedPayment ? 'activity-chip--warning' : '',
+      className: isVoidedPayment
+        ? 'payment-entry--warning'
+        : isLatestActivePayment
+          ? isOverpaid
+            ? 'payment-entry--danger'
+            : isSettled
+              ? 'payment-entry--success'
+              : 'payment-entry--warning'
+          : '',
+      extraContent: isVoidedPayment ? (
+        <>
+          <InlineMessage kind="warning">
+            تم إلغاء اعتماد هذه الدفعة المؤكدة. لم تعد تدخل في إجمالي التحصيل الحالي.
+          </InlineMessage>
+          <div className="payment-entry-grid detail-mobile-secondary">
+            <RecordMeta
+              label="سبب الإلغاء"
+              value={getPaymentVoidReasonTypeLabel(latestPaymentVoid?.void_reason_type)}
+            />
+            <RecordMeta label="وقت الإلغاء" value={formatDate(latestPaymentVoid?.created_at)} />
+          </div>
+          <p className="support-text">
+            ملاحظة الإلغاء: {latestPaymentVoid?.note || 'لا توجد ملاحظة إلغاء إضافية.'}
+          </p>
+          {replacementPayment ? (
+            <>
+              <InlineMessage kind="success">
+                تم تسجيل دفعة بديلة مصححة من هذه البطاقة في هذه الجلسة، مع بقاء الدفعة الأصلية ملغاة.
+              </InlineMessage>
+              <div className="payment-entry-grid detail-mobile-secondary">
+                <RecordMeta
+                  label="الدفعة البديلة"
+                  value={`${formatNumber(replacementPayment.amount_rub, 2)} RUB`}
+                />
+                <RecordMeta
+                  label="وقت الدفعة البديلة"
+                  value={formatDate(replacementPayment.paid_at || replacementPayment.created_at)}
+                />
+              </div>
+            </>
+          ) : isReplacementFormOpen ? (
+            <form className="form-grid" onSubmit={handleReplacementPaymentSubmit}>
+              <InlineMessage kind="info">
+                ستُسجل هذه الدفعة كسطر جديد مستقل، ولن يجري تعديل الدفعة الملغاة أو حذفها.
+              </InlineMessage>
+              {replacementPaymentActionDisabledReason ? (
+                <InlineMessage kind="warning">{replacementPaymentActionDisabledReason}</InlineMessage>
+              ) : null}
+              {replacementPaymentSubmitError ? (
+                <InlineMessage kind="error">{replacementPaymentSubmitError}</InlineMessage>
+              ) : null}
+              <div className="payment-entry-grid detail-mobile-secondary">
+                <RecordMeta label="مرجع التصحيح" value={`${formatNumber(payment.amount_rub, 2)} RUB`} />
+                <RecordMeta label="الوقت الاقتصادي الأصلي" value={formatDate(payment.paid_at)} />
+              </div>
+              <div className="field">
+                <label htmlFor={`replacement-payment-amount-${entry.id}`}>المبلغ البديل بالروبل</label>
+                <input
+                  id={`replacement-payment-amount-${entry.id}`}
+                  name="amount_rub"
+                  type="number"
+                  step="any"
+                  min="0.01"
+                  value={replacementPaymentForm.amount_rub}
+                  onChange={handleReplacementPaymentFormChange}
+                  disabled={replacementPaymentSubmitting || paymentVoidSubmitting}
+                  required
+                />
+              </div>
+              <div className="field">
+                <label htmlFor={`replacement-payment-method-${entry.id}`}>وسيلة التحصيل</label>
+                <select
+                  id={`replacement-payment-method-${entry.id}`}
+                  name="payment_method"
+                  value={replacementPaymentForm.payment_method}
+                  onChange={handleReplacementPaymentFormChange}
+                  disabled={replacementPaymentSubmitting || paymentVoidSubmitting}
+                  required
+                >
+                  <option value="">اختر وسيلة التحصيل</option>
+                  {PAYMENT_METHOD_OPTIONS.map((option) => (
+                    <option key={option.value} value={option.value}>
+                      {option.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div className="field">
+                <label htmlFor={`replacement-payment-paid-at-${entry.id}`}>وقت الدفع الاقتصادي</label>
+                <input
+                  id={`replacement-payment-paid-at-${entry.id}`}
+                  name="paid_at"
+                  type="datetime-local"
+                  value={replacementPaymentForm.paid_at}
+                  onChange={handleReplacementPaymentFormChange}
+                  disabled={replacementPaymentSubmitting || paymentVoidSubmitting}
+                  required
+                />
+                <p className="support-text">
+                  هذا الحقل مملوء افتراضيا من وقت الدفعة الأصلية الملغاة، ويمكن تعديله عند الحاجة.
+                </p>
+              </div>
+              <div className="field">
+                <label htmlFor={`replacement-payment-note-${entry.id}`}>ملاحظة الدفعة البديلة</label>
+                <textarea
+                  id={`replacement-payment-note-${entry.id}`}
+                  name="note"
+                  value={replacementPaymentForm.note}
+                  onChange={handleReplacementPaymentFormChange}
+                  placeholder="يمكنك تعديل ملاحظة الدفعة البديلة بما يشرح التصحيح الحالي."
+                  disabled={replacementPaymentSubmitting || paymentVoidSubmitting}
+                />
+              </div>
+              <div className="inline-actions">
+                <button
+                  type="submit"
+                  className="button primary"
+                  disabled={
+                    replacementPaymentSubmitting ||
+                    paymentVoidSubmitting ||
+                    Boolean(replacementPaymentActionDisabledReason)
+                  }
+                >
+                  {replacementPaymentSubmitting
+                    ? 'جار حفظ الدفعة البديلة...'
+                    : 'حفظ الدفعة البديلة المصححة'}
+                </button>
+                <button
+                  type="button"
+                  className="button secondary"
+                  onClick={handleCancelReplacementPaymentForm}
+                  disabled={replacementPaymentSubmitting}
+                >
+                  إلغاء
+                </button>
+              </div>
+            </form>
+          ) : (
+            <div className="inline-actions">
+              <button
+                type="button"
+                className="button secondary"
+                onClick={() => handleOpenReplacementPaymentForm(payment)}
+                disabled={
+                  replacementPaymentSubmitting ||
+                  paymentVoidSubmitting ||
+                  !paymentId ||
+                  Boolean(replacementPaymentActionDisabledReason)
+                }
+                title={replacementPaymentActionDisabledReason || ''}
+              >
+                تسجيل دفعة بديلة مصححة
+              </button>
+            </div>
+          )}
+        </>
+      ) : isVoidFormOpen ? (
+        <form className="form-grid" onSubmit={handlePaymentVoidSubmit}>
+          {paymentVoidActionDisabledReason ? (
+            <InlineMessage kind="warning">{paymentVoidActionDisabledReason}</InlineMessage>
+          ) : null}
+          {paymentVoidSubmitError ? (
+            <InlineMessage kind="error">{paymentVoidSubmitError}</InlineMessage>
+          ) : null}
+          <div className="payment-entry-grid detail-mobile-secondary">
+            <RecordMeta label="المبلغ الأصلي" value={`${formatNumber(payment.amount_rub, 2)} RUB`} />
+            <RecordMeta label="وسيلة التحصيل" value={extractPaymentMethod(payment)} />
+            <RecordMeta label="وقت الدفع" value={formatDate(payment.paid_at)} />
+            <RecordMeta label="وقت التسجيل" value={formatDate(payment.created_at)} />
+          </div>
+          <p className="support-text">ملاحظة الدفع الأصلية: {extractPaymentNote(payment)}</p>
+          <div className="field">
+            <label htmlFor={`payment-void-reason-${entry.id}`}>سبب الإلغاء</label>
+            <select
+              id={`payment-void-reason-${entry.id}`}
+              name="void_reason_type"
+              value={paymentVoidForm.void_reason_type}
+              onChange={handlePaymentVoidFormChange}
+              disabled={paymentVoidSubmitting}
+              required
+            >
+              <option value="">اختر سبب الإلغاء</option>
+              {PAYMENT_VOID_REASON_TYPE_OPTIONS.map((option) => (
+                <option key={option.value} value={option.value}>
+                  {option.label}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div className="field">
+            <label htmlFor={`payment-void-note-${entry.id}`}>ملاحظة الإلغاء</label>
+            <textarea
+              id={`payment-void-note-${entry.id}`}
+              name="note"
+              value={paymentVoidForm.note}
+              onChange={handlePaymentVoidFormChange}
+              placeholder="اكتب سببا واضحا لعدم اعتماد هذه الدفعة ضمن الإجماليات الحالية."
+              disabled={paymentVoidSubmitting}
+              required
+            />
+          </div>
+          <div className="inline-actions">
+            <button
+              type="submit"
+              className="button primary"
+              disabled={
+                paymentVoidSubmitting ||
+                replacementPaymentSubmitting ||
+                Boolean(paymentVoidActionDisabledReason)
+              }
+            >
+              {paymentVoidSubmitting ? 'جار حفظ إلغاء الدفعة...' : 'حفظ إلغاء الدفعة'}
+            </button>
+            <button
+              type="button"
+              className="button secondary"
+              onClick={handleCancelPaymentVoidForm}
+              disabled={paymentVoidSubmitting}
+            >
+              إلغاء
+            </button>
+          </div>
+        </form>
+      ) : (
+        <div className="inline-actions">
+          <button
+            type="button"
+            className="button secondary"
+            onClick={() => handleOpenPaymentVoidForm(paymentId)}
+            disabled={
+              paymentVoidSubmitting ||
+              replacementPaymentSubmitting ||
+              !paymentId ||
+              Boolean(paymentVoidActionDisabledReason)
+            }
+            title={paymentVoidActionDisabledReason || ''}
+          >
+            إلغاء الدفعة
+          </button>
+        </div>
+      ),
+    }
+  })
+  const activePaymentEntries = activePayments.map((payment, index) => ({
     id: payment.id ?? `${payment.created_at}-${payment.amount_rub}`,
     amountLabel: `${formatNumber(payment.amount_rub, 2)} RUB`,
     methodLabel: extractPaymentMethod(payment),
@@ -1200,6 +2926,20 @@ function TransferDetailsPage() {
             </Link>
             <button
               type="button"
+              className="button secondary"
+              onClick={handleOpenTransferEdit}
+              disabled={
+                transferLoading ||
+                Boolean(transferError) ||
+                !transfer ||
+                Boolean(transferEditActionDisabledReason)
+              }
+              title={transferEditActionDisabledReason || ''}
+            >
+              تعديل الحوالة
+            </button>
+            <button
+              type="button"
               className="button primary"
               onClick={handlePrint}
               disabled={transferLoading || Boolean(transferError) || !transfer}
@@ -1328,6 +3068,431 @@ function TransferDetailsPage() {
           />
         </SectionCard>
 
+        {transfer ? (
+          <SectionCard
+            title="تعديل الحوالة"
+            description="عدّل بيانات الحوالة من هذه الشاشة فقط ضمن النطاق الآمن المعتمد، مع إبقاء رقم المرجع وتاريخ الإنشاء ثابتين دائما."
+            className={[
+              'app-section-panel',
+              'transfer-details-edit-section',
+              activeSection === 'summary' ? 'is-active' : '',
+            ]
+              .filter(Boolean)
+              .join(' ')}
+          >
+            {transferEditSubmitSuccess ? (
+              <InlineMessage kind="success">{transferEditSubmitSuccess}</InlineMessage>
+            ) : null}
+            {transferEditSubmitError ? (
+              <InlineMessage kind="error">{transferEditSubmitError}</InlineMessage>
+            ) : null}
+
+            {!isEditingTransfer ? (
+              <>
+                {transferEditActionDisabledReason ? (
+                  <InlineMessage kind="warning">{transferEditActionDisabledReason}</InlineMessage>
+                ) : canUseBroaderTransferEdit ? (
+                  <InlineMessage kind="info">
+                    لا توجد دفعات مؤكدة على هذه الحوالة بعد، لذلك يمكن تعديل العميل وقيم التسعير الأساسية
+                    وإعادة احتساب مبلغ التسوية قبل الحفظ.
+                  </InlineMessage>
+                ) : transferEditScopeKnown ? (
+                  <InlineMessage kind="warning">
+                    تحتوي هذه الحوالة على دفعات مؤكدة، لذلك يبقى التعديل محصورا في الحالة والملاحظات فقط،
+                    بينما تبقى الحقول المالية وبيانات العميل مقفلة.
+                  </InlineMessage>
+                ) : null}
+
+                <div className="inline-actions">
+                  <button
+                    type="button"
+                    className="button secondary"
+                    onClick={handleOpenTransferEdit}
+                    disabled={Boolean(transferEditActionDisabledReason)}
+                  >
+                    فتح نموذج التعديل
+                  </button>
+                </div>
+              </>
+            ) : (
+              <form className="form-grid transfer-details-edit-form" onSubmit={handleTransferEditSubmit}>
+                <ReadonlyField
+                  id="transfer-edit-reference"
+                  label="رقم المرجع"
+                  value={referenceNumber}
+                  helpText="يبقى رقم المرجع ثابتا ولا يمكن تعديله من هذه الشاشة."
+                />
+                <ReadonlyField
+                  id="transfer-edit-created-at"
+                  label="تاريخ الإنشاء"
+                  value={transferCreatedAtLabel}
+                  helpText="يبقى تاريخ إنشاء الحوالة كما سُجل أول مرة للحفاظ على المرجعية والطباعة."
+                />
+
+                {canUseBroaderTransferEdit ? (
+                  <>
+                    <InlineMessage kind="info">
+                      سيعاد احتساب القيم التالية بنفس منطق إنشاء الحوالة الحالي قبل حفظ التعديلات.
+                    </InlineMessage>
+
+                    {transferCustomerOptionsError ? (
+                      <InlineMessage kind="warning">{transferCustomerOptionsError}</InlineMessage>
+                    ) : null}
+
+                    <FieldShell
+                      label="العميل"
+                      htmlFor="transfer-edit-customer"
+                      helpText="يمكن تغيير ربط الحوالة بعميل آخر فقط قبل تسجيل أي دفعة مؤكدة عليها."
+                    >
+                      <select
+                        id="transfer-edit-customer"
+                        name="customer_id"
+                        value={transferEditForm.customer_id}
+                        onChange={handleTransferEditFormChange}
+                        disabled={transferEditSubmitting || transferCustomerOptionsLoading}
+                        required
+                      >
+                        <option value="" disabled>
+                          {transferCustomerOptionsLoading
+                            ? 'جار تحميل العملاء...'
+                            : transferCustomerOptions.length === 0
+                              ? 'لا توجد خيارات عميل متاحة'
+                              : 'اختر العميل'}
+                        </option>
+                        {transferCustomerOptions.map((customerOption) => (
+                          <option key={customerOption.id} value={customerOption.id}>
+                            {customerOption.full_name}
+                            {customerOption.isArchived ? ' (مؤرشف)' : ''}
+                          </option>
+                        ))}
+                      </select>
+                    </FieldShell>
+
+                    <FieldShell
+                      label="كمية USDT"
+                      htmlFor="transfer-edit-amount"
+                      helpText="أدخل كمية الحوالة المطلوبة تسويتها بعد التعديل."
+                    >
+                      <input
+                        id="transfer-edit-amount"
+                        name="amount"
+                        type="number"
+                        step="any"
+                        min="0"
+                        value={transferEditForm.amount}
+                        onChange={handleTransferEditFormChange}
+                        disabled={transferEditSubmitting}
+                        required
+                      />
+                    </FieldShell>
+
+                    <FieldShell
+                      label="السعر العام"
+                      htmlFor="transfer-edit-global-rate"
+                      helpText="السعر الأساسي قبل تطبيق نسبة الزيادة على الحوالة."
+                    >
+                      <input
+                        id="transfer-edit-global-rate"
+                        name="global_rate"
+                        type="number"
+                        step="any"
+                        min="0"
+                        value={transferEditForm.global_rate}
+                        onChange={handleTransferEditFormChange}
+                        disabled={transferEditSubmitting}
+                        required
+                      />
+                    </FieldShell>
+
+                    <ReadonlyField
+                      id="transfer-edit-value-before-percentage"
+                      label="القيمة قبل النسبة"
+                      value={formatNumber(transferEditValueBeforePercentage, 2)}
+                      placeholder="يتم احتسابها تلقائيا"
+                    />
+
+                    <FieldShell
+                      label="نسبة الزيادة"
+                      htmlFor="transfer-edit-percentage"
+                      helpText="إدخال 2 يعني 2%."
+                    >
+                      <input
+                        id="transfer-edit-percentage"
+                        name="percentage"
+                        type="number"
+                        step="any"
+                        min="0"
+                        value={transferEditForm.percentage}
+                        onChange={handleTransferEditFormChange}
+                        disabled={transferEditSubmitting}
+                      />
+                    </FieldShell>
+
+                    <ReadonlyField
+                      id="transfer-edit-value-after-percentage"
+                      label="مبلغ التسوية"
+                      value={formatNumber(transferEditValueAfterPercentage, 2)}
+                      placeholder="يتم احتسابه تلقائيا"
+                    />
+                  </>
+                ) : isRestrictedTransferEdit ? (
+                  <>
+                    <InlineMessage kind="warning">
+                      تم تسجيل دفعات مؤكدة على هذه الحوالة، لذلك تبقى الحقول المالية وبيانات العميل للقراءة
+                      فقط بينما يبقى تعديل الحالة والملاحظات متاحا.
+                    </InlineMessage>
+                    <InfoGrid className="transfer-details-secondary-grid">
+                      <InfoCard title="العميل" value={displayCustomerName} />
+                      <InfoCard title="USDT" value={formatNumber(transfer?.usdt_amount, 2)} />
+                      <InfoCard title="السعر العام" value={formatNumber(transfer?.market_rate, 4)} />
+                      <InfoCard title="نسبة الزيادة" value={`${formatNumber(percentageValue, 2)}%`} />
+                      <InfoCard
+                        title="مبلغ التسوية"
+                        value={`${formatNumber(valueAfterPercentage, 2)} RUB`}
+                        className="info-card--accent"
+                      />
+                    </InfoGrid>
+                  </>
+                ) : (
+                  <InlineMessage kind="warning">
+                    {transferEditActionDisabledReason ||
+                      'لا يمكن متابعة تعديل الحوالة حاليا قبل اكتمال التحقق من نطاق التعديل الآمن.'}
+                  </InlineMessage>
+                )}
+
+                <FieldShell
+                  label="الحالة"
+                  htmlFor="transfer-edit-status"
+                  helpText="تنعكس الحالة التشغيلية مباشرة في العرض الحالي والصفحات المرتبطة."
+                >
+                  <select
+                    id="transfer-edit-status"
+                    name="status"
+                    value={transferEditForm.status}
+                    onChange={handleTransferEditFormChange}
+                    disabled={transferEditSubmitting}
+                    required
+                  >
+                    {transferStatusEditOptions.map((option) => (
+                      <option key={option.value} value={option.value}>
+                        {option.label}
+                      </option>
+                    ))}
+                  </select>
+                </FieldShell>
+
+                <FieldShell label="ملاحظات" htmlFor="transfer-edit-notes">
+                  <textarea
+                    id="transfer-edit-notes"
+                    name="notes"
+                    value={transferEditForm.notes}
+                    onChange={handleTransferEditFormChange}
+                    placeholder="ملاحظات داخلية على الحوالة"
+                    disabled={transferEditSubmitting}
+                  />
+                </FieldShell>
+
+                <div className="inline-actions">
+                  <button
+                    type="submit"
+                    className="button primary"
+                    disabled={
+                      transferEditSubmitting ||
+                      (!canUseBroaderTransferEdit &&
+                        !isRestrictedTransferEdit &&
+                        Boolean(transferEditActionDisabledReason))
+                    }
+                  >
+                    {transferEditSubmitting ? 'جار حفظ تعديلات الحوالة...' : 'حفظ تعديلات الحوالة'}
+                  </button>
+                  <button
+                    type="button"
+                    className="button secondary"
+                    onClick={handleCloseTransferEdit}
+                    disabled={transferEditSubmitting}
+                  >
+                    إلغاء
+                  </button>
+                </div>
+              </form>
+            )}
+          </SectionCard>
+        ) : null}
+
+        {isOverpaid ? (
+          <SectionCard
+            title="معالجة زيادة الدفع"
+            description="تُسجل هذه المعالجة كسجل تشغيلي مستقل يشرح كيف تم حسم الزيادة الحالية، من دون تعديل المدفوعات أو مبلغ التسوية."
+            className={[
+              'app-section-panel',
+              'transfer-details-resolution-section',
+              activeSection === 'summary' ? 'is-active' : '',
+            ]
+              .filter(Boolean)
+              .join(' ')}
+          >
+            {overpaymentResolutionSubmitSuccess ? (
+              <InlineMessage kind="success">{overpaymentResolutionSubmitSuccess}</InlineMessage>
+            ) : null}
+
+            {overpaymentResolutionLoading ? (
+              <InlineMessage kind="info">
+                جار التحقق من آخر معالجة مسجلة لهذه الزيادة قبل عرض الإجراء المتاح.
+              </InlineMessage>
+            ) : hasResolvedCurrentOverpayment ? (
+              <>
+                <InlineMessage kind="success">
+                  تم تسجيل معالجة مطابقة للزيادة الحالية، لذلك أصبحت هذه الزيادة محلولة تشغيليا مع بقاء التاريخ المالي كما هو.
+                </InlineMessage>
+                <InfoGrid className="transfer-details-secondary-grid">
+                  <InfoCard
+                    title="نوع المعالجة"
+                    value={latestOverpaymentResolutionTypeLabel}
+                    className="info-card--success"
+                  />
+                  <InfoCard
+                    title="المبلغ المعالج"
+                    value={overpaymentResolutionRecordedAmountLabel}
+                    className="info-card--success"
+                    valueClassName="info-card-value--metric info-card-value--success"
+                  />
+                  <InfoCard title="وقت التسجيل" value={latestOverpaymentResolutionCreatedAtLabel} />
+                  <InfoCard
+                    title="ملاحظة المعالجة"
+                    value={latestOverpaymentResolutionNote}
+                    className="info-card--full"
+                  />
+                </InfoGrid>
+              </>
+            ) : hasUnknownOverpaymentResolutionState ? (
+              <>
+                <InlineMessage kind="warning">
+                  {overpaymentResolutionError ||
+                    'تعذر التحقق من آخر معالجة مسجلة لهذه الزيادة حاليا.'}
+                </InlineMessage>
+                <p className="support-text">
+                  لا يتم فتح إجراء معالجة جديد قبل معرفة أحدث سجل معالجة محفوظ لهذه الحوالة. حدّث الصفحة أو أعد التحقق بعد عودة الاتصال.
+                </p>
+                {!isOffline ? (
+                  <div className="inline-actions">
+                    <button
+                      type="button"
+                      className="button secondary"
+                      onClick={handleOverpaymentResolutionRefresh}
+                    >
+                      إعادة التحقق من آخر معالجة
+                    </button>
+                  </div>
+                ) : null}
+              </>
+            ) : (
+              <>
+                <InlineMessage kind="warning">
+                  توجد زيادة دفع حالية بمقدار {formatNumber(overpaidAmountRub, 2)} RUB ولم تُسجل لها بعد معالجة مطابقة لهذه القيمة.
+                </InlineMessage>
+
+                {overpaymentResolutionSubmitError ? (
+                  <InlineMessage kind="error">{overpaymentResolutionSubmitError}</InlineMessage>
+                ) : null}
+
+                {overpaymentResolutionActionDisabledReason ? (
+                  <InlineMessage kind="warning">{overpaymentResolutionActionDisabledReason}</InlineMessage>
+                ) : null}
+
+                {showOverpaymentResolutionForm ? (
+                  <form className="stack" onSubmit={handleOverpaymentResolutionSubmit}>
+                    <div className="field">
+                      <label htmlFor="overpayment-resolution-amount">قيمة الزيادة الحالية</label>
+                      <input
+                        id="overpayment-resolution-amount"
+                        type="text"
+                        value={`${formatNumber(overpaidAmountRub, 2)} RUB`}
+                        readOnly
+                      />
+                      <p className="support-text">
+                        هذا المبلغ يُلتقط من الرصيد السالب الحالي فقط، ولا يغيّر أي دفعة أو مبلغ تسوية محفوظ.
+                      </p>
+                    </div>
+
+                    <div className="field">
+                      <label htmlFor="overpayment-resolution-type">نوع المعالجة</label>
+                      <select
+                        id="overpayment-resolution-type"
+                        name="resolution_type"
+                        value={overpaymentResolutionForm.resolution_type}
+                        onChange={handleOverpaymentResolutionFormChange}
+                        disabled={overpaymentResolutionSubmitting}
+                        required
+                      >
+                        <option value="" disabled>
+                          اختر نوع معالجة واضح
+                        </option>
+                        {OVERPAYMENT_RESOLUTION_TYPE_OPTIONS.map((option) => (
+                          <option key={option.value} value={option.value}>
+                            {option.label}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+
+                    <div className="field">
+                      <label htmlFor="overpayment-resolution-note">ملاحظة المعالجة</label>
+                      <textarea
+                        id="overpayment-resolution-note"
+                        name="note"
+                        value={overpaymentResolutionForm.note}
+                        onChange={handleOverpaymentResolutionFormChange}
+                        placeholder="اكتب تفسيرا واضحا لكيفية حسم الزيادة الحالية ولماذا لم تعد تحتاج متابعة تشغيلية."
+                        disabled={overpaymentResolutionSubmitting}
+                        required
+                      />
+                    </div>
+
+                    <div className="inline-actions">
+                      <button
+                        type="submit"
+                        className="button primary"
+                        disabled={
+                          overpaymentResolutionSubmitting ||
+                          Boolean(overpaymentResolutionActionDisabledReason)
+                        }
+                      >
+                        {overpaymentResolutionSubmitting
+                          ? 'جار حفظ معالجة الزيادة...'
+                          : 'حفظ معالجة زيادة الدفع'}
+                      </button>
+                      <button
+                        type="button"
+                        className="button secondary"
+                        onClick={handleCancelOverpaymentResolutionForm}
+                        disabled={overpaymentResolutionSubmitting}
+                      >
+                        إلغاء
+                      </button>
+                    </div>
+                  </form>
+                ) : (
+                  <>
+                    <p className="support-text">
+                      استخدم هذا الإجراء فقط بعد مراجعة الدفعات المؤكدة والتأكد من أن الزيادة الحالية قد استردت أو تمت تسويتها خارج هذا السجل، من دون تعديل الحقيقة المالية التاريخية.
+                    </p>
+                    <div className="inline-actions">
+                      <button
+                        type="button"
+                        className="button primary"
+                        onClick={handleOpenOverpaymentResolutionForm}
+                        disabled={Boolean(overpaymentResolutionActionDisabledReason)}
+                      >
+                        معالجة زيادة الدفع
+                      </button>
+                    </div>
+                  </>
+                )}
+              </>
+            )}
+          </SectionCard>
+        ) : null}
+
         <SectionCard
           title="إجراء التحصيل"
           description="هذه هي منطقة الإجراء الأساسية لتسجيل الحركة المالية التالية على الحوالة."
@@ -1383,10 +3548,30 @@ function TransferDetailsPage() {
               {paymentsError} سيظهر أدناه ما توفر فقط من السجل المؤكد والعناصر المحلية.
             </InlineMessage>
           ) : null}
+          {paymentVoidSubmitSuccess ? (
+            <InlineMessage kind="success" className="transfer-details-history-inline-status">
+              {paymentVoidSubmitSuccess}
+            </InlineMessage>
+          ) : null}
+          {replacementPaymentSubmitSuccess ? (
+            <InlineMessage kind="success" className="transfer-details-history-inline-status">
+              {replacementPaymentSubmitSuccess}
+            </InlineMessage>
+          ) : null}
+          {paymentVoidActionDisabledReason && hasEligibleConfirmedPaymentForVoid ? (
+            <InlineMessage kind="warning" className="transfer-details-history-inline-status">
+              {paymentVoidActionDisabledReason}
+            </InlineMessage>
+          ) : null}
+          {replacementPaymentActionDisabledReason && hasEligibleVoidedPaymentForReplacement ? (
+            <InlineMessage kind="warning" className="transfer-details-history-inline-status">
+              {replacementPaymentActionDisabledReason}
+            </InlineMessage>
+          ) : null}
           <PaymentList
             errorMessage={paymentsError}
             loading={paymentsLoading}
-            payments={paymentEntries}
+            payments={paymentEntriesWithVoidState}
             pendingPayments={pendingPaymentEntries}
             onRetry={handlePaymentsRefresh}
           />
@@ -1442,12 +3627,12 @@ function TransferDetailsPage() {
               {paymentsError} لذلك لا يمكن تأكيد حالة قفل الحوالة محليًا بشكل كامل حتى يعود سجل المدفوعات المؤكد أو يُعاد تحميله من الخادم.
             </InlineMessage>
           ) : null}
-          {!paymentsLoading && hasPayments ? (
+          {!paymentsLoading && hasConfirmedServerPayments ? (
             <InlineMessage kind="warning">
               تحتوي هذه الحوالة بالفعل على {payments.length} دفعة. يجب اعتبار الحقول الأساسية مثل العميل والكمية والأسعار ووضع التسعير والعمولة والإجمالي والمبلغ المستحق مقفلة. كما أن قاعدة البيانات تمنع تعديل هذه القيم بعد وجود دفعات.
             </InlineMessage>
           ) : null}
-          {!paymentsLoading && !paymentsError && !hasPayments ? (
+          {!paymentsLoading && !paymentsError && !hasConfirmedServerPayments ? (
             <p className="support-text">
               لا توجد مدفوعات مسجلة بعد. إذا تمت إضافة واجهة تعديل لاحقًا فيمكن إبقاء القيم الأساسية قابلة للتعديل حتى أول دفعة.
             </p>
@@ -1471,7 +3656,7 @@ function TransferDetailsPage() {
         pricingRows={pricingRows}
         paymentsError={paymentsError}
         paymentsLoading={paymentsLoading}
-        paymentRows={paymentEntries}
+        paymentRows={activePaymentEntries}
         totalPaidValue={`${formatNumber(totalPaidRub, 2)} RUB`}
         remainingValue={remainingMessage}
         remainingClassName={printRemainingClass}

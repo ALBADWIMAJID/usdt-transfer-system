@@ -2,23 +2,20 @@
 
 Task completed:
 
-- **Safe customer archive / delete workflow**:
-  - added customer archive state support with `is_archived` and `archived_at`
-  - hard delete is now limited to customers with no linked transfers
-  - customers with linked transfers are archived instead of hard-deleted
-  - archived customers remain available in historical details but are removed from active new-transfer selection
-  - customer lifecycle mutations stay online-only; no offline archive/delete queue was introduced
+- **Payment correction Phase D corrected replacement-payment flow**:
+  - adds a compact replacement-payment workflow inside `TransferDetailsPage` for confirmed payments that were already
+    voided through `transfer_payment_voids`
+  - prefills the replacement form from the original voided payment, including amount, payment method, note, and
+    `paid_at`
+  - records the replacement as a new confirmed `transfer_payments` row instead of editing the original row
+  - keeps the original payment historically visible as voided while the new replacement payment appears as active
+  - updates page totals, remaining amount, and overpayment from active confirmed payments only after the replacement is
+    saved
+  - keeps the replacement flow online-only and separate from local pending/blocked/failed payment items
 
 ## Files changed
 
-- `src/pages/CustomerDetailsPage.jsx`
-- `src/pages/CustomersPage.jsx`
-- `src/components/customers/CustomerRecordCard.jsx`
-- `src/pages/NewTransferPage.jsx`
-- `src/lib/offline/customerSnapshots.js`
-- `src/index.css`
-- `supabase/migrations/20260320_add_customer_archive_state.sql`
-- `supabase/baselines/current_app_contract_snapshot.sql`
+- `src/pages/TransferDetailsPage.jsx`
 - `docs/implementation-log.md`
 - `docs/last-change-summary.md` (this file)
 
@@ -27,4 +24,6 @@ Task completed:
 - `npm run lint` - passed
 - `npm run build` - passed
 
-Build still reports the existing chunk-size warning only.
+Deferred intentionally: direct payment edit, hard delete, cross-transfer payment move, persistent schema-level linkage
+between original voided payments and replacement payments, dashboard/customer/transfers changes, offline correction
+semantics, replay changes, transfer edit, print-policy redesign, and multi-company work.
