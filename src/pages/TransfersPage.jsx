@@ -8,9 +8,11 @@ import InlineMessage from '../components/ui/InlineMessage.jsx'
 import OfflineSnapshotNotice from '../components/ui/OfflineSnapshotNotice.jsx'
 import SectionCard from '../components/ui/SectionCard.jsx'
 import { useAuth } from '../context/auth-context.js'
+import { useTenant } from '../context/tenant-context.js'
 import useNetworkStatus from '../hooks/useNetworkStatus.js'
 import useOfflineSnapshot from '../hooks/useOfflineSnapshot.js'
-import { TRANSFERS_LIST_SNAPSHOT_KEY } from '../lib/offline/cacheKeys.js'
+import { MISSING_CURRENT_ORG_MESSAGE, withOrgScope } from '../lib/orgScope.js'
+import { getTransfersListSnapshotKey } from '../lib/offline/cacheKeys.js'
 import { getOfflineSnapshotMissingMessage } from '../lib/offline/freshness.js'
 import {
   isBrowserOffline,
@@ -302,6 +304,7 @@ function TransfersPage() {
   const location = useLocation()
   const [searchParams] = useSearchParams()
   const { configError, isConfigured } = useAuth()
+  const { orgId } = useTenant()
   const { isOffline } = useNetworkStatus()
   const { clearSnapshotState, markCachedSnapshot, markLiveSnapshot, snapshotState } =
     useOfflineSnapshot()
@@ -318,6 +321,7 @@ function TransfersPage() {
   )
   const [createdAfter, setCreatedAfter] = useState(() => searchParams.get('createdAfter') || '')
   const [activeSection, setActiveSection] = useState('queue')
+  const transfersListSnapshotKey = getTransfersListSnapshotKey(orgId)
 
   useEffect(() => {
     const timeoutId = window.setTimeout(() => {
@@ -347,7 +351,7 @@ function TransfersPage() {
       setLoading(true)
       setLoadError('')
 
-      const snapshot = await loadReadSnapshot(TRANSFERS_LIST_SNAPSHOT_KEY)
+      const snapshot = await loadReadSnapshot(transfersListSnapshotKey)
 
       if (!isMounted) {
         return
@@ -373,20 +377,33 @@ function TransfersPage() {
       setLoading(true)
       setLoadError('')
 
+      if (!orgId) {
+        setTransfers([])
+        setLoadError(MISSING_CURRENT_ORG_MESSAGE)
+        setLoading(false)
+        return
+      }
+
       try {
         const [transfersResult, paymentsResult] = await withLiveReadTimeout(
           Promise.all([
-            supabase
-              .schema('public')
-              .from('transfers')
-              .select(
-                'id, reference_number, customer_id, usdt_amount, payable_rub, status, created_at'
-              )
-              .order('created_at', { ascending: false }),
-            supabase
-              .schema('public')
-              .from('transfer_payments')
-              .select('id, transfer_id, amount_rub'),
+            withOrgScope(
+              supabase
+                .schema('public')
+                .from('transfers')
+                .select(
+                  'id, reference_number, customer_id, usdt_amount, payable_rub, status, created_at'
+                )
+                .order('created_at', { ascending: false }),
+              orgId
+            ),
+            withOrgScope(
+              supabase
+                .schema('public')
+                .from('transfer_payments')
+                .select('id, transfer_id, amount_rub'),
+              orgId
+            ),
           ]),
           {
             timeoutMessage: 'تعذر إكمال تحميل صف الحوالات في الوقت المتوقع.',
@@ -417,13 +434,16 @@ function TransfersPage() {
 
         if (transferIds.length > 0) {
           const { data: nextPaymentVoidRows, error: paymentVoidsError } = await withLiveReadTimeout(
-            supabase
-              .schema('public')
-              .from('transfer_payment_voids')
-              .select(TRANSFER_PAYMENT_VOID_SELECT)
-              .in('transfer_id', transferIds)
-              .order('created_at', { ascending: false })
-              .order('id', { ascending: false }),
+            withOrgScope(
+              supabase
+                .schema('public')
+                .from('transfer_payment_voids')
+                .select(TRANSFER_PAYMENT_VOID_SELECT)
+                .in('transfer_id', transferIds)
+                .order('created_at', { ascending: false })
+                .order('id', { ascending: false }),
+              orgId
+            ),
             {
               timeoutMessage:
                 'تعذر إكمال تحميل حالات إلغاء الدفعات المؤكدة للحوالات في الوقت المتوقع.',
@@ -459,13 +479,16 @@ function TransfersPage() {
             data: overpaymentResolutionRows,
             error: overpaymentResolutionError,
           } = await withLiveReadTimeout(
-            supabase
-              .schema('public')
-              .from('transfer_overpayment_resolutions')
-              .select(TRANSFER_OVERPAYMENT_RESOLUTION_SELECT)
-              .in('transfer_id', transferIds)
-              .order('created_at', { ascending: false })
-              .order('id', { ascending: false }),
+            withOrgScope(
+              supabase
+                .schema('public')
+                .from('transfer_overpayment_resolutions')
+                .select(TRANSFER_OVERPAYMENT_RESOLUTION_SELECT)
+                .in('transfer_id', transferIds)
+                .order('created_at', { ascending: false })
+                .order('id', { ascending: false }),
+              orgId
+            ),
             {
               timeoutMessage:
                 'تعذر إكمال تحميل حالات معالجة زيادة الدفع للحوالات في الوقت المتوقع.',
@@ -497,7 +520,10 @@ function TransfersPage() {
 
         if (customerIds.length > 0) {
           const { data: customersData, error: customersError } = await withLiveReadTimeout(
-            supabase.schema('public').from('customers').select('id, full_name').in('id', customerIds),
+            withOrgScope(
+              supabase.schema('public').from('customers').select('id, full_name').in('id', customerIds),
+              orgId
+            ),
             {
               timeoutMessage: 'تعذر إكمال تحميل أسماء العملاء للحوالات في الوقت المتوقع.',
             }
@@ -597,7 +623,7 @@ function TransfersPage() {
         setLoading(false)
 
         const savedSnapshot = await saveReadSnapshot({
-          key: TRANSFERS_LIST_SNAPSHOT_KEY,
+          key: transfersListSnapshotKey,
           scope: 'transfers-list',
           type: 'transfers_list',
           data: {
@@ -638,7 +664,9 @@ function TransfersPage() {
     isOffline,
     markCachedSnapshot,
     markLiveSnapshot,
+    orgId,
     refreshKey,
+    transfersListSnapshotKey,
   ])
 
   const handleRefresh = () => {

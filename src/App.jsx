@@ -8,6 +8,8 @@ import ThemePreferenceProvider from './context/ThemePreferenceProvider.jsx'
 import NetworkProvider from './context/NetworkProvider.jsx'
 import SyncProvider from './context/SyncProvider.jsx'
 import { useAuth } from './context/auth-context.js'
+import TenantProvider from './context/TenantProvider.jsx'
+import { useTenant } from './context/tenant-context.js'
 import CustomerDetailsPage from './pages/CustomerDetailsPage.jsx'
 import CustomersPage from './pages/CustomersPage.jsx'
 import DashboardPage from './pages/DashboardPage.jsx'
@@ -18,8 +20,9 @@ import TransfersPage from './pages/TransfersPage.jsx'
 
 function HomeRedirect() {
   const { loading, user } = useAuth()
+  const { loading: tenantLoading } = useTenant()
 
-  if (loading) {
+  if (loading || (user && tenantLoading)) {
     return <div className="screen-message">جار تحميل لوحة التشغيل...</div>
   }
 
@@ -61,13 +64,15 @@ function App() {
   return (
     <ThemePreferenceProvider>
       <NetworkProvider>
-        <SyncProvider>
-          <AuthProvider>
-            <BrowserRouter>
-              <AppRoutes />
-            </BrowserRouter>
-          </AuthProvider>
-        </SyncProvider>
+        <AuthProvider>
+          <TenantProvider>
+            <SyncProvider>
+              <BrowserRouter>
+                <AppRoutes />
+              </BrowserRouter>
+            </SyncProvider>
+          </TenantProvider>
+        </AuthProvider>
       </NetworkProvider>
     </ThemePreferenceProvider>
   )

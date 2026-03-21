@@ -1,8 +1,9 @@
 -- Live metadata export queries
--- Date: 2026-03-13
+-- Date: 2026-03-21
 --
 -- Purpose:
 -- - Read-only query pack for exporting the authoritative live schema metadata.
+-- - Support the multi-company live-baseline alignment phase without inventing tenant schema from repo assumptions.
 -- - Use this only to inspect and compare the live database.
 --
 -- Safe usage:
@@ -12,6 +13,55 @@
 -- Do not:
 -- - treat this as a migration
 -- - modify rows based on this file
+
+-- Important:
+-- - Some tenant objects are confirmed live already (`organizations`, `user_profiles`, `current_org_id`, etc.).
+-- - A separate membership table is NOT confirmed by the repo today.
+-- - Use the discovery queries below first, then rerun or extend the narrower exports if live reveals additional
+--   tenant-link objects that must be captured.
+
+-- 0. Public relation inventory for tenant discovery
+select
+  n.nspname as schema_name,
+  c.relname as relation_name,
+  case c.relkind
+    when 'r' then 'table'
+    when 'v' then 'view'
+    when 'm' then 'materialized_view'
+    else c.relkind::text
+  end as relation_type
+from pg_class c
+join pg_namespace n
+  on n.oid = c.relnamespace
+where n.nspname = 'public'
+  and c.relkind in ('r', 'v', 'm')
+order by relation_type, relation_name;
+
+-- 0b. Candidate tenant-related functions for helper discovery
+select
+  n.nspname as function_schema,
+  p.proname as function_name,
+  pg_get_function_identity_arguments(p.oid) as identity_arguments,
+  pg_get_function_result(p.oid) as result_type
+from pg_proc p
+join pg_namespace n
+  on n.oid = p.pronamespace
+where n.nspname = 'public'
+  and (
+    p.proname ilike '%org%'
+    or p.proname ilike '%member%'
+    or p.proname ilike '%profile%'
+    or p.proname in (
+      'format_transfer_reference_number',
+      'next_transfer_reference_number',
+      'assign_transfer_reference_number',
+      'prevent_transfer_reference_number_change',
+      'lock_transfer_core_fields_after_payment',
+      'refresh_transfer_status',
+      'rls_auto_enable'
+    )
+  )
+order by p.proname, pg_get_function_identity_arguments(p.oid);
 
 -- 1. Relevant relations and columns
 select
@@ -29,14 +79,17 @@ where table_schema = 'public'
     'customers',
     'transfers',
     'transfer_payments',
+    'transfer_payment_voids',
+    'transfer_overpayment_resolutions',
     'transfer_reference_counters',
     'organizations',
     'user_profiles',
-    'fx_quotes'
+    'fx_quotes',
+    'audit_logs'
   )
 order by table_name, ordinal_position;
 
--- 2. Public views
+-- 2. Public views and materialized views
 select
   schemaname,
   viewname,
@@ -47,6 +100,14 @@ where schemaname = 'public'
     'transfer_balances'
   )
 order by viewname;
+
+select
+  schemaname,
+  matviewname,
+  definition
+from pg_matviews
+where schemaname = 'public'
+order by matviewname;
 
 -- 3. Primary keys, unique constraints, checks, and foreign keys
 select
@@ -71,10 +132,13 @@ where tc.table_schema = 'public'
     'customers',
     'transfers',
     'transfer_payments',
+    'transfer_payment_voids',
+    'transfer_overpayment_resolutions',
     'transfer_reference_counters',
     'organizations',
     'user_profiles',
-    'fx_quotes'
+    'fx_quotes',
+    'audit_logs'
   )
 order by tc.table_name, tc.constraint_type, tc.constraint_name, kcu.ordinal_position;
 
@@ -104,9 +168,12 @@ where tc.table_schema = 'public'
     'customers',
     'transfers',
     'transfer_payments',
+    'transfer_payment_voids',
+    'transfer_overpayment_resolutions',
     'organizations',
     'user_profiles',
-    'fx_quotes'
+    'fx_quotes',
+    'audit_logs'
   )
 order by tc.table_name, tc.constraint_name, kcu.ordinal_position;
 
@@ -122,10 +189,13 @@ where schemaname = 'public'
     'customers',
     'transfers',
     'transfer_payments',
+    'transfer_payment_voids',
+    'transfer_overpayment_resolutions',
     'transfer_reference_counters',
     'organizations',
     'user_profiles',
-    'fx_quotes'
+    'fx_quotes',
+    'audit_logs'
   )
 order by tablename, indexname;
 
@@ -144,10 +214,13 @@ where n.nspname = 'public'
     'customers',
     'transfers',
     'transfer_payments',
+    'transfer_payment_voids',
+    'transfer_overpayment_resolutions',
     'transfer_reference_counters',
     'organizations',
     'user_profiles',
-    'fx_quotes'
+    'fx_quotes',
+    'audit_logs'
   )
 order by c.relname;
 
@@ -167,14 +240,17 @@ where schemaname = 'public'
     'customers',
     'transfers',
     'transfer_payments',
+    'transfer_payment_voids',
+    'transfer_overpayment_resolutions',
     'transfer_reference_counters',
     'organizations',
     'user_profiles',
-    'fx_quotes'
+    'fx_quotes',
+    'audit_logs'
   )
 order by tablename, policyname;
 
--- 8. Table grants
+-- 8. Table and view grants
 select
   table_schema,
   table_name,
@@ -186,10 +262,14 @@ where table_schema = 'public'
     'customers',
     'transfers',
     'transfer_payments',
+    'transfer_payment_voids',
+    'transfer_overpayment_resolutions',
     'transfer_reference_counters',
     'organizations',
     'user_profiles',
-    'fx_quotes'
+    'fx_quotes',
+    'audit_logs',
+    'transfer_balances'
   )
 order by table_name, grantee, privilege_type;
 
@@ -252,7 +332,11 @@ where n.nspname = 'public'
   and c.relname in (
     'customers',
     'transfers',
-    'transfer_payments'
+    'transfer_payments',
+    'transfer_payment_voids',
+    'transfer_overpayment_resolutions',
+    'organizations',
+    'user_profiles'
   )
   and not t.tgisinternal
 order by c.relname, t.tgname;

@@ -2,28 +2,24 @@
 
 Task completed:
 
-- **Payment correction Phase D corrected replacement-payment flow**:
-  - adds a compact replacement-payment workflow inside `TransferDetailsPage` for confirmed payments that were already
-    voided through `transfer_payment_voids`
-  - prefills the replacement form from the original voided payment, including amount, payment method, note, and
-    `paid_at`
-  - records the replacement as a new confirmed `transfer_payments` row instead of editing the original row
-  - keeps the original payment historically visible as voided while the new replacement payment appears as active
-  - updates page totals, remaining amount, and overpayment from active confirmed payments only after the replacement is
-    saved
-  - keeps the replacement flow online-only and separate from local pending/blocked/failed payment items
+- **Final manual live tenant smoke-validation package**:
+  - adds `docs/multi-company-live-smoke-checklist.md` as the authoritative human-executable final gate before the first
+    safe tenant rollout
+  - covers bootstrap, read-side, write-side, offline/cache/queue, direct URL checks, DB/runtime observation, and the
+    final go/no-go decision
+  - updates `docs/multi-company-rollout-readiness.md` so blocker #2 remains resolved and only the live smoke-validation
+    pass remains as the final rollout gate
 
 ## Files changed
 
-- `src/pages/TransferDetailsPage.jsx`
+- `docs/multi-company-live-smoke-checklist.md`
+- `docs/multi-company-rollout-readiness.md`
 - `docs/implementation-log.md`
 - `docs/last-change-summary.md` (this file)
 
 ## Verification
 
-- `npm run lint` - passed
-- `npm run build` - passed
+- documentation review only
 
-Deferred intentionally: direct payment edit, hard delete, cross-transfer payment move, persistent schema-level linkage
-between original voided payments and replacement payments, dashboard/customer/transfers changes, offline correction
-semantics, replay changes, transfer edit, print-policy redesign, and multi-company work.
+Deferred intentionally: execution of the live smoke-validation pass itself, any future multi-org company switcher, and
+unrelated implementation beyond this final validation package.

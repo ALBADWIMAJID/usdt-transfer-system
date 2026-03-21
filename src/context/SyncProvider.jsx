@@ -1,4 +1,5 @@
 import { createContext, useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useTenant } from './tenant-context.js'
 import {
   getCustomerQueueSummary,
   normalizeQueuedCustomersState,
@@ -138,6 +139,7 @@ const SyncContext = createContext(null)
 
 function SyncProvider({ children }) {
   const { isOffline } = useNetworkStatus()
+  const { orgId } = useTenant()
   const [manualState, setManualState] = useState(initialManualState)
   const [queueSummary, setQueueSummary] = useState(() =>
     createCombinedQueueSummary({
@@ -149,16 +151,27 @@ function SyncProvider({ children }) {
   const syncPromiseRef = useRef(null)
 
   const refreshSyncState = useCallback(async () => {
+    if (!orgId) {
+      const emptySummary = createCombinedQueueSummary({
+        customers: createEmptyQueueSummary(),
+        payments: createEmptyQueueSummary(),
+        transfers: createEmptyQueueSummary(),
+      })
+
+      setQueueSummary(emptySummary)
+      return emptySummary
+    }
+
     await Promise.all([
-      normalizeQueuedCustomersState(),
-      normalizeQueuedPaymentsState(),
-      normalizeQueuedTransfersState(),
+      normalizeQueuedCustomersState(orgId),
+      normalizeQueuedPaymentsState(orgId),
+      normalizeQueuedTransfersState(orgId),
     ])
 
     const [customers, payments, transfers] = await Promise.all([
-      getCustomerQueueSummary(),
-      getPaymentQueueSummary(),
-      getTransferQueueSummary(),
+      getCustomerQueueSummary({ orgId }),
+      getPaymentQueueSummary({ orgId }),
+      getTransferQueueSummary({ orgId }),
     ])
 
     const nextSummary = createCombinedQueueSummary({
@@ -169,7 +182,7 @@ function SyncProvider({ children }) {
 
     setQueueSummary(nextSummary)
     return nextSummary
-  }, [])
+  }, [orgId])
 
   useEffect(() => {
     refreshSyncState()
@@ -181,6 +194,14 @@ function SyncProvider({ children }) {
     return unsubscribe
   }, [refreshSyncState])
 
+  useEffect(() => {
+    if (orgId) {
+      return
+    }
+
+    setManualState(initialManualState)
+  }, [orgId])
+
   const runSyncNow = useCallback(
     async ({
       automatic = false,
@@ -189,6 +210,22 @@ function SyncProvider({ children }) {
       includeTransfers = true,
     } = {}) => {
       if (isOffline) {
+        return {
+          blockedCount: 0,
+          customerResult: emptyReplayResult,
+          dedupedCount: 0,
+          failedCount: 0,
+          paymentResult: emptyReplayResult,
+          replayedCount: 0,
+          started: false,
+          totalProcessed: 0,
+          transferResult: emptyReplayResult,
+        }
+      }
+
+      if (!orgId) {
+        setManualState(initialManualState)
+
         return {
           blockedCount: 0,
           customerResult: emptyReplayResult,
@@ -248,17 +285,18 @@ function SyncProvider({ children }) {
       const syncPromise = (async () => {
         const customerResult =
           includeCustomers && customerCount > 0
-            ? await replayCustomerQueue({ includeFailed: !automatic })
+            ? await replayCustomerQueue({ includeFailed: !automatic, orgId })
             : emptyReplayResult
         const transferResult =
           includeTransfers && transferCount > 0
-            ? await replayTransferQueue({ includeFailed: !automatic })
+            ? await replayTransferQueue({ includeFailed: !automatic, orgId })
             : emptyReplayResult
         const paymentResult =
           includePayments && paymentCount > 0
             ? await replayPaymentQueue({
                 includeBlocked: true,
                 includeFailed: !automatic,
+                orgId,
                 transferReplayResult: transferResult,
               })
             : emptyReplayResult
@@ -347,7 +385,7 @@ function SyncProvider({ children }) {
 
       return syncPromise
     },
-    [isOffline, refreshSyncState]
+    [isOffline, orgId, refreshSyncState]
   )
 
   const syncPaymentsNow = useCallback(

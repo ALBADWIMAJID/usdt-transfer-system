@@ -1,5 +1,202 @@
 # Implementation Log
 
+## 2026-03-21 - Final manual live tenant smoke-validation package
+
+Scope: documentation/checklist only. Converts the remaining live tenant-validation gate into one repo-ready manual
+execution package for the first safe rollout, and updates readiness docs so blocker #2 stays resolved while the
+privileged/live smoke-validation pass remains the only final gate.
+
+Files changed:
+
+- `docs/multi-company-live-smoke-checklist.md` - adds the final human-executable live tenant smoke checklist covering
+  bootstrap, read/write boundaries, offline/cache/queue checks, direct URLs, DB/runtime observation, and go/no-go
+  decision output
+- `docs/multi-company-rollout-readiness.md` - points to the new checklist as the authoritative final gate and confirms
+  live smoke validation is now the only remaining blocker
+- `docs/implementation-log.md`
+- `docs/last-change-summary.md`
+
+Key result:
+
+- blocker #2 remains resolved in code and documentation
+- the repo now has a concrete final live-validation package that a human tester can run before declaring the rollout ready
+
+Verification:
+
+- documentation review only
+
+## 2026-03-21 - Multi-company rollout blocker fix for legacy offline queue records
+
+Scope: smallest blocker fix only. Removes the Phase F upgrade-path behavior that auto-adopted legacy queued mutations
+without `orgId` into the active org, and replaces it with fail-closed quarantine by excluding those legacy records from
+org-scoped queue listing, summary, and replay paths. No routes, schema, company switcher, or replay-order changes were
+started in this fix.
+
+Files changed:
+
+- `src/lib/offline/customerQueue.js` - stops mutating legacy no-`orgId` customer records into the active org and only
+  lists records that already carry org context
+- `src/lib/offline/transferQueue.js` - stops mutating legacy no-`orgId` transfer records into the active org and only
+  lists records that already carry org context
+- `src/lib/offline/paymentQueue.js` - stops mutating legacy no-`orgId` payment records into the active org and only
+  lists records that already carry org context
+- `docs/multi-company-rollout-readiness.md` - marks the legacy offline-queue blocker resolved in code and leaves live
+  tenant smoke validation as the remaining rollout blocker
+- `docs/implementation-log.md`
+- `docs/last-change-summary.md`
+
+Key result:
+
+- valid org-aware queued customer, transfer, and payment records continue to work normally
+- legacy queued mutations with no org context are now quarantined by omission from org-scoped queue summary/replay paths
+  and can no longer replay into the active org implicitly
+
+Verification:
+
+- `ReadLints` on edited queue files - no diagnostics
+- `npm run build` - passed
+
+## 2026-03-21 - Multi-company Phase G rollout-readiness validation
+
+Scope: validation/documentation only. Re-reads the completed tenant rollout phases through Phase F, checks the current
+bootstrap/read/write/offline and DB-hardening paths for first-release tenant-boundary alignment, and records an explicit
+rollout-readiness verdict without starting company switching or broad new implementation work.
+
+Files changed:
+
+- `docs/multi-company-rollout-readiness.md` - adds the final Phase G assessment, blocker list, and manual validation
+  checklist for the first safe tenant rollout shape
+- `docs/implementation-log.md`
+- `docs/last-change-summary.md`
+
+Key result:
+
+- the current repo is code-aligned across bootstrap, read-side, write-side, offline namespacing, and hardened DB payment
+  truth for the locked one-company-per-user release shape
+- rollout is still blocked by the lack of real privileged/live tenant smoke validation and by the legacy pre-Phase-F
+  offline queue path that auto-adopts no-`orgId` records into the active org instead of failing closed
+
+Verification:
+
+- Phase G code/doc review across the tenant rollout artifacts and main operational pages
+- `npm run build` - passed
+
+## 2026-03-21 - Multi-company Phase F offline/cache/queue org namespacing
+
+Scope: offline/cache/queue only. Replaces global browser snapshot keys with current-org namespaced keys, makes queued
+offline mutations carry `orgId`, updates mutation dedupe keys to include org context, and scopes queue summaries/replay
+to the active org while preserving the existing customer -> transfer -> payment replay order. No company switcher,
+schema change, or broad UI refactor work was started in this phase.
+
+Files changed:
+
+- `src/App.jsx` - moves `SyncProvider` under tenant bootstrap so sync/replay can consume the resolved current org
+- `src/context/SyncProvider.jsx` - scopes queue summaries and replay runs to the active org and clears sync state when
+  org context is unavailable
+- `src/hooks/usePendingCustomers.js` - scopes pending offline customer state to the active org
+- `src/hooks/usePendingTransfers.js` - scopes pending offline transfer state to the active org
+- `src/hooks/usePendingPayments.js` - scopes pending offline payment state to the active org
+- `src/lib/offline/cacheKeys.js` - adds `org:{orgId}:...` snapshot key builders
+- `src/lib/offline/readCache.js` - fails safely when no org-scoped snapshot key is available
+- `src/lib/offline/mutationIds.js` - makes mutation dedupe keys org-aware
+- `src/lib/offline/customerQueue.js` - adds `orgId` to queued customer records and scopes listing/summary/replay state
+- `src/lib/offline/transferQueue.js` - adds `orgId` to queued transfer records and scopes listing/summary/replay state
+- `src/lib/offline/paymentQueue.js` - adds `orgId` to queued payment records and scopes listing/summary/replay state
+- `src/lib/offline/replayCustomers.js` - scopes duplicate checks and replay inserts to the active org
+- `src/lib/offline/replayTransfers.js` - scopes duplicate checks, replay inserts, and payment-linking to the active org
+- `src/lib/offline/replayPayments.js` - scopes duplicate checks, replay inserts, and dependency resolution inputs to the
+  active org
+- `src/lib/offline/customerSnapshots.js` - updates customer snapshot maintenance to use org-aware snapshot keys
+- `src/pages/DashboardPage.jsx` - uses org-aware dashboard snapshot keys
+- `src/pages/CustomersPage.jsx` - uses org-aware customer-list snapshots and stamps queued offline customer payloads
+- `src/pages/NewTransferPage.jsx` - uses org-aware customer-option snapshots and stamps queued offline transfer payloads
+- `src/pages/TransfersPage.jsx` - uses org-aware transfers-list snapshots
+- `src/pages/CustomerDetailsPage.jsx` - uses org-aware customer-detail snapshots and passes org context to snapshot-sync
+  helpers
+- `src/pages/TransferDetailsPage.jsx` - uses org-aware transfer-detail snapshots and stamps queued offline payment
+  payloads
+- `docs/implementation-log.md`
+- `docs/last-change-summary.md`
+
+Verification:
+
+- `ReadLints` on edited frontend files - no diagnostics
+- `npm run build` - passed
+
+## 2026-03-21 - Multi-company Phase E write-side org stamping
+
+Scope: write-side only. Adds compact current-org payload stamping on tenant-scoped inserts and same-org guards on the
+current online update/delete paths so business writes align to the live org model while keeping the database triggers
+and RLS policies as the primary authority. No company switcher, offline queue namespacing, or broader UI refactor work
+was started in this phase.
+
+Files changed:
+
+- `src/lib/orgScope.js` - adds a tiny shared helper for explicit `org_id` stamping on tenant-scoped insert payloads
+- `src/pages/CustomersPage.jsx` - stamps `org_id` on online customer creation
+- `src/pages/CustomerDetailsPage.jsx` - adds same-org guards to customer edit/archive/delete operations and linked
+  transfer count checks
+- `src/pages/NewTransferPage.jsx` - stamps `org_id` on online transfer creation
+- `src/pages/TransferDetailsPage.jsx` - stamps `org_id` on payment, payment-void, overpayment-resolution, and
+  replacement-payment inserts, and adds same-org guards to transfer updates
+- `docs/implementation-log.md`
+- `docs/last-change-summary.md`
+
+Verification:
+
+- `ReadLints` on edited frontend files - no diagnostics
+- `npm run build` - passed
+
+## 2026-03-21 - Multi-company Phase D read-side org scoping
+
+Scope: read-side only. Adds compact current-org query shaping on the main operational read surfaces and makes customer
+and transfer detail loading fail closed before child reads continue when the parent row is outside the current org or
+otherwise unavailable. No company switcher, write-side org stamping, or offline/cache namespacing work was started in
+this phase.
+
+Files changed:
+
+- `src/lib/orgScope.js` - adds a tiny shared helper for current-org query shaping on live reads
+- `src/pages/DashboardPage.jsx` - scopes dashboard live reads to the current org as defense in depth
+- `src/pages/CustomersPage.jsx` - scopes customer portfolio reads and derived transfer/payment reads to the current org
+- `src/pages/TransfersPage.jsx` - scopes transfer list reads and related customer/payment reads to the current org
+- `src/pages/NewTransferPage.jsx` - scopes customer-option loading to the current org
+- `src/pages/CustomerDetailsPage.jsx` - scopes customer detail reads, waits for the parent customer row before loading
+  child transfer/payment data, and fails closed when the customer is unavailable under the current org
+- `src/pages/TransferDetailsPage.jsx` - scopes transfer detail reads, waits for the parent transfer row before loading
+  child payment/overpayment reads, and scopes customer-option reads for transfer editing
+- `docs/implementation-log.md`
+- `docs/last-change-summary.md`
+
+Verification:
+
+- `ReadLints` on edited frontend files - no diagnostics
+- `npm run build` - passed
+
+## 2026-03-21 - Multi-company Phase C auth/profile/current-org bootstrap
+
+Scope: auth/bootstrap only. Adds a compact tenant bootstrap provider that resolves the signed-in operator profile plus
+server-resolved current organization before protected operational routes render, and fails closed with explicit loading,
+provisioning, and retryable failure states. No company switcher, business-query scoping, or offline/cache namespacing
+work was started in this phase.
+
+Files changed:
+
+- `src/context/tenant-context.js` - adds the tenant bootstrap hook/context contract
+- `src/context/TenantProvider.jsx` - loads `user_profiles`, resolves `current_org_id()`, reads the current
+  `organizations` row, and exposes compact bootstrap state plus retry
+- `src/components/ProtectedRoute.jsx` - blocks protected routes until tenant bootstrap resolves and shows safe
+  unprovisioned/error states instead of rendering the app shell early
+- `src/App.jsx` - inserts `TenantProvider` under `AuthProvider` and keeps the home redirect closed while tenant bootstrap
+  is still loading
+- `docs/implementation-log.md`
+- `docs/last-change-summary.md`
+
+Verification:
+
+- `ReadLints` on edited frontend files - no diagnostics
+- manual runtime validation still recommended for signed-out, provisioned, unprovisioned, loading, and retry paths
+
 ## 2026-03-21 - Conservative transfer edit workflow in TransferDetails
 
 Scope: TransferDetails only. Adds an online-only transfer edit flow that reuses the current creation-style pricing
@@ -2451,3 +2648,232 @@ Verification:
 Suggested next step:
 - Optional: `prefers-color-scheme` or settings toggle writing `data-theme`; migrate remaining hardcoded
   light `rgba(255,…)` in mobile block to tokens
+
+## 2026-03-21T18:00:00+03:00 - Multi-company Phase B documentation/spec alignment
+
+Requested scope:
+- Convert the completed multi-company design analysis into repo-ready documentation/spec artifacts only
+- Do not implement tenant schema, RLS, auth bootstrap, offline namespacing, or any app logic changes yet
+- Record the live-vs-repo tenant gap, the locked first-release tenant model, the live export checklist, and the
+  phased rollout plan so later implementation can proceed from an explicit baseline
+
+Files changed:
+- `docs/multi-company-phase-a-gap-map.md` **(new)** — repo-vs-live tenant gap map, current single-workspace
+  assumptions, offline/queue tenant-risk areas, and missing RLS/policy truth
+- `docs/multi-company-target-architecture.md` **(new)** — locked first-release tenant model, target org/profile/
+  membership shape, active-org concept, org placement, and parent/child consistency rules
+- `docs/multi-company-live-export-checklist.md` **(new)** — explicit list of live Supabase tables, columns, helper
+  functions, policies, triggers, views, and membership questions that must be exported/confirmed before executable
+  tenant work starts
+- `docs/multi-company-phased-rollout-plan.md` **(new)** — safe execution sequence from Phase B live-baseline
+  alignment through auth bootstrap, read/write scoping, offline namespacing, and RLS rollout validation
+- `docs/implementation-log.md`
+- `docs/last-change-summary.md`
+
+What was added:
+- A repo-specific multi-company documentation baseline without changing application behavior
+- An explicit "export-and-align, not invent-from-scratch" tenant direction tied to the existing repo and live-doc
+  evidence
+- Clear stop conditions preventing guessed tenant migrations or guessed policy implementation before authoritative
+  live definitions are captured
+
+What was not changed:
+- Supabase schema or migrations
+- RLS policy SQL
+- Auth/bootstrap logic
+- Offline snapshot, queue, replay, or dedupe behavior
+- Routes, UI workflows, or operational calculations
+
+Verification:
+- Documentation-only change; no runtime code or schema changes were made
+
+Suggested next step:
+- Capture the authoritative live Supabase tenant baseline described in
+  `docs/multi-company-live-export-checklist.md`, then reconcile repo baseline artifacts before authoring any
+  executable tenant changes
+
+## 2026-03-21T18:30:00+03:00 - Multi-company live-export preparation and reconciliation
+
+Requested scope:
+- Execute the next safe tenant-alignment step: authoritative live tenant baseline export and repo reconciliation
+- Perform the export if this environment can do so safely, otherwise switch to preparation mode without faking outputs
+- Do not implement tenant schema, auth/bootstrap, offline namespacing, or app logic changes
+
+Files changed:
+- `supabase/baselines/live_metadata_export_queries.sql` — expanded the read-only query pack for the current
+  multi-company scope: discovery queries, broader tenant/business table coverage, and trigger/grant/policy/index
+  coverage for the newer operational tables
+- `supabase/baselines/live_export_manual_runbook_20260321.md` **(new)** — exact manual export steps and target
+  artifact names for a privileged environment
+- `docs/multi-company-live-reconciliation.md` **(new)** — environment result, current evidence source inventory,
+  live-vs-repo reconciliation classes, and explicit unknowns that still require authoritative export
+- `docs/implementation-log.md`
+- `docs/last-change-summary.md`
+
+What was found:
+- the current shell environment does not have the Supabase CLI available
+- the repo does not contain local Supabase linkage/config files for `db pull`
+- the project environment exposes public app configuration only, which is not sufficient for an authoritative
+  schema/RLS export
+
+What was added:
+- an export-preparation runbook instead of fabricated live-export outputs
+- a stronger metadata query pack ready to run in a privileged environment
+- a reconciliation document that separates:
+  - confirmed live evidence
+  - repo baseline gaps
+  - documented-but-not-implemented tenant targets
+  - still-unknown items that must remain unknown until exported from live
+
+What was not changed:
+- no new live schema pull artifact was fabricated
+- no tenant migrations were created
+- no auth/bootstrap logic changed
+- no offline/cache/queue logic changed
+- no runtime application behavior changed
+
+Verification:
+- documentation/baseline-only change; no code or schema implementation was performed
+
+Suggested next step:
+- run the prepared live export from a privileged environment using
+  `supabase/baselines/live_export_manual_runbook_20260321.md`, then update
+  `docs/multi-company-live-reconciliation.md` with the real exported facts before starting executable tenant work
+
+## 2026-03-21T19:15:00+03:00 - Phase H1 transfer_payment_voids tenant hardening
+
+Requested scope:
+- Implement only the first narrow tenant-hardening phase after the live export findings
+- Harden `transfer_payment_voids` into an org-scoped child table
+- Do not touch `transfer_overpayment_resolutions`, `transfer_balances`, `refresh_transfer_status()`, auth/bootstrap,
+  offline namespacing, or broader multi-company app work
+
+Files changed:
+- `supabase/migrations/20260321_harden_transfer_payment_voids_org_scope.sql` **(new)** — explicit corrective
+  migration that:
+  - adds `org_id`
+  - validates legacy `payment_id` -> `transfer_id` consistency
+  - backfills `org_id` from the parent payment/transfer chain
+  - adds a `security definer` trigger function to derive/enforce `org_id` on future writes
+  - adds the `organizations` foreign key and `org_id` index
+  - replaces permissive authenticated policies with a same-org `ALL` policy based on `current_org_id()`
+- `supabase/baselines/current_app_contract_snapshot.sql` — records `transfer_payment_voids` as an org-scoped child
+  table with `org_id`
+- `docs/implementation-log.md`
+- `docs/last-change-summary.md`
+
+Why this was the safest H1:
+- the live export already proved core business tables are org-scoped while `transfer_payment_voids` remained a
+  permissive authenticated hole
+- the app already uses payment voids operationally, so this table is now security-relevant even before broader
+  multi-company bootstrap work begins
+- the migration stays narrow: one table, one child-consistency trigger, one policy replacement path
+
+What was not changed:
+- `transfer_overpayment_resolutions`
+- `transfer_balances`
+- `refresh_transfer_status()`
+- frontend auth/bootstrap or app-shell behavior
+- offline/cache/queue logic
+- routes or UI
+
+Validation expectations:
+- existing `transfer_payment_voids` rows backfill to non-null `org_id`
+- rows where `payment_id` does not belong to `transfer_id` fail the migration loudly instead of silently drifting
+- future writes derive `org_id` from the parent records and reject cross-parent mismatches
+- same-org reads/inserts continue to work while cross-org access is blocked by RLS
+
+Suggested next step:
+- validate the H1 migration against a safe environment or staging copy, then design/implement the matching H2
+  hardening for `transfer_overpayment_resolutions` before touching DB-level payment-truth alignment
+
+## 2026-03-21T19:35:00+03:00 - Phase H2 transfer_overpayment_resolutions tenant hardening
+
+Requested scope:
+- Implement only the second narrow tenant-hardening phase after the live export findings
+- Harden `transfer_overpayment_resolutions` into an org-scoped child table
+- Do not touch `transfer_payment_voids` again beyond using H1 as a pattern reference
+- Do not touch `transfer_balances`, `refresh_transfer_status()`, auth/bootstrap, offline namespacing, or broader
+  multi-company app work
+
+Files changed:
+- `supabase/migrations/20260321_harden_transfer_overpayment_resolutions_org_scope.sql` **(new)** — explicit
+  corrective migration that:
+  - adds `org_id`
+  - backfills `org_id` from the parent transfer
+  - validates historical parent-transfer linkage and org consistency
+  - adds a `security definer` trigger function to derive/enforce `org_id` on future writes
+  - adds the `organizations` foreign key and `org_id` index
+  - replaces permissive authenticated policies with a same-org `ALL` policy based on `current_org_id()`
+- `supabase/baselines/current_app_contract_snapshot.sql` — records `transfer_overpayment_resolutions` as an org-scoped
+  child table with `org_id`
+- `docs/implementation-log.md`
+- `docs/last-change-summary.md`
+
+Why this was the safest H2:
+- the live export already proved core business tables are org-scoped while
+  `transfer_overpayment_resolutions` remained a permissive authenticated hole
+- the app already uses overpayment resolutions operationally, so this table is security-relevant even before broader
+  multi-company bootstrap work begins
+- the migration stays narrow: one table, one parent-consistency trigger, one policy replacement path
+
+What was not changed:
+- `transfer_payment_voids`
+- `transfer_balances`
+- `refresh_transfer_status()`
+- frontend auth/bootstrap or app-shell behavior
+- offline/cache/queue logic
+- routes or UI
+
+Validation expectations:
+- existing `transfer_overpayment_resolutions` rows backfill to non-null `org_id`
+- rows whose parent transfer is missing or has no `org_id` fail the migration loudly instead of silently drifting
+- future writes derive `org_id` from the parent transfer and reject manual mismatches
+- same-org reads/inserts continue to work while cross-org access is blocked by RLS
+
+Suggested next step:
+- validate the H2 migration against a safe environment or staging copy, then move to the Phase H3/H4 DB
+  payment-truth alignment work for `transfer_balances` and `refresh_transfer_status()`
+
+## 2026-03-21T20:05:00+03:00 - Phase H3/H4 DB payment-truth alignment
+
+Requested scope:
+- Implement only the DB truth-alignment phase after the H1/H2 tenant hardening work
+- Make DB-level balance and status logic follow the app's active-vs-voided payment model
+- Do not touch broader multi-company bootstrap/auth/session behavior, offline namespacing, or UI/routes
+
+Files changed:
+- `supabase/migrations/20260321_align_active_payment_db_truth.sql` **(new)** — narrow corrective migration that:
+  - rewrites `public.transfer_balances` so only active confirmed payments count toward `paid_rub` and `remaining_rub`
+  - rewrites `public.refresh_transfer_status(uuid)` so only active confirmed payments count toward `open` / `partial` /
+    `paid`
+  - adds a dedicated `public.after_payment_void_mutation()` trigger function
+  - adds `transfer_payment_voids` status-refresh triggers for insert, delete, and transfer-changing updates
+- `supabase/baselines/current_app_contract_snapshot.sql` — documents the active-payment rule, `transfer_balances`,
+  `refresh_transfer_status(uuid)`, and the `transfer_payment_voids` refresh-trigger path
+- `docs/implementation-log.md`
+- `docs/last-change-summary.md`
+
+Why this was the safest H3/H4:
+- the live export showed that the app already excludes voided payments while the DB still summed raw
+  `transfer_payments`
+- direct rewrites of the existing view/function were narrower and easier to review than introducing a new shared
+  accounting object
+- the trigger path stayed narrow and only covered the missing correctness edge: status refresh after void mutations
+
+What was not changed:
+- auth/session/current-org bootstrap
+- offline/cache/queue logic
+- routes or UI
+- unrelated tenant tables
+- broader accounting redesign beyond active-vs-voided payment exclusion
+
+Validation expectations:
+- `transfer_balances` excludes payments that have a matching `transfer_payment_voids.payment_id`
+- `refresh_transfer_status()` excludes voided payments when computing transfer status
+- inserting or deleting a payment-void row refreshes the related transfer status
+- historical `transfer_payments` rows remain untouched
+
+Suggested next step:
+- validate the H3/H4 migration against a safe environment or staging copy, then proceed only to the next smallest
+  remaining multi-company phase rather than broad bootstrap work by default

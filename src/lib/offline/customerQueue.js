@@ -2,6 +2,7 @@ import {
   createCustomerMutationDedupeKey,
   createLocalPendingCustomerReference,
   createOfflineMutationId,
+  normalizeMutationOrgId,
 } from './mutationIds.js'
 import {
   getMutationRecord,
@@ -18,24 +19,30 @@ function normalizeCustomerPayload(payload) {
   return {
     full_name: String(payload.full_name || '').trim(),
     notes: payload.notes ? String(payload.notes).trim() : null,
+    org_id: normalizeMutationOrgId(payload.org_id),
     phone: payload.phone ? String(payload.phone).trim() : null,
   }
 }
 
-function buildQueuedCustomerRecord({ localMeta = {}, payload }) {
+function buildQueuedCustomerRecord({ localMeta = {}, orgId, payload }) {
   const normalizedPayload = normalizeCustomerPayload(payload)
   const createdAt = new Date().toISOString()
+  const normalizedOrgId = normalizeMutationOrgId(orgId || normalizedPayload.org_id)
 
   return {
     createdAt,
-    dedupeKey: createCustomerMutationDedupeKey(normalizedPayload),
+    dedupeKey: createCustomerMutationDedupeKey(normalizedPayload, normalizedOrgId),
     id: createOfflineMutationId('customer-create'),
     lastError: '',
     lastAttemptAt: '',
     localMeta: {
       localReference: localMeta.localReference || createLocalPendingCustomerReference(),
     },
-    payload: normalizedPayload,
+    orgId: normalizedOrgId,
+    payload: {
+      ...normalizedPayload,
+      org_id: normalizedOrgId,
+    },
     retryCount: 0,
     status: 'pending',
     type: CUSTOMER_CREATE_MUTATION_TYPE,
@@ -62,28 +69,55 @@ function sortQueueRecordsByCreatedAt(records, direction = 'desc') {
 }
 
 async function queueOfflineCustomer({ localMeta, payload }) {
+  const normalizedOrgId = normalizeMutationOrgId(payload?.org_id)
+
+  if (!normalizedOrgId) {
+    return null
+  }
+
   const queuedRecord = buildQueuedCustomerRecord({
     localMeta,
+    orgId: normalizedOrgId,
     payload,
   })
 
   return putMutationRecord(queuedRecord)
 }
 
-async function listQueuedCustomerMutations() {
-  const records = await listMutationRecords()
-
-  return records.filter((record) => record?.type === CUSTOMER_CREATE_MUTATION_TYPE)
+function getQueuedCustomerOrgId(record) {
+  return normalizeMutationOrgId(record?.orgId || record?.payload?.org_id)
 }
 
-async function listActiveQueuedCustomers() {
-  const records = await listQueuedCustomerMutations()
+function isScopedQueuedCustomer(record) {
+  return Boolean(getQueuedCustomerOrgId(record))
+}
+
+function matchesQueuedCustomerOrg(record, orgId) {
+  return getQueuedCustomerOrgId(record) === normalizeMutationOrgId(orgId)
+}
+
+async function listQueuedCustomerMutations({ orgId = '' } = {}) {
+  const records = await listMutationRecords()
+  const normalizedOrgId = normalizeMutationOrgId(orgId)
+  const scopedRecords = records.filter((record) => record?.type === CUSTOMER_CREATE_MUTATION_TYPE)
+
+  if (!normalizedOrgId) {
+    return []
+  }
+
+  return scopedRecords.filter(
+    (record) => isScopedQueuedCustomer(record) && matchesQueuedCustomerOrg(record, normalizedOrgId)
+  )
+}
+
+async function listActiveQueuedCustomers({ orgId = '' } = {}) {
+  const records = await listQueuedCustomerMutations({ orgId })
 
   return sortQueueRecordsByCreatedAt(records.filter(isActiveCustomerMutation))
 }
 
-async function listReplayableQueuedCustomers({ includeFailed = true } = {}) {
-  const records = await listQueuedCustomerMutations()
+async function listReplayableQueuedCustomers({ includeFailed = true, orgId = '' } = {}) {
+  const records = await listQueuedCustomerMutations({ orgId })
 
   return sortQueueRecordsByCreatedAt(
     records.filter((record) => {
@@ -101,8 +135,8 @@ async function listReplayableQueuedCustomers({ includeFailed = true } = {}) {
   )
 }
 
-async function getCustomerQueueSummary() {
-  const records = await listQueuedCustomerMutations()
+async function getCustomerQueueSummary({ orgId = '' } = {}) {
+  const records = await listQueuedCustomerMutations({ orgId })
   const summary = {
     activeCount: 0,
     blockedCount: 0,
@@ -174,8 +208,8 @@ async function markQueuedCustomerPending(id) {
   }))
 }
 
-async function normalizeQueuedCustomersState() {
-  const records = await listQueuedCustomerMutations()
+async function normalizeQueuedCustomersState(orgId = '') {
+  const records = await listQueuedCustomerMutations({ orgId })
   const syncingRecords = records.filter((record) => record.status === 'syncing')
 
   if (syncingRecords.length === 0) {
@@ -184,7 +218,7 @@ async function normalizeQueuedCustomersState() {
 
   await Promise.all(syncingRecords.map((record) => markQueuedCustomerPending(record.id)))
 
-  return listQueuedCustomerMutations()
+  return listQueuedCustomerMutations({ orgId })
 }
 
 async function resolveQueuedCustomer(id) {

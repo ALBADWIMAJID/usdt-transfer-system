@@ -14,11 +14,13 @@ import RecordCard from '../components/ui/RecordCard.jsx'
 import RecordHeader from '../components/ui/RecordHeader.jsx'
 import SectionCard from '../components/ui/SectionCard.jsx'
 import { useAuth } from '../context/auth-context.js'
+import { useTenant } from '../context/tenant-context.js'
 import useNetworkStatus from '../hooks/useNetworkStatus.js'
 import useOfflineSnapshot from '../hooks/useOfflineSnapshot.js'
 import usePendingCustomers from '../hooks/usePendingCustomers.js'
 import useReplayQueue from '../hooks/useReplayQueue.js'
-import { CUSTOMERS_LIST_SNAPSHOT_KEY } from '../lib/offline/cacheKeys.js'
+import { MISSING_CURRENT_ORG_MESSAGE, withOrgScope, withStampedOrg } from '../lib/orgScope.js'
+import { getCustomersListSnapshotKey } from '../lib/offline/cacheKeys.js'
 import { queueOfflineCustomer } from '../lib/offline/customerQueue.js'
 import { getOfflineSnapshotMissingMessage } from '../lib/offline/freshness.js'
 import {
@@ -486,6 +488,7 @@ function buildPendingCustomerNote(record) {
 
 function CustomersPage() {
   const { configError, isConfigured } = useAuth()
+  const { orgId } = useTenant()
   const { isOffline } = useNetworkStatus()
   const { clearSnapshotState, markCachedSnapshot, markLiveSnapshot, snapshotState } =
     useOfflineSnapshot()
@@ -506,6 +509,7 @@ function CustomersPage() {
   const [submitting, setSubmitting] = useState(false)
   const [submitError, setSubmitError] = useState('')
   const [submitSuccess, setSubmitSuccess] = useState('')
+  const customersListSnapshotKey = getCustomersListSnapshotKey(orgId)
   const {
     activeCount: pendingCustomerCount,
     failedCount: failedPendingCustomerCount,
@@ -533,7 +537,7 @@ function CustomersPage() {
       setLoadError('')
       setPortfolioWarning('')
 
-      const snapshot = await loadReadSnapshot(CUSTOMERS_LIST_SNAPSHOT_KEY)
+      const snapshot = await loadReadSnapshot(customersListSnapshotKey)
 
       if (!isMounted) {
         return
@@ -569,9 +573,23 @@ function CustomersPage() {
       setLoadError('')
       setPortfolioWarning('')
 
+      if (!orgId) {
+        setCustomers([])
+        setArchivedCustomers([])
+        setAttentionCustomers([])
+        setRecentActivityItems([])
+        setPortfolioStats(emptyPortfolioStats)
+        setLoadError(MISSING_CURRENT_ORG_MESSAGE)
+        setLoading(false)
+        return
+      }
+
       try {
         const { data: customersData, error: customersError } = await withLiveReadTimeout(
-          supabase.schema('public').from('customers').select('*').order('full_name', { ascending: true }),
+          withOrgScope(
+            supabase.schema('public').from('customers').select('*').order('full_name', { ascending: true }),
+            orgId
+          ),
           {
             timeoutMessage: 'تعذر إكمال تحميل ملفات العملاء في الوقت المتوقع.',
           }
@@ -600,16 +618,22 @@ function CustomersPage() {
 
         const [transfersResult, paymentsResult] = await withLiveReadTimeout(
           Promise.all([
-            supabase
-              .schema('public')
-              .from('transfers')
-              .select('id, customer_id, reference_number, status, payable_rub, created_at')
-              .order('created_at', { ascending: false }),
-            supabase
-              .schema('public')
-              .from('transfer_payments')
-              .select('id, transfer_id, amount_rub, payment_method, note, paid_at, created_at')
-              .order('created_at', { ascending: false }),
+            withOrgScope(
+              supabase
+                .schema('public')
+                .from('transfers')
+                .select('id, customer_id, reference_number, status, payable_rub, created_at')
+                .order('created_at', { ascending: false }),
+              orgId
+            ),
+            withOrgScope(
+              supabase
+                .schema('public')
+                .from('transfer_payments')
+                .select('id, transfer_id, amount_rub, payment_method, note, paid_at, created_at')
+                .order('created_at', { ascending: false }),
+              orgId
+            ),
           ]),
           {
             timeoutMessage: 'تعذر إكمال تحميل مؤشرات متابعة العملاء في الوقت المتوقع.',
@@ -661,13 +685,16 @@ function CustomersPage() {
 
         if (transferIds.length > 0) {
           const { data: nextPaymentVoidRows, error: paymentVoidsError } = await withLiveReadTimeout(
-            supabase
-              .schema('public')
-              .from('transfer_payment_voids')
-              .select(TRANSFER_PAYMENT_VOID_SELECT)
-              .in('transfer_id', transferIds)
-              .order('created_at', { ascending: false })
-              .order('id', { ascending: false }),
+            withOrgScope(
+              supabase
+                .schema('public')
+                .from('transfer_payment_voids')
+                .select(TRANSFER_PAYMENT_VOID_SELECT)
+                .in('transfer_id', transferIds)
+                .order('created_at', { ascending: false })
+                .order('id', { ascending: false }),
+              orgId
+            ),
             {
               timeoutMessage:
                 'تعذر إكمال تحميل حالات إلغاء الدفعات المؤكدة لمحفظة العملاء في الوقت المتوقع.',
@@ -719,13 +746,16 @@ function CustomersPage() {
             data: overpaymentResolutionRows,
             error: overpaymentResolutionError,
           } = await withLiveReadTimeout(
-            supabase
-              .schema('public')
-              .from('transfer_overpayment_resolutions')
-              .select(TRANSFER_OVERPAYMENT_RESOLUTION_SELECT)
-              .in('transfer_id', transferIds)
-              .order('created_at', { ascending: false })
-              .order('id', { ascending: false }),
+            withOrgScope(
+              supabase
+                .schema('public')
+                .from('transfer_overpayment_resolutions')
+                .select(TRANSFER_OVERPAYMENT_RESOLUTION_SELECT)
+                .in('transfer_id', transferIds)
+                .order('created_at', { ascending: false })
+                .order('id', { ascending: false }),
+              orgId
+            ),
             {
               timeoutMessage:
                 'تعذر إكمال تحميل حالات معالجة زيادة الدفع لمحفظة العملاء في الوقت المتوقع.',
@@ -1099,7 +1129,7 @@ function CustomersPage() {
         setLoading(false)
 
         const savedSnapshot = await saveReadSnapshot({
-          key: CUSTOMERS_LIST_SNAPSHOT_KEY,
+          key: customersListSnapshotKey,
           scope: 'customers-list',
           type: 'customers_list',
           data: {
@@ -1153,10 +1183,12 @@ function CustomersPage() {
     }
   }, [
     clearSnapshotState,
+    customersListSnapshotKey,
     isConfigured,
     isOffline,
     markCachedSnapshot,
     markLiveSnapshot,
+    orgId,
     refreshKey,
   ])
 
@@ -1602,6 +1634,11 @@ function CustomersPage() {
       return
     }
 
+    if (!orgId) {
+      setSubmitError(MISSING_CURRENT_ORG_MESSAGE)
+      return
+    }
+
     const payload = {
       ...normalizeCustomerProfilePayload(formValues),
     }
@@ -1618,7 +1655,7 @@ function CustomersPage() {
     if (isOffline) {
       try {
         const queuedRecord = await queueOfflineCustomer({
-          payload,
+          payload: withStampedOrg(payload, orgId),
         })
 
         if (!queuedRecord) {
@@ -1641,7 +1678,10 @@ function CustomersPage() {
       return
     }
 
-    const { error } = await supabase.schema('public').from('customers').insert([payload])
+    const { error } = await supabase
+      .schema('public')
+      .from('customers')
+      .insert([withStampedOrg(payload, orgId)])
 
     if (error) {
       setSubmitError(error.message)

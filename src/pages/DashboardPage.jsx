@@ -15,10 +15,12 @@ import RecordCard from '../components/ui/RecordCard.jsx'
 import RecordHeader from '../components/ui/RecordHeader.jsx'
 import RetryBlock from '../components/ui/RetryBlock.jsx'
 import { useAuth } from '../context/auth-context.js'
+import { useTenant } from '../context/tenant-context.js'
 import useDashboardMobileLiteLayout from '../hooks/useDashboardMobileLiteLayout.js'
 import useNetworkStatus from '../hooks/useNetworkStatus.js'
 import useOfflineSnapshot from '../hooks/useOfflineSnapshot.js'
-import { DASHBOARD_SNAPSHOT_KEY } from '../lib/offline/cacheKeys.js'
+import { MISSING_CURRENT_ORG_MESSAGE, withOrgScope } from '../lib/orgScope.js'
+import { getDashboardSnapshotKey } from '../lib/offline/cacheKeys.js'
 import { getOfflineSnapshotMissingMessage } from '../lib/offline/freshness.js'
 import {
   isBrowserOffline,
@@ -443,6 +445,7 @@ function renderProfitDrillDownItem(item) {
 
 function DashboardPage() {
   const { configError, isConfigured } = useAuth()
+  const { orgId } = useTenant()
   const { isOffline } = useNetworkStatus()
   const dashboardMobileLite = useDashboardMobileLiteLayout()
   const { clearSnapshotState, markCachedSnapshot, markLiveSnapshot, snapshotState } =
@@ -457,6 +460,7 @@ function DashboardPage() {
   const [loading, setLoading] = useState(Boolean(isConfigured))
   const [loadError, setLoadError] = useState(isConfigured ? '' : configError)
   const [lastUpdatedAt, setLastUpdatedAt] = useState('')
+  const dashboardSnapshotKey = getDashboardSnapshotKey(orgId)
 
   const hydrateFromSnapshot = useCallback(
     async (options = {}) => {
@@ -465,7 +469,7 @@ function DashboardPage() {
       setLoading(true)
       setLoadError('')
 
-      const snapshot = await loadReadSnapshot(DASHBOARD_SNAPSHOT_KEY)
+      const snapshot = await loadReadSnapshot(dashboardSnapshotKey)
 
       if (!snapshot?.data) {
         clearSnapshotState()
@@ -499,12 +503,18 @@ function DashboardPage() {
       markCachedSnapshot(snapshot.savedAt)
       return true
     },
-    [clearSnapshotState, markCachedSnapshot]
+    [clearSnapshotState, dashboardSnapshotKey, markCachedSnapshot]
   )
 
   const loadDashboard = useCallback(async () => {
     if (!isConfigured || !supabase) {
       setLoadError(configError || 'إعدادات Supabase غير مكتملة.')
+      setLoading(false)
+      return
+    }
+
+    if (!orgId) {
+      setLoadError(MISSING_CURRENT_ORG_MESSAGE)
       setLoading(false)
       return
     }
@@ -522,17 +532,26 @@ function DashboardPage() {
       const now = new Date()
 
       const [customersResult, transfersResult, paymentsResult] = await withLiveReadTimeout(Promise.all([
-        supabase.schema('public').from('customers').select('*', { count: 'exact', head: true }),
-        supabase
-          .schema('public')
-          .from('transfers')
-          .select('id, reference_number, customer_id, status, usdt_amount, payable_rub, commission_rub, created_at')
-          .order('created_at', { ascending: false }),
-        supabase
-          .schema('public')
-          .from('transfer_payments')
-          .select('id, transfer_id, amount_rub, payment_method, note, paid_at, created_at')
-          .order('created_at', { ascending: false }),
+        withOrgScope(
+          supabase.schema('public').from('customers').select('*', { count: 'exact', head: true }),
+          orgId
+        ),
+        withOrgScope(
+          supabase
+            .schema('public')
+            .from('transfers')
+            .select('id, reference_number, customer_id, status, usdt_amount, payable_rub, commission_rub, created_at')
+            .order('created_at', { ascending: false }),
+          orgId
+        ),
+        withOrgScope(
+          supabase
+            .schema('public')
+            .from('transfer_payments')
+            .select('id, transfer_id, amount_rub, payment_method, note, paid_at, created_at')
+            .order('created_at', { ascending: false }),
+          orgId
+        ),
       ]), {
         timeoutMessage: 'تعذر إكمال تحميل لوحة التشغيل المالية في الوقت المتوقع.',
       })
@@ -568,13 +587,16 @@ function DashboardPage() {
 
       if (transferIds.length > 0) {
         const { data: nextPaymentVoidRows, error: paymentVoidsError } = await withLiveReadTimeout(
-          supabase
-            .schema('public')
-            .from('transfer_payment_voids')
-            .select(TRANSFER_PAYMENT_VOID_SELECT)
-            .in('transfer_id', transferIds)
-            .order('created_at', { ascending: false })
-            .order('id', { ascending: false }),
+          withOrgScope(
+            supabase
+              .schema('public')
+              .from('transfer_payment_voids')
+              .select(TRANSFER_PAYMENT_VOID_SELECT)
+              .in('transfer_id', transferIds)
+              .order('created_at', { ascending: false })
+              .order('id', { ascending: false }),
+            orgId
+          ),
           {
             timeoutMessage:
               'تعذر إكمال تحميل حالات إلغاء الدفعات المؤكدة للوحة التشغيل في الوقت المتوقع.',
@@ -615,13 +637,16 @@ function DashboardPage() {
       if (transferIds.length > 0) {
         const { data: overpaymentResolutionRows, error: overpaymentResolutionError } =
           await withLiveReadTimeout(
-            supabase
-              .schema('public')
-              .from('transfer_overpayment_resolutions')
-              .select(TRANSFER_OVERPAYMENT_RESOLUTION_SELECT)
-              .in('transfer_id', transferIds)
-              .order('created_at', { ascending: false })
-              .order('id', { ascending: false }),
+            withOrgScope(
+              supabase
+                .schema('public')
+                .from('transfer_overpayment_resolutions')
+                .select(TRANSFER_OVERPAYMENT_RESOLUTION_SELECT)
+                .in('transfer_id', transferIds)
+                .order('created_at', { ascending: false })
+                .order('id', { ascending: false }),
+              orgId
+            ),
             {
               timeoutMessage:
                 'تعذر إكمال تحميل حالات معالجة زيادة الدفع للوحة التشغيل في الوقت المتوقع.',
@@ -713,11 +738,14 @@ function DashboardPage() {
 
       if (relevantCustomerIds.length > 0) {
         const { data: customersData, error: customersDataError } = await withLiveReadTimeout(
-          supabase
-            .schema('public')
-            .from('customers')
-            .select('id, full_name')
-            .in('id', relevantCustomerIds),
+          withOrgScope(
+            supabase
+              .schema('public')
+              .from('customers')
+              .select('id, full_name')
+              .in('id', relevantCustomerIds),
+            orgId
+          ),
           {
             timeoutMessage: 'تعذر إكمال تحميل أسماء العملاء للوحة التشغيل في الوقت المتوقع.',
           }
@@ -987,7 +1015,7 @@ function DashboardPage() {
       setLoading(false)
 
       const savedSnapshot = await saveReadSnapshot({
-        key: DASHBOARD_SNAPSHOT_KEY,
+        key: dashboardSnapshotKey,
         scope: 'dashboard-main',
         type: 'dashboard_main',
         data: {
@@ -1016,10 +1044,12 @@ function DashboardPage() {
   }, [
     clearSnapshotState,
     configError,
+    dashboardSnapshotKey,
     hydrateFromSnapshot,
     isConfigured,
     isOffline,
     markLiveSnapshot,
+    orgId,
   ])
 
   useEffect(() => {

@@ -93,6 +93,8 @@ create table if not exists public.transfer_payment_voids (
   id uuid primary key default gen_random_uuid(),
   payment_id uuid not null references public.transfer_payments(id) on delete restrict,
   transfer_id uuid not null references public.transfers(id) on delete restrict,
+  -- Live tenant alignment hardening: org-scoped child rows derive org from the parent transfer/payment chain.
+  org_id uuid not null,
   void_reason_type text not null,
   note text not null,
   created_at timestamptz not null default timezone('utc', now())
@@ -101,17 +103,25 @@ create table if not exists public.transfer_payment_voids (
 create unique index if not exists transfer_payment_voids_payment_id_key
 on public.transfer_payment_voids (payment_id);
 
+create index if not exists transfer_payment_voids_org_id_idx
+on public.transfer_payment_voids (org_id);
+
 create index if not exists transfer_payment_voids_transfer_created_idx
 on public.transfer_payment_voids (transfer_id, created_at desc);
 
 create table if not exists public.transfer_overpayment_resolutions (
   id uuid primary key default gen_random_uuid(),
   transfer_id uuid not null references public.transfers(id) on delete restrict,
+  -- Live tenant alignment hardening: org-scoped child rows derive org from the parent transfer.
+  org_id uuid not null,
   resolution_type text not null,
   resolved_overpaid_amount_rub numeric(18,2) not null,
   note text not null,
   created_at timestamptz not null default timezone('utc', now())
 );
+
+create index if not exists transfer_overpayment_resolutions_org_id_idx
+on public.transfer_overpayment_resolutions (org_id);
 
 create index if not exists transfer_overpayment_resolutions_transfer_created_idx
 on public.transfer_overpayment_resolutions (transfer_id, created_at desc);
@@ -239,3 +249,121 @@ create trigger lock_transfer_core_fields_after_payment
 before update on public.transfers
 for each row
 execute function public.lock_transfer_core_fields_after_payment();
+
+-- Active-payment truth:
+-- - a confirmed payment counts only when no row exists in public.transfer_payment_voids for that payment_id
+-- - DB-level balances and status refresh must match the app's confirmed-vs-voided payment model
+
+create or replace view public.transfer_balances as
+select
+  t.id,
+  t.org_id,
+  t.customer_id,
+  t.usdt_amount,
+  t.market_rate,
+  t.client_rate,
+  t.pricing_mode,
+  t.commission_pct,
+  t.commission_rub,
+  t.gross_rub,
+  t.payable_rub,
+  coalesce(sum(tp.amount_rub), 0)::numeric(18,2) as paid_rub,
+  (t.payable_rub - coalesce(sum(tp.amount_rub), 0))::numeric(18,2) as remaining_rub,
+  t.status,
+  t.created_at,
+  t.updated_at
+from public.transfers t
+left join public.transfer_payments tp
+  on tp.transfer_id = t.id
+ and not exists (
+   select 1
+   from public.transfer_payment_voids tpv
+   where tpv.payment_id = tp.id
+ )
+group by t.id;
+
+create or replace function public.refresh_transfer_status(p_transfer_id uuid)
+returns void
+language plpgsql
+as $$
+declare
+  v_payable numeric(18,2);
+  v_paid numeric(18,2);
+begin
+  select payable_rub
+  into v_payable
+  from public.transfers
+  where id = p_transfer_id;
+
+  select coalesce(sum(tp.amount_rub), 0)::numeric(18,2)
+  into v_paid
+  from public.transfer_payments tp
+  where tp.transfer_id = p_transfer_id
+    and not exists (
+      select 1
+      from public.transfer_payment_voids tpv
+      where tpv.payment_id = tp.id
+    );
+
+  update public.transfers
+  set status = case
+    when v_paid <= 0 then 'open'
+    when v_paid < v_payable then 'partial'
+    else 'paid'
+  end,
+  updated_at = now()
+  where id = p_transfer_id;
+end;
+$$;
+
+create or replace function public.after_payment_void_mutation()
+returns trigger
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  if tg_op = 'INSERT' then
+    perform public.refresh_transfer_status(new.transfer_id);
+    return new;
+  end if;
+
+  if tg_op = 'DELETE' then
+    perform public.refresh_transfer_status(old.transfer_id);
+    return old;
+  end if;
+
+  if tg_op = 'UPDATE' then
+    perform public.refresh_transfer_status(old.transfer_id);
+
+    if new.transfer_id is distinct from old.transfer_id then
+      perform public.refresh_transfer_status(new.transfer_id);
+    end if;
+
+    return new;
+  end if;
+
+  return null;
+end;
+$$;
+
+drop trigger if exists trg_transfer_payment_voids_refresh_status_ins on public.transfer_payment_voids;
+
+create trigger trg_transfer_payment_voids_refresh_status_ins
+after insert on public.transfer_payment_voids
+for each row
+execute function public.after_payment_void_mutation();
+
+drop trigger if exists trg_transfer_payment_voids_refresh_status_del on public.transfer_payment_voids;
+
+create trigger trg_transfer_payment_voids_refresh_status_del
+after delete on public.transfer_payment_voids
+for each row
+execute function public.after_payment_void_mutation();
+
+drop trigger if exists trg_transfer_payment_voids_refresh_status_upd on public.transfer_payment_voids;
+
+create trigger trg_transfer_payment_voids_refresh_status_upd
+after update of payment_id, transfer_id on public.transfer_payment_voids
+for each row
+execute function public.after_payment_void_mutation();

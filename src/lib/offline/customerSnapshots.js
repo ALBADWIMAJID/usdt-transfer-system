@@ -1,6 +1,6 @@
 import {
-  CUSTOMERS_LIST_SNAPSHOT_KEY,
-  NEW_TRANSFER_CUSTOMERS_SNAPSHOT_KEY,
+  getCustomersListSnapshotKey,
+  getNewTransferCustomersSnapshotKey,
   getCustomerDetailsSnapshotKey,
 } from './cacheKeys.js'
 import { deleteFromStore } from './db.js'
@@ -202,8 +202,12 @@ function sortCustomerOptions(customers) {
   )
 }
 
-async function syncCustomerDetailsSnapshot(customer) {
-  const detailKey = getCustomerDetailsSnapshotKey(customer.id)
+async function syncCustomerDetailsSnapshot(customer, orgId) {
+  if (!customer?.id || !orgId) {
+    return
+  }
+
+  const detailKey = getCustomerDetailsSnapshotKey(orgId, customer.id)
   const detailSnapshot = await loadReadSnapshot(detailKey)
 
   if (detailSnapshot?.data?.customer) {
@@ -225,20 +229,23 @@ async function syncCustomerDetailsSnapshot(customer) {
   }
 }
 
-export async function syncEditedCustomerSnapshots(customer) {
-  if (!customer?.id) {
+export async function syncEditedCustomerSnapshots(customer, orgId) {
+  if (!customer?.id || !orgId) {
     return
   }
 
-  await syncCustomerDetailsSnapshot(customer)
+  const customersListSnapshotKey = getCustomersListSnapshotKey(orgId)
+  const newTransferCustomersSnapshotKey = getNewTransferCustomersSnapshotKey(orgId)
 
-  const customersSnapshot = await loadReadSnapshot(CUSTOMERS_LIST_SNAPSHOT_KEY)
+  await syncCustomerDetailsSnapshot(customer, orgId)
+
+  const customersSnapshot = await loadReadSnapshot(customersListSnapshotKey)
 
   if (customersSnapshot?.data) {
     await persistUpdatedSnapshot(
       customersSnapshot,
       {
-        key: CUSTOMERS_LIST_SNAPSHOT_KEY,
+        key: customersListSnapshotKey,
         scope: 'customers-list',
         type: 'customers_list',
       },
@@ -266,7 +273,7 @@ export async function syncEditedCustomerSnapshots(customer) {
     )
   }
 
-  const newTransferSnapshot = await loadReadSnapshot(NEW_TRANSFER_CUSTOMERS_SNAPSHOT_KEY)
+  const newTransferSnapshot = await loadReadSnapshot(newTransferCustomersSnapshotKey)
 
   if (newTransferSnapshot?.data?.customers) {
     const nextCustomers = customer.is_archived
@@ -285,7 +292,7 @@ export async function syncEditedCustomerSnapshots(customer) {
     await persistUpdatedSnapshot(
       newTransferSnapshot,
       {
-        key: NEW_TRANSFER_CUSTOMERS_SNAPSHOT_KEY,
+        key: newTransferCustomersSnapshotKey,
         scope: 'new-transfer-customer-options',
         type: 'customers_options',
       },
@@ -297,14 +304,17 @@ export async function syncEditedCustomerSnapshots(customer) {
   }
 }
 
-export async function syncArchivedCustomerSnapshots(customer) {
-  if (!customer?.id) {
+export async function syncArchivedCustomerSnapshots(customer, orgId) {
+  if (!customer?.id || !orgId) {
     return
   }
 
-  await syncCustomerDetailsSnapshot(customer)
+  const customersListSnapshotKey = getCustomersListSnapshotKey(orgId)
+  const newTransferCustomersSnapshotKey = getNewTransferCustomersSnapshotKey(orgId)
 
-  const customersSnapshot = await loadReadSnapshot(CUSTOMERS_LIST_SNAPSHOT_KEY)
+  await syncCustomerDetailsSnapshot(customer, orgId)
+
+  const customersSnapshot = await loadReadSnapshot(customersListSnapshotKey)
 
   if (customersSnapshot?.data) {
     const existingActiveEntry = Array.isArray(customersSnapshot.data.customers)
@@ -321,7 +331,7 @@ export async function syncArchivedCustomerSnapshots(customer) {
     await persistUpdatedSnapshot(
       customersSnapshot,
       {
-        key: CUSTOMERS_LIST_SNAPSHOT_KEY,
+        key: customersListSnapshotKey,
         scope: 'customers-list',
         type: 'customers_list',
       },
@@ -337,13 +347,13 @@ export async function syncArchivedCustomerSnapshots(customer) {
     )
   }
 
-  const newTransferSnapshot = await loadReadSnapshot(NEW_TRANSFER_CUSTOMERS_SNAPSHOT_KEY)
+  const newTransferSnapshot = await loadReadSnapshot(newTransferCustomersSnapshotKey)
 
   if (newTransferSnapshot?.data?.customers) {
     await persistUpdatedSnapshot(
       newTransferSnapshot,
       {
-        key: NEW_TRANSFER_CUSTOMERS_SNAPSHOT_KEY,
+        key: newTransferCustomersSnapshotKey,
         scope: 'new-transfer-customer-options',
         type: 'customers_options',
       },
@@ -359,12 +369,14 @@ export async function syncArchivedCustomerSnapshots(customer) {
   }
 }
 
-export async function syncDeletedCustomerSnapshots(customerId) {
-  if (!customerId) {
+export async function syncDeletedCustomerSnapshots(customerId, orgId) {
+  if (!customerId || !orgId) {
     return
   }
 
-  const detailKey = getCustomerDetailsSnapshotKey(customerId)
+  const detailKey = getCustomerDetailsSnapshotKey(orgId, customerId)
+  const customersListSnapshotKey = getCustomersListSnapshotKey(orgId)
+  const newTransferCustomersSnapshotKey = getNewTransferCustomersSnapshotKey(orgId)
 
   try {
     await deleteFromStore(detailKey)
@@ -372,13 +384,13 @@ export async function syncDeletedCustomerSnapshots(customerId) {
     console.warn('Failed to remove customer detail snapshot:', customerId, error)
   }
 
-  const customersSnapshot = await loadReadSnapshot(CUSTOMERS_LIST_SNAPSHOT_KEY)
+  const customersSnapshot = await loadReadSnapshot(customersListSnapshotKey)
 
   if (customersSnapshot?.data) {
     await persistUpdatedSnapshot(
       customersSnapshot,
       {
-        key: CUSTOMERS_LIST_SNAPSHOT_KEY,
+        key: customersListSnapshotKey,
         scope: 'customers-list',
         type: 'customers_list',
       },
@@ -391,13 +403,13 @@ export async function syncDeletedCustomerSnapshots(customerId) {
     )
   }
 
-  const newTransferSnapshot = await loadReadSnapshot(NEW_TRANSFER_CUSTOMERS_SNAPSHOT_KEY)
+  const newTransferSnapshot = await loadReadSnapshot(newTransferCustomersSnapshotKey)
 
   if (newTransferSnapshot?.data?.customers) {
     await persistUpdatedSnapshot(
       newTransferSnapshot,
       {
-        key: NEW_TRANSFER_CUSTOMERS_SNAPSHOT_KEY,
+        key: newTransferCustomersSnapshotKey,
         scope: 'new-transfer-customer-options',
         type: 'customers_options',
       },

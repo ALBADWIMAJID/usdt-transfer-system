@@ -2,6 +2,7 @@ import {
   createLocalPendingTransferReference,
   createOfflineMutationId,
   createTransferMutationDedupeKey,
+  normalizeMutationOrgId,
 } from './mutationIds.js'
 import {
   getMutationRecord,
@@ -24,6 +25,7 @@ function normalizeTransferPayload(payload, customerId) {
     gross_rub: Number(payload.gross_rub || 0),
     market_rate: Number(payload.market_rate || 0),
     notes: payload.notes ? String(payload.notes).trim() : null,
+    org_id: normalizeMutationOrgId(payload.org_id),
     payable_rub: Number(payload.payable_rub || 0),
     pricing_mode: String(payload.pricing_mode || 'hybrid').trim() || 'hybrid',
     status: String(payload.status || 'open').trim() || 'open',
@@ -31,14 +33,15 @@ function normalizeTransferPayload(payload, customerId) {
   }
 }
 
-function buildQueuedTransferRecord({ customerId, localMeta = {}, payload }) {
+function buildQueuedTransferRecord({ customerId, localMeta = {}, orgId, payload }) {
   const normalizedPayload = normalizeTransferPayload(payload, customerId)
   const createdAt = new Date().toISOString()
+  const normalizedOrgId = normalizeMutationOrgId(orgId || normalizedPayload.org_id)
 
   return {
     createdAt,
     customerId,
-    dedupeKey: createTransferMutationDedupeKey(normalizedPayload),
+    dedupeKey: createTransferMutationDedupeKey(normalizedPayload, normalizedOrgId),
     id: createOfflineMutationId('transfer-create'),
     lastError: '',
     lastAttemptAt: '',
@@ -46,7 +49,11 @@ function buildQueuedTransferRecord({ customerId, localMeta = {}, payload }) {
       customerName: localMeta.customerName || '',
       localReference: localMeta.localReference || createLocalPendingTransferReference(),
     },
-    payload: normalizedPayload,
+    orgId: normalizedOrgId,
+    payload: {
+      ...normalizedPayload,
+      org_id: normalizedOrgId,
+    },
     retryCount: 0,
     status: 'pending',
     type: TRANSFER_CREATE_MUTATION_TYPE,
@@ -73,23 +80,50 @@ function sortQueueRecordsByCreatedAt(records, direction = 'desc') {
 }
 
 async function queueOfflineTransfer({ customerId, localMeta, payload }) {
+  const normalizedOrgId = normalizeMutationOrgId(payload?.org_id)
+
+  if (!normalizedOrgId) {
+    return null
+  }
+
   const queuedRecord = buildQueuedTransferRecord({
     customerId,
     localMeta,
+    orgId: normalizedOrgId,
     payload,
   })
 
   return putMutationRecord(queuedRecord)
 }
 
-async function listQueuedTransferMutations() {
-  const records = await listMutationRecords()
-
-  return records.filter((record) => record?.type === TRANSFER_CREATE_MUTATION_TYPE)
+function getQueuedTransferOrgId(record) {
+  return normalizeMutationOrgId(record?.orgId || record?.payload?.org_id)
 }
 
-async function listActiveQueuedTransfers({ customerId = '' } = {}) {
-  const records = await listQueuedTransferMutations()
+function isScopedQueuedTransfer(record) {
+  return Boolean(getQueuedTransferOrgId(record))
+}
+
+function matchesQueuedTransferOrg(record, orgId) {
+  return getQueuedTransferOrgId(record) === normalizeMutationOrgId(orgId)
+}
+
+async function listQueuedTransferMutations({ orgId = '' } = {}) {
+  const records = await listMutationRecords()
+  const normalizedOrgId = normalizeMutationOrgId(orgId)
+  const scopedRecords = records.filter((record) => record?.type === TRANSFER_CREATE_MUTATION_TYPE)
+
+  if (!normalizedOrgId) {
+    return []
+  }
+
+  return scopedRecords.filter(
+    (record) => isScopedQueuedTransfer(record) && matchesQueuedTransferOrg(record, normalizedOrgId)
+  )
+}
+
+async function listActiveQueuedTransfers({ customerId = '', orgId = '' } = {}) {
+  const records = await listQueuedTransferMutations({ orgId })
 
   return sortQueueRecordsByCreatedAt(
     records.filter((record) => {
@@ -106,8 +140,8 @@ async function listActiveQueuedTransfers({ customerId = '' } = {}) {
   )
 }
 
-async function listReplayableQueuedTransfers({ includeFailed = true } = {}) {
-  const records = await listQueuedTransferMutations()
+async function listReplayableQueuedTransfers({ includeFailed = true, orgId = '' } = {}) {
+  const records = await listQueuedTransferMutations({ orgId })
 
   return sortQueueRecordsByCreatedAt(
     records.filter((record) => {
@@ -125,8 +159,8 @@ async function listReplayableQueuedTransfers({ includeFailed = true } = {}) {
   )
 }
 
-async function getTransferQueueSummary() {
-  const records = await listQueuedTransferMutations()
+async function getTransferQueueSummary({ orgId = '' } = {}) {
+  const records = await listQueuedTransferMutations({ orgId })
   const summary = {
     activeCount: 0,
     blockedCount: 0,
@@ -198,8 +232,8 @@ async function markQueuedTransferPending(id) {
   }))
 }
 
-async function normalizeQueuedTransfersState() {
-  const records = await listQueuedTransferMutations()
+async function normalizeQueuedTransfersState(orgId = '') {
+  const records = await listQueuedTransferMutations({ orgId })
   const syncingRecords = records.filter((record) => record.status === 'syncing')
 
   if (syncingRecords.length === 0) {
@@ -208,7 +242,7 @@ async function normalizeQueuedTransfersState() {
 
   await Promise.all(syncingRecords.map((record) => markQueuedTransferPending(record.id)))
 
-  return listQueuedTransferMutations()
+  return listQueuedTransferMutations({ orgId })
 }
 
 async function resolveQueuedTransfer(id) {

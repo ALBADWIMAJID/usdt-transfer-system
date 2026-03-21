@@ -6,11 +6,12 @@ import {
   resolveQueuedCustomer,
 } from './customerQueue.js'
 
-function buildDuplicateCheckQuery(payload) {
+function buildDuplicateCheckQuery(payload, orgId) {
   let query = supabase
     .schema('public')
     .from('customers')
     .select('id, full_name, phone')
+    .eq('org_id', orgId || payload.org_id || '')
     .eq('full_name', payload.full_name)
     .limit(1)
 
@@ -23,9 +24,13 @@ function buildDuplicateCheckQuery(payload) {
   return query
 }
 
-async function findExistingServerCustomer(payload) {
+async function findExistingServerCustomer(payload, orgId) {
   if (!supabase) {
     return { data: null, error: new Error('Supabase client is not configured.') }
+  }
+
+  if (!orgId && !payload?.org_id) {
+    return { data: null, error: new Error('Current organization is not available for customer replay.') }
   }
 
   // Conservative duplicate protection: only exact full_name + phone matches are treated as existing.
@@ -33,7 +38,7 @@ async function findExistingServerCustomer(payload) {
     return { data: null, error: null }
   }
 
-  const { data, error } = await buildDuplicateCheckQuery(payload)
+  const { data, error } = await buildDuplicateCheckQuery(payload, orgId)
 
   if (error) {
     return { data: null, error }
@@ -57,10 +62,10 @@ async function insertServerCustomer(payload) {
     .select('id, full_name, phone')
 }
 
-async function replayQueuedCustomer(record) {
+async function replayQueuedCustomer(record, { orgId = '' } = {}) {
   await markQueuedCustomerSyncing(record.id)
 
-  const duplicateCheck = await findExistingServerCustomer(record.payload)
+  const duplicateCheck = await findExistingServerCustomer(record.payload, orgId || record.orgId)
 
   if (duplicateCheck.error) {
     await markQueuedCustomerFailed(record.id, duplicateCheck.error.message)
@@ -102,8 +107,8 @@ async function replayQueuedCustomer(record) {
   }
 }
 
-async function replayCustomerQueue({ includeFailed = true } = {}) {
-  const records = await listReplayableQueuedCustomers({ includeFailed })
+async function replayCustomerQueue({ includeFailed = true, orgId = '' } = {}) {
+  const records = await listReplayableQueuedCustomers({ includeFailed, orgId })
   const summary = {
     blockedCount: 0,
     dedupedCount: 0,
@@ -113,7 +118,7 @@ async function replayCustomerQueue({ includeFailed = true } = {}) {
   }
 
   for (const record of records) {
-    const result = await replayQueuedCustomer(record)
+    const result = await replayQueuedCustomer(record, { orgId })
 
     if (result.outcome === 'synced') {
       summary.replayedCount += 1

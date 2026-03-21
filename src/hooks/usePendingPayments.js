@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useTenant } from '../context/tenant-context.js'
 import {
   listActiveQueuedPaymentsForTransfer,
   normalizeQueuedPaymentsState,
@@ -6,22 +7,23 @@ import {
 } from '../lib/offline/paymentQueue.js'
 
 function usePendingPayments(transferId) {
+  const { orgId } = useTenant()
   const [pendingPayments, setPendingPayments] = useState([])
   const [loading, setLoading] = useState(Boolean(transferId))
 
   const refreshPendingPayments = useCallback(async () => {
-    if (!transferId) {
+    if (!transferId || !orgId) {
       setPendingPayments([])
       setLoading(false)
       return
     }
 
     setLoading(true)
-    await normalizeQueuedPaymentsState()
-    const queuedPayments = await listActiveQueuedPaymentsForTransfer(transferId)
+    await normalizeQueuedPaymentsState(orgId)
+    const queuedPayments = await listActiveQueuedPaymentsForTransfer(transferId, { orgId })
     setPendingPayments(queuedPayments)
     setLoading(false)
-  }, [transferId])
+  }, [orgId, transferId])
 
   useEffect(() => {
     if (typeof queueMicrotask === 'function') {

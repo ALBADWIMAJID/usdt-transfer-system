@@ -9,13 +9,15 @@ import RecordCard from '../components/ui/RecordCard.jsx'
 import RecordHeader from '../components/ui/RecordHeader.jsx'
 import SectionCard from '../components/ui/SectionCard.jsx'
 import { useAuth } from '../context/auth-context.js'
+import { useTenant } from '../context/tenant-context.js'
 import useNetworkStatus from '../hooks/useNetworkStatus.js'
 import useOfflineSnapshot from '../hooks/useOfflineSnapshot.js'
 import usePendingTransfers from '../hooks/usePendingTransfers.js'
 import useReplayQueue from '../hooks/useReplayQueue.js'
+import { MISSING_CURRENT_ORG_MESSAGE, withOrgScope, withStampedOrg } from '../lib/orgScope.js'
 import {
-  CUSTOMERS_LIST_SNAPSHOT_KEY,
-  NEW_TRANSFER_CUSTOMERS_SNAPSHOT_KEY,
+  getCustomersListSnapshotKey,
+  getNewTransferCustomersSnapshotKey,
 } from '../lib/offline/cacheKeys.js'
 import { getOfflineSnapshotMissingMessage } from '../lib/offline/freshness.js'
 import {
@@ -136,8 +138,11 @@ function normalizeCustomerOptions(customers = []) {
   )
 }
 
-async function loadCachedCustomerOptions() {
-  const directSnapshot = await loadReadSnapshot(NEW_TRANSFER_CUSTOMERS_SNAPSHOT_KEY)
+async function loadCachedCustomerOptions({
+  customersListSnapshotKey = '',
+  newTransferCustomersSnapshotKey = '',
+} = {}) {
+  const directSnapshot = await loadReadSnapshot(newTransferCustomersSnapshotKey)
   const directCustomers = normalizeCustomerOptions(directSnapshot?.data?.customers || [])
 
   if (directCustomers.length > 0) {
@@ -147,7 +152,7 @@ async function loadCachedCustomerOptions() {
     }
   }
 
-  const portfolioSnapshot = await loadReadSnapshot(CUSTOMERS_LIST_SNAPSHOT_KEY)
+  const portfolioSnapshot = await loadReadSnapshot(customersListSnapshotKey)
   const portfolioCustomers = normalizeCustomerOptions(portfolioSnapshot?.data?.customers || [])
 
   if (portfolioCustomers.length > 0) {
@@ -200,6 +205,7 @@ function NewTransferPage() {
   const [searchParams] = useSearchParams()
   const navigate = useNavigate()
   const { configError, isConfigured } = useAuth()
+  const { orgId } = useTenant()
   const { isOffline } = useNetworkStatus()
   const { clearSnapshotState, markCachedSnapshot, markLiveSnapshot, snapshotState } =
     useOfflineSnapshot()
@@ -214,6 +220,8 @@ function NewTransferPage() {
   const [submitSuccess, setSubmitSuccess] = useState('')
   const [submitting, setSubmitting] = useState(false)
   const rateAssistRequestRef = useRef(null)
+  const customersListSnapshotKey = getCustomersListSnapshotKey(orgId)
+  const newTransferCustomersSnapshotKey = getNewTransferCustomersSnapshotKey(orgId)
   const {
     activeCount: pendingTransferCount,
     failedCount: failedTransferCount,
@@ -237,7 +245,10 @@ function NewTransferPage() {
       setCustomersLoading(true)
       setCustomersError('')
 
-      const cachedCustomers = await loadCachedCustomerOptions()
+      const cachedCustomers = await loadCachedCustomerOptions({
+        customersListSnapshotKey,
+        newTransferCustomersSnapshotKey,
+      })
 
       if (!isMounted) {
         return
@@ -265,14 +276,24 @@ function NewTransferPage() {
       setCustomersLoading(true)
       setCustomersError('')
 
+      if (!orgId) {
+        setCustomers([])
+        setCustomersError(MISSING_CURRENT_ORG_MESSAGE)
+        setCustomersLoading(false)
+        return
+      }
+
       try {
         const { data, error } = await withLiveReadTimeout(
-          supabase
-            .schema('public')
-            .from('customers')
-            .select('id, full_name')
-            .eq('is_archived', false)
-            .order('full_name', { ascending: true }),
+          withOrgScope(
+            supabase
+              .schema('public')
+              .from('customers')
+              .select('id, full_name')
+              .eq('is_archived', false)
+              .order('full_name', { ascending: true }),
+            orgId
+          ),
           {
             timeoutMessage: 'تعذر إكمال تحميل قائمة العملاء في الوقت المتوقع.',
           }
@@ -295,7 +316,7 @@ function NewTransferPage() {
           data: {
             customers: normalizedCustomers,
           },
-          key: NEW_TRANSFER_CUSTOMERS_SNAPSHOT_KEY,
+          key: newTransferCustomersSnapshotKey,
           scope: {
             page: 'new_transfer',
           },
@@ -334,11 +355,14 @@ function NewTransferPage() {
   }, [
     clearSnapshotState,
     configError,
+    customersListSnapshotKey,
     customerRefreshKey,
     isConfigured,
     isOffline,
     markCachedSnapshot,
     markLiveSnapshot,
+    newTransferCustomersSnapshotKey,
+    orgId,
   ])
 
   useEffect(() => {
@@ -463,6 +487,11 @@ function NewTransferPage() {
       return
     }
 
+    if (!orgId) {
+      setSubmitError(MISSING_CURRENT_ORG_MESSAGE)
+      return
+    }
+
     if (!formValues.customer_id) {
       setSubmitError('اختر العميل قبل إنشاء الحوالة.')
       return
@@ -529,7 +558,7 @@ function NewTransferPage() {
           localMeta: {
             customerName: selectedCustomer.full_name,
           },
-          payload,
+          payload: withStampedOrg(payload, orgId),
         })
 
         setFormValues(createEmptyForm(formValues.customer_id))
@@ -552,7 +581,7 @@ function NewTransferPage() {
       .schema('public')
       .from('transfers')
       .insert([
-        {
+        withStampedOrg({
           customer_id: payload.customer_id,
           usdt_amount: payload.usdt_amount,
           market_rate: payload.market_rate,
@@ -564,7 +593,7 @@ function NewTransferPage() {
           payable_rub: payload.payable_rub,
           notes: payload.notes,
           status: payload.status,
-        },
+        }, orgId),
       ])
       .select('id, reference_number')
       .maybeSingle()

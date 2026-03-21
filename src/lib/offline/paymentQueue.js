@@ -1,4 +1,8 @@
-import { createOfflineMutationId, createPaymentMutationDedupeKey } from './mutationIds.js'
+import {
+  createOfflineMutationId,
+  createPaymentMutationDedupeKey,
+  normalizeMutationOrgId,
+} from './mutationIds.js'
 import {
   getMutationRecord,
   listMutationRecords,
@@ -14,19 +18,21 @@ function normalizePaymentPayload(payload, transferId) {
   return {
     amount_rub: Number(payload.amount_rub || 0),
     note: payload.note ? String(payload.note).trim() : null,
+    org_id: normalizeMutationOrgId(payload.org_id),
     paid_at: payload.paid_at || new Date().toISOString(),
     payment_method: String(payload.payment_method || '').trim(),
     transfer_id: transferId,
   }
 }
 
-function buildQueuedPaymentRecord({ payload, transferId, localMeta = {} }) {
+function buildQueuedPaymentRecord({ orgId, payload, transferId, localMeta = {} }) {
   const normalizedPayload = normalizePaymentPayload(payload, transferId)
   const createdAt = new Date().toISOString()
+  const normalizedOrgId = normalizeMutationOrgId(orgId || normalizedPayload.org_id)
 
   return {
     createdAt,
-    dedupeKey: createPaymentMutationDedupeKey(normalizedPayload),
+    dedupeKey: createPaymentMutationDedupeKey(normalizedPayload, normalizedOrgId),
     id: createOfflineMutationId('payment-create'),
     blockedReason: '',
     lastError: '',
@@ -37,7 +43,11 @@ function buildQueuedPaymentRecord({ payload, transferId, localMeta = {} }) {
       dependencyTransferQueueId: localMeta.dependencyTransferQueueId || '',
       referenceNumber: localMeta.referenceNumber || '',
     },
-    payload: normalizedPayload,
+    orgId: normalizedOrgId,
+    payload: {
+      ...normalizedPayload,
+      org_id: normalizedOrgId,
+    },
     retryCount: 0,
     status: 'pending',
     transferId,
@@ -65,8 +75,15 @@ function sortQueueRecordsByCreatedAt(records, direction = 'desc') {
 }
 
 async function queueOfflinePayment({ payload, transferId, localMeta }) {
+  const normalizedOrgId = normalizeMutationOrgId(payload?.org_id)
+
+  if (!normalizedOrgId) {
+    return null
+  }
+
   const queuedRecord = buildQueuedPaymentRecord({
     localMeta,
+    orgId: normalizedOrgId,
     payload,
     transferId,
   })
@@ -74,14 +91,34 @@ async function queueOfflinePayment({ payload, transferId, localMeta }) {
   return putMutationRecord(queuedRecord)
 }
 
-async function listQueuedPaymentMutations() {
-  const records = await listMutationRecords()
-
-  return records.filter((record) => record?.type === PAYMENT_CREATE_MUTATION_TYPE)
+function getQueuedPaymentOrgId(record) {
+  return normalizeMutationOrgId(record?.orgId || record?.payload?.org_id)
 }
 
-async function listActiveQueuedPaymentsForTransfer(transferId) {
-  const records = await listQueuedPaymentMutations()
+function isScopedQueuedPayment(record) {
+  return Boolean(getQueuedPaymentOrgId(record))
+}
+
+function matchesQueuedPaymentOrg(record, orgId) {
+  return getQueuedPaymentOrgId(record) === normalizeMutationOrgId(orgId)
+}
+
+async function listQueuedPaymentMutations({ orgId = '' } = {}) {
+  const records = await listMutationRecords()
+  const normalizedOrgId = normalizeMutationOrgId(orgId)
+  const scopedRecords = records.filter((record) => record?.type === PAYMENT_CREATE_MUTATION_TYPE)
+
+  if (!normalizedOrgId) {
+    return []
+  }
+
+  return scopedRecords.filter(
+    (record) => isScopedQueuedPayment(record) && matchesQueuedPaymentOrg(record, normalizedOrgId)
+  )
+}
+
+async function listActiveQueuedPaymentsForTransfer(transferId, { orgId = '' } = {}) {
+  const records = await listQueuedPaymentMutations({ orgId })
 
   return sortQueueRecordsByCreatedAt(
     records.filter((record) => isActivePaymentMutation(record) && record.transferId === transferId)
@@ -91,8 +128,9 @@ async function listActiveQueuedPaymentsForTransfer(transferId) {
 async function listReplayableQueuedPayments({
   includeBlocked = true,
   includeFailed = true,
+  orgId = '',
 } = {}) {
-  const records = await listQueuedPaymentMutations()
+  const records = await listQueuedPaymentMutations({ orgId })
 
   return sortQueueRecordsByCreatedAt(
     records.filter((record) => {
@@ -114,8 +152,8 @@ async function listReplayableQueuedPayments({
   )
 }
 
-async function getPaymentQueueSummary() {
-  const records = await listQueuedPaymentMutations()
+async function getPaymentQueueSummary({ orgId = '' } = {}) {
+  const records = await listQueuedPaymentMutations({ orgId })
   const summary = {
     activeCount: 0,
     blockedCount: 0,
@@ -219,7 +257,7 @@ async function prepareQueuedPaymentForReplay(id, { localMetaPatch = {}, payloadP
 
     return {
       blockedReason: '',
-      dedupeKey: createPaymentMutationDedupeKey(nextPayload),
+      dedupeKey: createPaymentMutationDedupeKey(nextPayload, record.orgId || nextPayload.org_id),
       localMeta: nextLocalMeta,
       payload: nextPayload,
       status: 'pending',
@@ -230,6 +268,7 @@ async function prepareQueuedPaymentForReplay(id, { localMetaPatch = {}, payloadP
 
 async function linkQueuedPaymentsToResolvedTransfer({
   localReference = '',
+  orgId = '',
   queueId = '',
   referenceNumber = '',
   serverTransferId = '',
@@ -238,7 +277,7 @@ async function linkQueuedPaymentsToResolvedTransfer({
     return 0
   }
 
-  const records = await listQueuedPaymentMutations()
+  const records = await listQueuedPaymentMutations({ orgId })
   const matchingRecords = records.filter((record) => {
     if (record?.type !== PAYMENT_CREATE_MUTATION_TYPE) {
       return false
@@ -275,8 +314,8 @@ async function linkQueuedPaymentsToResolvedTransfer({
   return results.filter(Boolean).length
 }
 
-async function normalizeQueuedPaymentsState() {
-  const records = await listQueuedPaymentMutations()
+async function normalizeQueuedPaymentsState(orgId = '') {
+  const records = await listQueuedPaymentMutations({ orgId })
   const syncingRecords = records.filter((record) => record.status === 'syncing')
 
   if (syncingRecords.length === 0) {
@@ -285,7 +324,7 @@ async function normalizeQueuedPaymentsState() {
 
   await Promise.all(syncingRecords.map((record) => markQueuedPaymentPending(record.id)))
 
-  return listQueuedPaymentMutations()
+  return listQueuedPaymentMutations({ orgId })
 }
 
 async function resolveQueuedPayment(id) {

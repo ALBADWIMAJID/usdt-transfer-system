@@ -17,6 +17,7 @@ import RecordMeta from '../components/ui/RecordMeta.jsx'
 import ReadonlyField from '../components/ui/ReadonlyField.jsx'
 import SectionCard from '../components/ui/SectionCard.jsx'
 import { useAuth } from '../context/auth-context.js'
+import { useTenant } from '../context/tenant-context.js'
 import useNetworkStatus from '../hooks/useNetworkStatus.js'
 import useOfflineSnapshot from '../hooks/useOfflineSnapshot.js'
 import usePendingPayments from '../hooks/usePendingPayments.js'
@@ -24,6 +25,7 @@ import useReplayQueue from '../hooks/useReplayQueue.js'
 import { getTransferDetailsSnapshotKey } from '../lib/offline/cacheKeys.js'
 import { getOfflineSnapshotMissingMessage } from '../lib/offline/freshness.js'
 import { queueOfflinePayment } from '../lib/offline/paymentQueue.js'
+import { MISSING_CURRENT_ORG_MESSAGE, withOrgScope, withStampedOrg } from '../lib/orgScope.js'
 import {
   isBrowserOffline,
   isLikelyOfflineReadFailure,
@@ -396,6 +398,7 @@ function TransferDetailsPage() {
   const { transferId } = useParams()
   const location = useLocation()
   const { configError, isConfigured } = useAuth()
+  const { orgId } = useTenant()
   const { isOffline } = useNetworkStatus()
   const { clearSnapshotState, markCachedSnapshot, markLiveSnapshot, snapshotState } =
     useOfflineSnapshot()
@@ -448,7 +451,7 @@ function TransferDetailsPage() {
   const [overpaymentResolutionSubmitSuccess, setOverpaymentResolutionSubmitSuccess] = useState('')
   const previousPendingCountRef = useRef(0)
   const snapshotPersistQueueRef = useRef(Promise.resolve(null))
-  const transferSnapshotKey = getTransferDetailsSnapshotKey(transferId)
+  const transferSnapshotKey = getTransferDetailsSnapshotKey(orgId, transferId)
   const {
     activeCount: localPaymentCount,
     blockedCount: blockedLocalPaymentCount,
@@ -540,16 +543,27 @@ function TransferDetailsPage() {
       setTransferLoading(true)
       setTransferError('')
 
+      if (!orgId) {
+        setTransfer(null)
+        setCustomerName('')
+        setTransferError(MISSING_CURRENT_ORG_MESSAGE)
+        setTransferLoading(false)
+        return
+      }
+
       try {
         const { data, error } = await withLiveReadTimeout(
-          supabase
-            .schema('public')
-            .from('transfers')
-            .select(
-              'id, reference_number, customer_id, usdt_amount, market_rate, client_rate, pricing_mode, commission_pct, commission_rub, gross_rub, payable_rub, status, notes, created_at'
-            )
-            .eq('id', transferId)
-            .maybeSingle(),
+          withOrgScope(
+            supabase
+              .schema('public')
+              .from('transfers')
+              .select(
+                'id, reference_number, customer_id, usdt_amount, market_rate, client_rate, pricing_mode, commission_pct, commission_rub, gross_rub, payable_rub, status, notes, created_at'
+              )
+              .eq('id', transferId)
+              .maybeSingle(),
+            orgId
+          ),
           {
             timeoutMessage: 'تعذر إكمال تحميل هذه الحوالة في الوقت المتوقع.',
           }
@@ -579,12 +593,15 @@ function TransferDetailsPage() {
 
         if (data.customer_id) {
           const { data: customerData, error: customerError } = await withLiveReadTimeout(
-            supabase
-              .schema('public')
-              .from('customers')
-              .select('full_name')
-              .eq('id', data.customer_id)
-              .maybeSingle(),
+            withOrgScope(
+              supabase
+                .schema('public')
+                .from('customers')
+                .select('full_name')
+                .eq('id', data.customer_id)
+                .maybeSingle(),
+              orgId
+            ),
             {
               timeoutMessage: 'تعذر إكمال تحميل اسم العميل لهذه الحوالة في الوقت المتوقع.',
             }
@@ -629,12 +646,29 @@ function TransferDetailsPage() {
     isConfigured,
     isOffline,
     markCachedSnapshot,
+    orgId,
     transferId,
     transferSnapshotKey,
   ])
 
   useEffect(() => {
-    if (!isConfigured || !supabase || !transferId) {
+    if (!isConfigured || !supabase || !transferId || transferLoading) {
+      return undefined
+    }
+
+    if (!orgId) {
+      setPayments([])
+      setPaymentVoidRows([])
+      setPaymentsError(MISSING_CURRENT_ORG_MESSAGE)
+      setPaymentsLoading(false)
+      return undefined
+    }
+
+    if (!transfer || transferError) {
+      setPayments([])
+      setPaymentVoidRows([])
+      setPaymentsError('')
+      setPaymentsLoading(false)
       return undefined
     }
 
@@ -681,13 +715,16 @@ function TransferDetailsPage() {
 
       try {
         const { data, error } = await withLiveReadTimeout(
-          supabase
-            .schema('public')
-            .from('transfer_payments')
-            .select('id, amount_rub, payment_method, note, paid_at, created_at')
-            .eq('transfer_id', transferId)
-            .order('paid_at', { ascending: false })
-            .order('created_at', { ascending: false }),
+          withOrgScope(
+            supabase
+              .schema('public')
+              .from('transfer_payments')
+              .select('id, amount_rub, payment_method, note, paid_at, created_at')
+              .eq('transfer_id', transferId)
+              .order('paid_at', { ascending: false })
+              .order('created_at', { ascending: false }),
+            orgId
+          ),
           {
             timeoutMessage: 'تعذر إكمال تحميل مدفوعات هذه الحوالة في الوقت المتوقع.',
           }
@@ -706,13 +743,16 @@ function TransferDetailsPage() {
         }
 
         const { data: paymentVoidData, error: paymentVoidsError } = await withLiveReadTimeout(
-          supabase
-            .schema('public')
-            .from('transfer_payment_voids')
-            .select(TRANSFER_PAYMENT_VOID_SELECT)
-            .eq('transfer_id', transferId)
-            .order('created_at', { ascending: false })
-            .order('id', { ascending: false }),
+          withOrgScope(
+            supabase
+              .schema('public')
+              .from('transfer_payment_voids')
+              .select(TRANSFER_PAYMENT_VOID_SELECT)
+              .eq('transfer_id', transferId)
+              .order('created_at', { ascending: false })
+              .order('id', { ascending: false }),
+            orgId
+          ),
           {
             timeoutMessage: 'تعذر إكمال تحميل حالات إلغاء الدفعات المؤكدة لهذه الحوالة في الوقت المتوقع.',
           }
@@ -756,10 +796,37 @@ function TransferDetailsPage() {
     return () => {
       isMounted = false
     }
-  }, [isConfigured, isOffline, markCachedSnapshot, paymentsRefreshKey, transferId, transferSnapshotKey])
+  }, [
+    isConfigured,
+    isOffline,
+    markCachedSnapshot,
+    orgId,
+    paymentsRefreshKey,
+    transfer,
+    transferError,
+    transferId,
+    transferLoading,
+    transferSnapshotKey,
+  ])
 
   useEffect(() => {
-    if (!isConfigured || !supabase || !transferId) {
+    if (!isConfigured || !supabase || !transferId || transferLoading) {
+      return undefined
+    }
+
+    if (!orgId) {
+      setLatestOverpaymentResolution(null)
+      setOverpaymentResolutionLoaded(false)
+      setOverpaymentResolutionError(MISSING_CURRENT_ORG_MESSAGE)
+      setOverpaymentResolutionLoading(false)
+      return undefined
+    }
+
+    if (!transfer || transferError) {
+      setLatestOverpaymentResolution(null)
+      setOverpaymentResolutionLoaded(false)
+      setOverpaymentResolutionError('')
+      setOverpaymentResolutionLoading(false)
       return undefined
     }
 
@@ -811,15 +878,18 @@ function TransferDetailsPage() {
 
       try {
         const { data, error } = await withLiveReadTimeout(
-          supabase
-            .schema('public')
-            .from('transfer_overpayment_resolutions')
-            .select('id, transfer_id, resolution_type, resolved_overpaid_amount_rub, note, created_at')
-            .eq('transfer_id', transferId)
-            .order('created_at', { ascending: false })
-            .order('id', { ascending: false })
-            .limit(1)
-            .maybeSingle(),
+          withOrgScope(
+            supabase
+              .schema('public')
+              .from('transfer_overpayment_resolutions')
+              .select('id, transfer_id, resolution_type, resolved_overpaid_amount_rub, note, created_at')
+              .eq('transfer_id', transferId)
+              .order('created_at', { ascending: false })
+              .order('id', { ascending: false })
+              .limit(1)
+              .maybeSingle(),
+            orgId
+          ),
           {
             timeoutMessage:
               'تعذر إكمال تحميل آخر معالجة زيادة دفع لهذه الحوالة في الوقت المتوقع.',
@@ -869,8 +939,12 @@ function TransferDetailsPage() {
     isConfigured,
     isOffline,
     markCachedSnapshot,
+    orgId,
     overpaymentResolutionRefreshKey,
+    transfer,
+    transferError,
     transferId,
+    transferLoading,
     transferSnapshotKey,
   ])
 
@@ -1358,6 +1432,11 @@ function TransferDetailsPage() {
       return
     }
 
+    if (!orgId) {
+      setReplacementPaymentSubmitError(MISSING_CURRENT_ORG_MESSAGE)
+      return
+    }
+
     if (!transferId || !transfer) {
       setReplacementPaymentSubmitError('معرّف الحوالة غير متاح حاليا لتسجيل دفعة بديلة مصححة.')
       return
@@ -1423,7 +1502,7 @@ function TransferDetailsPage() {
     const { data, error: insertError } = await supabase
       .schema('public')
       .from('transfer_payments')
-      .insert([payload])
+      .insert([withStampedOrg(payload, orgId)])
       .select('id, amount_rub, payment_method, note, paid_at, created_at')
       .single()
 
@@ -1459,6 +1538,11 @@ function TransferDetailsPage() {
 
     if (!isConfigured || !supabase) {
       setPaymentVoidSubmitError(configError)
+      return
+    }
+
+    if (!orgId) {
+      setPaymentVoidSubmitError(MISSING_CURRENT_ORG_MESSAGE)
       return
     }
 
@@ -1519,7 +1603,7 @@ function TransferDetailsPage() {
     const { data, error: insertError } = await supabase
       .schema('public')
       .from('transfer_payment_voids')
-      .insert([payload])
+      .insert([withStampedOrg(payload, orgId)])
       .select(TRANSFER_PAYMENT_VOID_SELECT)
       .single()
 
@@ -1566,6 +1650,11 @@ function TransferDetailsPage() {
 
     if (!isConfigured || !supabase) {
       setOverpaymentResolutionSubmitError(configError)
+      return
+    }
+
+    if (!orgId) {
+      setOverpaymentResolutionSubmitError(MISSING_CURRENT_ORG_MESSAGE)
       return
     }
 
@@ -1624,7 +1713,7 @@ function TransferDetailsPage() {
     const { data, error: insertError } = await supabase
       .schema('public')
       .from('transfer_overpayment_resolutions')
-      .insert([payload])
+      .insert([withStampedOrg(payload, orgId)])
       .select('id, transfer_id, resolution_type, resolved_overpaid_amount_rub, note, created_at')
       .single()
 
@@ -1665,6 +1754,11 @@ function TransferDetailsPage() {
 
     if (!isConfigured || !supabase) {
       setTransferEditSubmitError(configError || 'تعذر الاتصال بقاعدة البيانات حاليا.')
+      return
+    }
+
+    if (!orgId) {
+      setTransferEditSubmitError(MISSING_CURRENT_ORG_MESSAGE)
       return
     }
 
@@ -1752,8 +1846,9 @@ function TransferDetailsPage() {
       const { data, error } = await supabase
         .schema('public')
         .from('transfers')
-        .update(payload)
+        .update(withStampedOrg(payload, orgId))
         .eq('id', transferId)
+        .eq('org_id', orgId)
         .select(
           'id, reference_number, customer_id, usdt_amount, market_rate, client_rate, pricing_mode, commission_pct, commission_rub, gross_rub, payable_rub, status, notes, created_at'
         )
@@ -1812,6 +1907,11 @@ function TransferDetailsPage() {
       return
     }
 
+    if (!orgId) {
+      setPaymentSubmitError(MISSING_CURRENT_ORG_MESSAGE)
+      return
+    }
+
     if (!transferId) {
       setPaymentSubmitError('معرّف الحوالة غير موجود في المسار الحالي.')
       return
@@ -1850,7 +1950,7 @@ function TransferDetailsPage() {
           customerName,
           referenceNumber: transfer?.reference_number || '',
         },
-        payload: queuedPayload,
+        payload: withStampedOrg(queuedPayload, orgId),
         transferId,
       })
 
@@ -1874,7 +1974,7 @@ function TransferDetailsPage() {
     const { error: insertError } = await supabase
       .schema('public')
       .from('transfer_payments')
-      .insert([payload])
+      .insert([withStampedOrg(payload, orgId)])
 
     if (insertError) {
       setPaymentSubmitError(insertError.message)
@@ -2097,11 +2197,14 @@ function TransferDetailsPage() {
 
       try {
         const { data, error } = await withLiveReadTimeout(
-          supabase
-            .schema('public')
-            .from('customers')
-            .select('id, full_name, is_archived')
-            .order('full_name', { ascending: true }),
+          withOrgScope(
+            supabase
+              .schema('public')
+              .from('customers')
+              .select('id, full_name, is_archived')
+              .order('full_name', { ascending: true }),
+            orgId
+          ),
           {
             timeoutMessage: 'تعذر إكمال تحميل قائمة العملاء لتعديل الحوالة في الوقت المتوقع.',
           }
@@ -2144,6 +2247,7 @@ function TransferDetailsPage() {
     customerName,
     isConfigured,
     isEditingTransfer,
+    orgId,
     transfer,
   ])
 

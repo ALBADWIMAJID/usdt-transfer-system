@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useTenant } from '../context/tenant-context.js'
 import {
   listActiveQueuedTransfers,
   normalizeQueuedTransfersState,
@@ -6,16 +7,23 @@ import {
 } from '../lib/offline/transferQueue.js'
 
 function usePendingTransfers(customerId = '') {
+  const { orgId } = useTenant()
   const [pendingTransfers, setPendingTransfers] = useState([])
   const [loading, setLoading] = useState(true)
 
   const refreshPendingTransfers = useCallback(async () => {
+    if (!orgId) {
+      setPendingTransfers([])
+      setLoading(false)
+      return
+    }
+
     setLoading(true)
-    await normalizeQueuedTransfersState()
-    const queuedTransfers = await listActiveQueuedTransfers({ customerId })
+    await normalizeQueuedTransfersState(orgId)
+    const queuedTransfers = await listActiveQueuedTransfers({ customerId, orgId })
     setPendingTransfers(queuedTransfers)
     setLoading(false)
-  }, [customerId])
+  }, [customerId, orgId])
 
   useEffect(() => {
     if (typeof queueMicrotask === 'function') {

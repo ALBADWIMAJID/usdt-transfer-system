@@ -10,11 +10,12 @@ import { listQueuedTransferMutations } from './transferQueue.js'
 import { resolvePaymentReplayDependency } from './dependencyResolution.js'
 import { supabase } from '../supabase.js'
 
-function buildDuplicateCheckQuery(payload) {
+function buildDuplicateCheckQuery(payload, orgId) {
   let query = supabase
     .schema('public')
     .from('transfer_payments')
     .select('id')
+    .eq('org_id', orgId || payload.org_id || '')
     .eq('transfer_id', payload.transfer_id)
     .eq('amount_rub', payload.amount_rub)
     .eq('payment_method', payload.payment_method)
@@ -30,12 +31,16 @@ function buildDuplicateCheckQuery(payload) {
   return query
 }
 
-async function findExistingServerPayment(payload) {
+async function findExistingServerPayment(payload, orgId) {
   if (!supabase) {
     return { data: null, error: new Error('Supabase client is not configured.') }
   }
 
-  const { data, error } = await buildDuplicateCheckQuery(payload)
+  if (!orgId && !payload?.org_id) {
+    return { data: null, error: new Error('Current organization is not available for payment replay.') }
+  }
+
+  const { data, error } = await buildDuplicateCheckQuery(payload, orgId)
 
   if (error) {
     return { data: null, error }
@@ -61,7 +66,7 @@ async function insertServerPayment(payload) {
 
 async function replayQueuedPayment(
   record,
-  { queuedTransfers = [], resolvedTransfers = [] } = {}
+  { orgId = '', queuedTransfers = [], resolvedTransfers = [] } = {}
 ) {
   const dependencyState = resolvePaymentReplayDependency(record, {
     queuedTransfers,
@@ -100,7 +105,7 @@ async function replayQueuedPayment(
 
   await markQueuedPaymentSyncing(nextRecord.id)
 
-  const duplicateCheck = await findExistingServerPayment(nextRecord.payload)
+  const duplicateCheck = await findExistingServerPayment(nextRecord.payload, orgId || nextRecord.orgId)
 
   if (duplicateCheck.error) {
     await markQueuedPaymentFailed(nextRecord.id, duplicateCheck.error.message)
@@ -145,11 +150,12 @@ async function replayQueuedPayment(
 async function replayPaymentQueue({
   includeBlocked = true,
   includeFailed = true,
+  orgId = '',
   transferReplayResult = null,
 } = {}) {
   const [records, queuedTransfers] = await Promise.all([
-    listReplayableQueuedPayments({ includeBlocked, includeFailed }),
-    listQueuedTransferMutations(),
+    listReplayableQueuedPayments({ includeBlocked, includeFailed, orgId }),
+    listQueuedTransferMutations({ orgId }),
   ])
   const summary = {
     blockedCount: 0,
@@ -161,6 +167,7 @@ async function replayPaymentQueue({
 
   for (const record of records) {
     const result = await replayQueuedPayment(record, {
+      orgId,
       queuedTransfers,
       resolvedTransfers: transferReplayResult?.resolvedTransfers || [],
     })

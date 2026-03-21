@@ -13,6 +13,7 @@ import OfflineSnapshotNotice from '../components/ui/OfflineSnapshotNotice.jsx'
 import PageHeader from '../components/ui/PageHeader.jsx'
 import SectionCard from '../components/ui/SectionCard.jsx'
 import { useAuth } from '../context/auth-context.js'
+import { useTenant } from '../context/tenant-context.js'
 import useNetworkStatus from '../hooks/useNetworkStatus.js'
 import useOfflineSnapshot from '../hooks/useOfflineSnapshot.js'
 import {
@@ -51,6 +52,7 @@ import {
   getTransferStatusMeta,
   matchesTransferStatusFilter,
 } from '../lib/transfer-ui.js'
+import { MISSING_CURRENT_ORG_MESSAGE, withOrgScope, withStampedOrg } from '../lib/orgScope.js'
 import { supabase } from '../lib/supabase.js'
 
 const CUSTOMER_DETAILS_SECTIONS = [
@@ -172,6 +174,7 @@ function CustomerDetailsPage() {
   const { customerId } = useParams()
   const navigate = useNavigate()
   const { configError, isConfigured } = useAuth()
+  const { orgId } = useTenant()
   const { isOffline } = useNetworkStatus()
   const { clearSnapshotState, markCachedSnapshot, markLiveSnapshot, snapshotState } =
     useOfflineSnapshot()
@@ -189,7 +192,7 @@ function CustomerDetailsPage() {
   const [customerPayments, setCustomerPayments] = useState([])
   const [paymentVoidRows, setPaymentVoidRows] = useState([])
   const [totalPaidRub, setTotalPaidRub] = useState(0)
-  const customerSnapshotKey = getCustomerDetailsSnapshotKey(customerId)
+  const customerSnapshotKey = getCustomerDetailsSnapshotKey(orgId, customerId)
   const [activeSection, setActiveSection] = useState('overview')
   const [isEditingCustomer, setIsEditingCustomer] = useState(false)
   const [editFormValues, setEditFormValues] = useState(() => createEmptyCustomerForm())
@@ -244,14 +247,25 @@ function CustomerDetailsPage() {
       setCustomerError('')
       setCustomerNotFound(false)
 
+      if (!orgId) {
+        setCustomer(null)
+        setCustomerError(MISSING_CURRENT_ORG_MESSAGE)
+        setCustomerNotFound(false)
+        setCustomerLoading(false)
+        return
+      }
+
       try {
         const { data, error } = await withLiveReadTimeout(
-          supabase
-            .schema('public')
-            .from('customers')
-            .select('id, full_name, phone, notes, is_archived, archived_at, created_at')
-            .eq('id', customerId)
-            .maybeSingle(),
+          withOrgScope(
+            supabase
+              .schema('public')
+              .from('customers')
+              .select('id, full_name, phone, notes, is_archived, archived_at, created_at')
+              .eq('id', customerId)
+              .maybeSingle(),
+            orgId
+          ),
           {
             timeoutMessage: 'تعذر إكمال تحميل ملف العميل في الوقت المتوقع.',
           }
@@ -344,10 +358,35 @@ function CustomerDetailsPage() {
     isConfigured,
     isOffline,
     markCachedSnapshot,
+    orgId,
   ])
 
   useEffect(() => {
-    if (!isConfigured || !supabase || !customerId) {
+    if (!isConfigured || !supabase || !customerId || customerLoading) {
+      return undefined
+    }
+
+    if (!orgId) {
+      setTransfers([])
+      setCustomerPayments([])
+      setPaymentVoidRows([])
+      setTotalPaidRub(0)
+      setTransfersError(MISSING_CURRENT_ORG_MESSAGE)
+      setPaymentTotalsError(MISSING_CURRENT_ORG_MESSAGE)
+      setTransfersLoading(false)
+      setPaymentTotalsLoading(false)
+      return undefined
+    }
+
+    if (!customer || customerNotFound || customerError) {
+      setTransfers([])
+      setCustomerPayments([])
+      setPaymentVoidRows([])
+      setTotalPaidRub(0)
+      setTransfersError('')
+      setPaymentTotalsError('')
+      setTransfersLoading(false)
+      setPaymentTotalsLoading(false)
       return undefined
     }
 
@@ -402,12 +441,15 @@ function CustomerDetailsPage() {
 
       try {
         const { data, error } = await withLiveReadTimeout(
-          supabase
-            .schema('public')
-            .from('transfers')
-            .select('id, reference_number, status, usdt_amount, market_rate, payable_rub, created_at')
-            .eq('customer_id', customerId)
-            .order('created_at', { ascending: false }),
+          withOrgScope(
+            supabase
+              .schema('public')
+              .from('transfers')
+              .select('id, reference_number, status, usdt_amount, market_rate, payable_rub, created_at')
+              .eq('customer_id', customerId)
+              .order('created_at', { ascending: false }),
+            orgId
+          ),
           {
             timeoutMessage: 'تعذر إكمال تحميل حوالات هذا العميل في الوقت المتوقع.',
           }
@@ -423,13 +465,16 @@ function CustomerDetailsPage() {
           data: overpaymentResolutionRows,
           error: overpaymentResolutionError,
         } = await withLiveReadTimeout(
-          supabase
-            .schema('public')
-            .from('transfer_overpayment_resolutions')
-            .select(TRANSFER_OVERPAYMENT_RESOLUTION_SELECT)
-            .in('transfer_id', overpaymentResolutionTransferIds)
-            .order('created_at', { ascending: false })
-            .order('id', { ascending: false }),
+          withOrgScope(
+            supabase
+              .schema('public')
+              .from('transfer_overpayment_resolutions')
+              .select(TRANSFER_OVERPAYMENT_RESOLUTION_SELECT)
+              .in('transfer_id', overpaymentResolutionTransferIds)
+              .order('created_at', { ascending: false })
+              .order('id', { ascending: false }),
+            orgId
+          ),
           {
             timeoutMessage:
               'تعذر إكمال تحميل حالات معالجة زيادة الدفع لهذا العميل في الوقت المتوقع.',
@@ -461,26 +506,32 @@ function CustomerDetailsPage() {
         }
 
         const { data: paymentsData, error: paymentsError } = await withLiveReadTimeout(
-          supabase
-            .schema('public')
-            .from('transfer_payments')
-            .select('id, transfer_id, amount_rub, payment_method, note, paid_at, created_at')
-            .in('transfer_id', transferIds)
-            .order('paid_at', { ascending: false })
-            .order('created_at', { ascending: false }),
+          withOrgScope(
+            supabase
+              .schema('public')
+              .from('transfer_payments')
+              .select('id, transfer_id, amount_rub, payment_method, note, paid_at, created_at')
+              .in('transfer_id', transferIds)
+              .order('paid_at', { ascending: false })
+              .order('created_at', { ascending: false }),
+            orgId
+          ),
           {
             timeoutMessage: 'تعذر إكمال تحميل سجل المدفوعات لهذا العميل في الوقت المتوقع.',
           }
         )
 
         const { data: paymentVoidData, error: paymentVoidsError } = await withLiveReadTimeout(
-          supabase
-            .schema('public')
-            .from('transfer_payment_voids')
-            .select(TRANSFER_PAYMENT_VOID_SELECT)
-            .in('transfer_id', transferIds)
-            .order('created_at', { ascending: false })
-            .order('id', { ascending: false }),
+          withOrgScope(
+            supabase
+              .schema('public')
+              .from('transfer_payment_voids')
+              .select(TRANSFER_PAYMENT_VOID_SELECT)
+              .in('transfer_id', transferIds)
+              .order('created_at', { ascending: false })
+              .order('id', { ascending: false }),
+            orgId
+          ),
           {
             timeoutMessage: 'تعذر إكمال تحميل حالات إلغاء الدفعات المؤكدة لهذا العميل في الوقت المتوقع.',
           }
@@ -588,7 +639,18 @@ function CustomerDetailsPage() {
     return () => {
       isMounted = false
     }
-  }, [customerId, customerSnapshotKey, isConfigured, isOffline, transfersRefreshKey])
+  }, [
+    customer,
+    customerError,
+    customerId,
+    customerLoading,
+    customerNotFound,
+    customerSnapshotKey,
+    isConfigured,
+    isOffline,
+    orgId,
+    transfersRefreshKey,
+  ])
 
   const handleTransfersRefresh = () => {
     setTransfersRefreshKey((current) => current + 1)
@@ -764,6 +826,12 @@ function CustomerDetailsPage() {
       return
     }
 
+    if (!orgId) {
+      setEditSubmitError(MISSING_CURRENT_ORG_MESSAGE)
+      setEditSubmitSuccess('')
+      return
+    }
+
     if (!customerId || !customer) {
       setEditSubmitError('تعذر تحديد ملف العميل المطلوب تحديثه.')
       setEditSubmitSuccess('')
@@ -787,8 +855,9 @@ function CustomerDetailsPage() {
       const { data, error } = await supabase
         .schema('public')
         .from('customers')
-        .update(payload)
+        .update(withStampedOrg(payload, orgId))
         .eq('id', customerId)
+        .eq('org_id', orgId)
         .select('id, full_name, phone, notes, is_archived, archived_at, created_at')
         .maybeSingle()
 
@@ -810,7 +879,7 @@ function CustomerDetailsPage() {
       setEditSubmitSuccess('تم تحديث بيانات العميل بنجاح.')
 
       try {
-        await syncEditedCustomerSnapshots(nextCustomer)
+        await syncEditedCustomerSnapshots(nextCustomer, orgId)
       } catch (snapshotError) {
         console.error('Failed to sync edited customer snapshots', snapshotError)
       }
@@ -834,6 +903,12 @@ function CustomerDetailsPage() {
       return
     }
 
+    if (!orgId) {
+      setLifecycleSubmitError(MISSING_CURRENT_ORG_MESSAGE)
+      setLifecycleSubmitSuccess('')
+      return
+    }
+
     if (!customerId || !customer || !pendingLifecycleAction) {
       setLifecycleSubmitError('تعذر تحديد ملف العميل المطلوب تحديث حالته.')
       setLifecycleSubmitSuccess('')
@@ -850,6 +925,7 @@ function CustomerDetailsPage() {
         .from('transfers')
         .select('id', { count: 'exact', head: true })
         .eq('customer_id', customerId)
+        .eq('org_id', orgId)
 
       if (countError) {
         throw countError
@@ -870,18 +946,25 @@ function CustomerDetailsPage() {
       }
 
       if (pendingLifecycleAction === 'delete') {
-        const { error: deleteError } = await supabase
+        const { data: deletedCustomer, error: deleteError } = await supabase
           .schema('public')
           .from('customers')
           .delete()
           .eq('id', customerId)
+          .eq('org_id', orgId)
+          .select('id')
+          .maybeSingle()
 
         if (deleteError) {
           throw deleteError
         }
 
+        if (!deletedCustomer) {
+          throw new Error('تعذر حذف ملف العميل في الوقت الحالي.')
+        }
+
         try {
-          await syncDeletedCustomerSnapshots(customerId)
+          await syncDeletedCustomerSnapshots(customerId, orgId)
         } catch (snapshotError) {
           console.error('Failed to sync deleted customer snapshots', snapshotError)
         }
@@ -903,8 +986,9 @@ function CustomerDetailsPage() {
       const { data, error } = await supabase
         .schema('public')
         .from('customers')
-        .update(archivePayload)
+        .update(withStampedOrg(archivePayload, orgId))
         .eq('id', customerId)
+        .eq('org_id', orgId)
         .select('id, full_name, phone, notes, is_archived, archived_at, created_at')
         .maybeSingle()
 
@@ -926,7 +1010,7 @@ function CustomerDetailsPage() {
       setLifecycleSubmitSuccess('تمت أرشفة العميل بنجاح. سيبقى متاحا للمراجعة التاريخية فقط ولن يظهر ضمن الاختيارات التشغيلية النشطة.')
 
       try {
-        await syncArchivedCustomerSnapshots(nextCustomer)
+        await syncArchivedCustomerSnapshots(nextCustomer, orgId)
       } catch (snapshotError) {
         console.error('Failed to sync archived customer snapshots', snapshotError)
       }

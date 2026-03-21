@@ -18,24 +18,30 @@ function normalizeMutationValue(value) {
   return String(value).trim()
 }
 
-function createPaymentMutationDedupeKey(payload) {
-  return [
+function normalizeMutationOrgId(orgId) {
+  return String(orgId || '').trim()
+}
+
+function buildOrgAwareDedupeKey(orgId, parts) {
+  return [normalizeMutationOrgId(orgId), ...parts.map(normalizeMutationValue)].join('::')
+}
+
+function createPaymentMutationDedupeKey(payload, orgId = payload?.org_id) {
+  return buildOrgAwareDedupeKey(orgId, [
     payload.transfer_id || '',
     Number(payload.amount_rub || 0).toFixed(2),
     payload.payment_method || '',
     payload.note || '',
     payload.paid_at || '',
-  ].join('::')
+  ])
 }
 
-function createCustomerMutationDedupeKey(payload) {
-  return [payload.full_name || '', payload.phone || '', payload.notes || '']
-    .map(normalizeMutationValue)
-    .join('::')
+function createCustomerMutationDedupeKey(payload, orgId = payload?.org_id) {
+  return buildOrgAwareDedupeKey(orgId, [payload.full_name || '', payload.phone || '', payload.notes || ''])
 }
 
-function createTransferMutationDedupeKey(payload) {
-  return [
+function createTransferMutationDedupeKey(payload, orgId = payload?.org_id) {
+  return buildOrgAwareDedupeKey(orgId, [
     payload.customer_id,
     payload.usdt_amount,
     payload.market_rate,
@@ -48,9 +54,7 @@ function createTransferMutationDedupeKey(payload) {
     payload.status,
     payload.created_at,
     payload.notes,
-  ]
-    .map(normalizeMutationValue)
-    .join('::')
+  ])
 }
 
 function createLocalPendingTransferReference() {
@@ -74,4 +78,5 @@ export {
   createOfflineMutationId,
   createPaymentMutationDedupeKey,
   createTransferMutationDedupeKey,
+  normalizeMutationOrgId,
 }

@@ -7,11 +7,12 @@ import {
 } from './transferQueue.js'
 import { linkQueuedPaymentsToResolvedTransfer } from './paymentQueue.js'
 
-function buildDuplicateCheckQuery(payload) {
+function buildDuplicateCheckQuery(payload, orgId) {
   let query = supabase
     .schema('public')
     .from('transfers')
     .select('id, reference_number')
+    .eq('org_id', orgId || payload.org_id || '')
     .eq('customer_id', payload.customer_id)
     .eq('usdt_amount', payload.usdt_amount)
     .eq('market_rate', payload.market_rate)
@@ -34,12 +35,16 @@ function buildDuplicateCheckQuery(payload) {
   return query
 }
 
-async function findExistingServerTransfer(payload) {
+async function findExistingServerTransfer(payload, orgId) {
   if (!supabase) {
     return { data: null, error: new Error('Supabase client is not configured.') }
   }
 
-  const { data, error } = await buildDuplicateCheckQuery(payload)
+  if (!orgId && !payload?.org_id) {
+    return { data: null, error: new Error('Current organization is not available for transfer replay.') }
+  }
+
+  const { data, error } = await buildDuplicateCheckQuery(payload, orgId)
 
   if (error) {
     return { data: null, error }
@@ -63,10 +68,10 @@ async function insertServerTransfer(payload) {
     .select('id, reference_number')
 }
 
-async function replayQueuedTransfer(record) {
+async function replayQueuedTransfer(record, { orgId = '' } = {}) {
   await markQueuedTransferSyncing(record.id)
 
-  const duplicateCheck = await findExistingServerTransfer(record.payload)
+  const duplicateCheck = await findExistingServerTransfer(record.payload, orgId || record.orgId)
 
   if (duplicateCheck.error) {
     await markQueuedTransferFailed(record.id, duplicateCheck.error.message)
@@ -81,6 +86,7 @@ async function replayQueuedTransfer(record) {
     await resolveQueuedTransfer(record.id)
     await linkQueuedPaymentsToResolvedTransfer({
       localReference: record.localMeta?.localReference || '',
+      orgId: orgId || record.orgId,
       queueId: record.id,
       referenceNumber: duplicateCheck.data.reference_number || '',
       serverTransferId: duplicateCheck.data.id,
@@ -109,6 +115,7 @@ async function replayQueuedTransfer(record) {
   await resolveQueuedTransfer(record.id)
   await linkQueuedPaymentsToResolvedTransfer({
     localReference: record.localMeta?.localReference || '',
+    orgId: orgId || record.orgId,
     queueId: record.id,
     referenceNumber: firstRecord?.reference_number || '',
     serverTransferId: firstRecord?.id || '',
@@ -122,8 +129,8 @@ async function replayQueuedTransfer(record) {
   }
 }
 
-async function replayTransferQueue({ includeFailed = true } = {}) {
-  const records = await listReplayableQueuedTransfers({ includeFailed })
+async function replayTransferQueue({ includeFailed = true, orgId = '' } = {}) {
+  const records = await listReplayableQueuedTransfers({ includeFailed, orgId })
   const summary = {
     blockedCount: 0,
     dedupedCount: 0,
@@ -134,7 +141,7 @@ async function replayTransferQueue({ includeFailed = true } = {}) {
   }
 
   for (const record of records) {
-    const result = await replayQueuedTransfer(record)
+    const result = await replayQueuedTransfer(record, { orgId })
 
     if (result.outcome === 'synced') {
       summary.replayedCount += 1

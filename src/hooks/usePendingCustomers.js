@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useTenant } from '../context/tenant-context.js'
 import {
   listActiveQueuedCustomers,
   normalizeQueuedCustomersState,
@@ -6,16 +7,23 @@ import {
 } from '../lib/offline/customerQueue.js'
 
 function usePendingCustomers() {
+  const { orgId } = useTenant()
   const [pendingCustomers, setPendingCustomers] = useState([])
   const [loading, setLoading] = useState(true)
 
   const refreshPendingCustomers = useCallback(async () => {
+    if (!orgId) {
+      setPendingCustomers([])
+      setLoading(false)
+      return
+    }
+
     setLoading(true)
-    await normalizeQueuedCustomersState()
-    const queuedCustomers = await listActiveQueuedCustomers()
+    await normalizeQueuedCustomersState(orgId)
+    const queuedCustomers = await listActiveQueuedCustomers({ orgId })
     setPendingCustomers(queuedCustomers)
     setLoading(false)
-  }, [])
+  }, [orgId])
 
   useEffect(() => {
     if (typeof queueMicrotask === 'function') {

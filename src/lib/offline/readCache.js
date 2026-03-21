@@ -60,6 +60,10 @@ export function isBrowserOffline() {
 }
 
 export async function loadReadSnapshot(key) {
+  if (!key) {
+    return null
+  }
+
   try {
     return await readFromStore(key)
   } catch (error) {
@@ -69,6 +73,10 @@ export async function loadReadSnapshot(key) {
 }
 
 export async function saveReadSnapshot({ data, key, scope, type }) {
+  if (!key) {
+    return null
+  }
+
   try {
     const record = createReadSnapshotRecord({
       data,
