@@ -27,6 +27,7 @@ function ConnectionBadge({ className = '' }) {
       className={['connection-badge', `connection-badge--${meta.tone}`, className]
         .filter(Boolean)
         .join(' ')}
+      aria-label={`${meta.label} - ${meta.detail}`}
       aria-live="polite"
       role="status"
     >

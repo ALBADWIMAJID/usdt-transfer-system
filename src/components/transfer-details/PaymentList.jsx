@@ -5,7 +5,7 @@ import RecordHeader from '../ui/RecordHeader.jsx'
 import RecordMeta from '../ui/RecordMeta.jsx'
 import RetryBlock from '../ui/RetryBlock.jsx'
 
-function renderPaymentCard(payment, { isLocalOnly = false } = {}) {
+function renderPaymentCard(payment, { isLocalOnly = false, compactView = false } = {}) {
   return (
     <RecordCard
       key={payment.id}
@@ -23,10 +23,17 @@ function renderPaymentCard(payment, { isLocalOnly = false } = {}) {
         title={payment.amountLabel}
         subtitle={payment.methodLabel}
         subtitleClassName="record-muted-strong"
-        metaItems={[
-          { label: isLocalOnly ? 'وقت الحفظ المحلي' : 'وقت الدفع', value: payment.paidAtLabel },
-          { label: 'سياق الحركة', value: payment.activityLabel, className: 'detail-mobile-secondary' },
-        ]}
+        metaItems={
+          compactView
+            ? [
+                { value: payment.paidAtLabel },
+                { value: payment.activityLabel },
+              ]
+            : [
+                { label: isLocalOnly ? 'وقت الحفظ المحلي' : 'وقت الدفع', value: payment.paidAtLabel },
+                { label: 'سياق الحركة', value: payment.activityLabel, className: 'detail-mobile-secondary' },
+              ]
+        }
         aside={
           <>
             {payment.badgeLabel ? (
@@ -34,30 +41,36 @@ function renderPaymentCard(payment, { isLocalOnly = false } = {}) {
                 {payment.badgeLabel}
               </span>
             ) : null}
-            <RecordMeta
-              label={isLocalOnly ? 'آخر تحديث محلي' : 'وقت التسجيل'}
-              value={payment.createdAtLabel}
-              className="detail-mobile-secondary"
-            />
+            {!compactView ? (
+              <RecordMeta
+                label={isLocalOnly ? 'آخر تحديث محلي' : 'وقت التسجيل'}
+                value={payment.createdAtLabel}
+                className="detail-mobile-secondary"
+              />
+            ) : null}
           </>
         }
       />
 
-      <div className="payment-entry-grid detail-mobile-secondary">
-        <RecordMeta label="وسيلة التحصيل" value={payment.methodLabel} />
-        <RecordMeta label="المبلغ المسجل" value={payment.amountLabel} />
-      </div>
+      {!compactView ? (
+        <div className="payment-entry-grid detail-mobile-secondary">
+          <RecordMeta label="وسيلة التحصيل" value={payment.methodLabel} />
+          <RecordMeta label="المبلغ المسجل" value={payment.amountLabel} />
+        </div>
+      ) : null}
 
-      <p className="record-note record-note--compact payment-entry-note detail-mobile-light">
-        {payment.noteText}
-      </p>
+      {payment.noteText ? (
+        <p className="record-note record-note--compact payment-entry-note detail-mobile-light">
+          {payment.noteText}
+        </p>
+      ) : null}
 
       {payment.extraContent ? payment.extraContent : null}
     </RecordCard>
   )
 }
 
-function PaymentList({ errorMessage, loading, payments, pendingPayments = [], onRetry }) {
+function PaymentList({ errorMessage, loading, payments, pendingPayments = [], onRetry, compactView = false }) {
   const hasPendingPayments = pendingPayments.length > 0
   const hasConfirmedPayments = payments.length > 0
   const hasAnyPayments = hasPendingPayments || hasConfirmedPayments
@@ -89,15 +102,17 @@ function PaymentList({ errorMessage, loading, payments, pendingPayments = [], on
       {hasPendingPayments ? (
         <section className="payment-history-group payment-history-group--local" aria-label="دفعات محلية">
           <div className="payment-history-group-head">
-            <strong>دفعات محفوظة محليا</strong>
-            <p>
-              {hasBlockedPendingPayments
-                ? 'تتضمن هذه العناصر دفعات ما زالت بانتظار اعتماد حوالة مرتبطة. لن تدخل في الإجماليات أو الطباعة حتى ينجح التأكيد ثم المزامنة.'
-                : 'هذه العناصر لم يؤكدها الخادم بعد، ولن تدخل في الإجماليات أو الطباعة حتى تنجح المزامنة.'}
-            </p>
+            <strong>{compactView ? 'محفوظة محليا' : 'دفعات محفوظة محليا'}</strong>
+            {!compactView ? (
+              <p>
+                {hasBlockedPendingPayments
+                  ? 'تتضمن هذه العناصر دفعات ما زالت بانتظار اعتماد حوالة مرتبطة. لن تدخل في الإجماليات أو الطباعة حتى ينجح التأكيد ثم المزامنة.'
+                  : 'هذه العناصر لم يؤكدها الخادم بعد، ولن تدخل في الإجماليات أو الطباعة حتى تنجح المزامنة.'}
+              </p>
+            ) : null}
           </div>
           <div className="record-list payment-history-list payment-history-list--local">
-            {pendingPayments.map((payment) => renderPaymentCard(payment, { isLocalOnly: true }))}
+            {pendingPayments.map((payment) => renderPaymentCard(payment, { isLocalOnly: true, compactView }))}
           </div>
         </section>
       ) : null}
@@ -105,11 +120,13 @@ function PaymentList({ errorMessage, loading, payments, pendingPayments = [], on
       {hasConfirmedPayments ? (
         <section className="payment-history-group" aria-label="دفعات مؤكدة">
           <div className="payment-history-group-head">
-            <strong>دفعات مؤكدة من الخادم</strong>
-            {hasPendingPayments ? <p>هذه الدفعات فقط تدخل في الإجماليات المؤكدة الحالية.</p> : null}
+            <strong>{compactView ? 'دفعات مؤكدة' : 'دفعات مؤكدة من الخادم'}</strong>
+            {!compactView && hasPendingPayments ? (
+              <p>هذه الدفعات فقط تدخل في الإجماليات المؤكدة الحالية.</p>
+            ) : null}
           </div>
           <div className="record-list payment-history-list">
-            {payments.map((payment) => renderPaymentCard(payment))}
+            {payments.map((payment) => renderPaymentCard(payment, { compactView }))}
           </div>
         </section>
       ) : null}

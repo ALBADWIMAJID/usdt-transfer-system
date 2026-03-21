@@ -2,7 +2,7 @@ import FilterBar from '../ui/FilterBar.jsx'
 import ListStateSwitcher from '../ui/ListStateSwitcher.jsx'
 import SearchField from '../ui/SearchField.jsx'
 import SectionCard from '../ui/SectionCard.jsx'
-import CustomerPortfolioGroup from './CustomerPortfolioGroup.jsx'
+import CustomerRecordCard from './CustomerRecordCard.jsx'
 
 function CustomersList({
   searchQuery,
@@ -11,7 +11,7 @@ function CustomersList({
   loading,
   hasCustomers,
   hasFilteredCustomers,
-  groups,
+  items = [],
   scopeLabel = '',
   activePortfolioFilterLabel = '',
   onClearPortfolioFilter,
@@ -19,8 +19,8 @@ function CustomersList({
 }) {
   return (
     <SectionCard
-      title="صف متابعة العملاء"
-      description="ابحث عن أي عميل بسرعة، ثم اعمل من القائمة حسب أولوية المتابعة: مراجعة مالية، تحصيل جزئي، ثم الملفات المفتوحة."
+      title="قائمة العملاء"
+      description="ابحث بسرعة ثم افتح ملف العميل مباشرة."
       className="customers-list-section"
     >
       <FilterBar className="customers-list-filter-bar">
@@ -53,15 +53,13 @@ function CustomersList({
         noResultsMessage="لا توجد نتائج مطابقة للبحث أو للتركيز الحالي على المتابعة. جرّب اسما مختلفا أو ألغ التركيز الحالي."
         refreshingMessage="جار تحديث محفظة العملاء..."
       >
-        <div className="customer-portfolio-groups">
-          {groups.map((group) => (
-            <CustomerPortfolioGroup
-              key={group.key}
-              title={group.title}
-              description={group.description}
-              count={group.items.length}
-              tone={group.tone}
-              customers={group.items}
+        <div className="record-list customers-directory-list">
+          {items.map((customer) => (
+            <CustomerRecordCard
+              key={customer.id}
+              customer={customer}
+              compact
+              variant="customers-list"
             />
           ))}
         </div>

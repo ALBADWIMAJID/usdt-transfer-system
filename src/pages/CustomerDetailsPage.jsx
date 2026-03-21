@@ -78,6 +78,8 @@ const CUSTOMER_DETAILS_SECTIONS = [
   },
 ]
 
+const MOBILE_CUSTOMER_DETAILS_QUERY = '(max-width: 767px)'
+
 function formatNumber(value, digits = 2) {
   if (value === null || value === undefined || value === '') {
     return '--'
@@ -178,6 +180,13 @@ function CustomerDetailsPage() {
   const { isOffline } = useNetworkStatus()
   const { clearSnapshotState, markCachedSnapshot, markLiveSnapshot, snapshotState } =
     useOfflineSnapshot()
+  const [isCompactMobileLayout, setIsCompactMobileLayout] = useState(() => {
+    if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') {
+      return false
+    }
+
+    return window.matchMedia(MOBILE_CUSTOMER_DETAILS_QUERY).matches
+  })
   const [customer, setCustomer] = useState(null)
   const [customerLoading, setCustomerLoading] = useState(Boolean(isConfigured))
   const [customerError, setCustomerError] = useState(isConfigured ? '' : configError)
@@ -203,6 +212,24 @@ function CustomerDetailsPage() {
   const [lifecycleSubmitting, setLifecycleSubmitting] = useState(false)
   const [lifecycleSubmitError, setLifecycleSubmitError] = useState('')
   const [lifecycleSubmitSuccess, setLifecycleSubmitSuccess] = useState('')
+
+  useEffect(() => {
+    if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') {
+      return undefined
+    }
+
+    const mediaQuery = window.matchMedia(MOBILE_CUSTOMER_DETAILS_QUERY)
+    const handleChange = (event) => {
+      setIsCompactMobileLayout(event.matches)
+    }
+
+    setIsCompactMobileLayout(mediaQuery.matches)
+    mediaQuery.addEventListener('change', handleChange)
+
+    return () => {
+      mediaQuery.removeEventListener('change', handleChange)
+    }
+  }, [])
 
   useEffect(() => {
     if (!isConfigured || !supabase || !customerId) {
@@ -1179,15 +1206,15 @@ function CustomerDetailsPage() {
   const transferGroups = [
     {
       key: 'overpaid',
-      title: 'تحتاج مراجعة مالية عاجلة',
-      description: 'هذه الحوالات تحمل زيادة دفع أو رصيدا سالبا وتتطلب تدخلا مباشرا.',
+      title: isCompactMobileLayout ? 'مراجعة مالية' : 'تحتاج مراجعة مالية عاجلة',
+      description: isCompactMobileLayout ? '' : 'هذه الحوالات تحمل زيادة دفع أو رصيدا سالبا وتتطلب تدخلا مباشرا.',
       tone: 'danger',
       items: filteredTransfers.filter((transfer) => transfer.isUnresolvedOverpaid),
     },
     {
       key: 'partial',
-      title: 'تحصيل جزئي قيد المتابعة',
-      description: 'دفعات مسجلة وما زالت هذه الحوالات تحتاج استكمال التحصيل.',
+      title: isCompactMobileLayout ? 'تحصيل جزئي' : 'تحصيل جزئي قيد المتابعة',
+      description: isCompactMobileLayout ? '' : 'دفعات مسجلة وما زالت هذه الحوالات تحتاج استكمال التحصيل.',
       tone: 'warning',
       items: filteredTransfers.filter(
         (transfer) => !transfer.isUnresolvedOverpaid && transfer.isPartialFollowUp
@@ -1195,8 +1222,8 @@ function CustomerDetailsPage() {
     },
     {
       key: 'open',
-      title: 'بانتظار أول دفعة',
-      description: 'حوالات قائمة لم تبدأ عليها حركة تحصيل بعد.',
+      title: isCompactMobileLayout ? 'بانتظار دفعة' : 'بانتظار أول دفعة',
+      description: isCompactMobileLayout ? '' : 'حوالات قائمة لم تبدأ عليها حركة تحصيل بعد.',
       tone: 'default',
       items: filteredTransfers.filter(
         (transfer) =>
@@ -1205,8 +1232,8 @@ function CustomerDetailsPage() {
     },
     {
       key: 'other',
-      title: 'حوالات مستقرة أو أقل أولوية',
-      description: 'سجلات أخرى يمكن الرجوع إليها عند الحاجة.',
+      title: isCompactMobileLayout ? 'سجلات أخرى' : 'حوالات مستقرة أو أقل أولوية',
+      description: isCompactMobileLayout ? '' : 'سجلات أخرى يمكن الرجوع إليها عند الحاجة.',
       tone: 'default',
       items: filteredTransfers.filter(
         (transfer) =>
@@ -1223,42 +1250,55 @@ function CustomerDetailsPage() {
       const referenceNumber =
         matchingTransfer?.reference_number || (payment.transfer_id ? `حوالة #${payment.transfer_id}` : 'حوالة')
       const activityTime = payment.paid_at || payment.created_at
+      const paymentMethodLabel = getPaymentMethodLabel(payment.payment_method)
 
       return {
         id: `payment-${payment.id ?? `${payment.transfer_id}-${payment.created_at}`}`,
         to: payment.transfer_id ? `/transfers/${payment.transfer_id}` : '/transfers',
-        eyebrow: 'دفعة',
-        title: `${formatNumber(payment.amount_rub, 2)} RUB`,
-        subtitle: referenceNumber,
-        metaItems: [
-          { label: 'وسيلة الدفع', value: getPaymentMethodLabel(payment.payment_method) },
-          { label: 'وقت الحركة', value: formatAgeLabel(activityTime), className: 'detail-mobile-secondary' },
-        ],
+        eyebrow: isCompactMobileLayout ? '' : 'دفعة',
+        title: isCompactMobileLayout ? 'دفعة تحصيل' : `${formatNumber(payment.amount_rub, 2)} RUB`,
+        subtitle: isCompactMobileLayout
+          ? `${referenceNumber} • ${formatNumber(payment.amount_rub, 2)} RUB`
+          : referenceNumber,
+        metaItems: isCompactMobileLayout
+          ? [{ value: paymentMethodLabel }]
+          : [
+              { label: 'وسيلة الدفع', value: paymentMethodLabel },
+              { label: 'وقت الحركة', value: formatAgeLabel(activityTime), className: 'detail-mobile-secondary' },
+            ],
         badgeLabel: 'تحصيل',
         badgeClassName: 'activity-chip--warning',
-        timeLabel: formatDate(activityTime),
-        noteText: payment.note || `دفعة مرتبطة بالحوالة ${referenceNumber}.`,
+        timeLabel: isCompactMobileLayout ? formatAgeLabel(activityTime) : formatDate(activityTime),
+        noteText: isCompactMobileLayout ? '' : payment.note || `دفعة مرتبطة بالحوالة ${referenceNumber}.`,
         eventAt: new Date(activityTime || 0).getTime(),
         cardClassName: 'customer-activity-card--payment',
       }
     }),
-    ...transfers.map((transfer) => ({
-      id: `transfer-${transfer.id ?? transfer.created_at}`,
-      to: transfer.id ? `/transfers/${transfer.id}` : '/transfers',
-      eyebrow: 'حوالة',
-      title: transfer.reference_number || (transfer.id ? `حوالة #${transfer.id}` : 'حوالة جديدة'),
-      subtitle: getTransferStatusMeta(transfer.status).label,
-      metaItems: [
-        { label: 'قيمة التسوية', value: `${formatNumber(transfer.payable_rub, 2)} RUB` },
-        { label: 'العمر التشغيلي', value: formatAgeLabel(transfer.created_at), className: 'detail-mobile-secondary' },
-      ],
-      badgeLabel: 'حوالة جديدة',
-      badgeClassName: 'activity-chip--success',
-      timeLabel: formatDate(transfer.created_at),
-      noteText: 'تم إنشاء حوالة ضمن ملف هذا العميل ويمكن الانتقال إلى تفاصيلها مباشرة.',
-      eventAt: new Date(transfer.created_at || 0).getTime(),
-      cardClassName: 'customer-activity-card--transfer',
-    })),
+    ...transfers.map((transfer) => {
+      const transferStatusLabel = getTransferStatusMeta(transfer.status).label
+
+      return {
+        id: `transfer-${transfer.id ?? transfer.created_at}`,
+        to: transfer.id ? `/transfers/${transfer.id}` : '/transfers',
+        eyebrow: isCompactMobileLayout ? '' : 'حوالة',
+        title: isCompactMobileLayout ? 'حوالة جديدة' : transfer.reference_number || (transfer.id ? `حوالة #${transfer.id}` : 'حوالة جديدة'),
+        subtitle: isCompactMobileLayout
+          ? transfer.reference_number || (transfer.id ? `حوالة #${transfer.id}` : 'حوالة')
+          : transferStatusLabel,
+        metaItems: isCompactMobileLayout
+          ? [{ value: `${formatNumber(transfer.payable_rub, 2)} RUB • ${transferStatusLabel}` }]
+          : [
+              { label: 'قيمة التسوية', value: `${formatNumber(transfer.payable_rub, 2)} RUB` },
+              { label: 'العمر التشغيلي', value: formatAgeLabel(transfer.created_at), className: 'detail-mobile-secondary' },
+            ],
+        badgeLabel: 'حوالة',
+        badgeClassName: 'activity-chip--success',
+        timeLabel: isCompactMobileLayout ? formatAgeLabel(transfer.created_at) : formatDate(transfer.created_at),
+        noteText: isCompactMobileLayout ? '' : 'تم إنشاء حوالة ضمن ملف هذا العميل ويمكن الانتقال إلى تفاصيلها مباشرة.',
+        eventAt: new Date(transfer.created_at || 0).getTime(),
+        cardClassName: 'customer-activity-card--transfer',
+      }
+    }),
   ]
     .sort((left, right) => right.eventAt - left.eventAt)
     .slice(0, 8)
@@ -1373,6 +1413,10 @@ function CustomerDetailsPage() {
         },
       ]
 
+  const overviewHighlightItems = isCompactMobileLayout
+    ? customerSummaryHighlightItems.slice(0, 3)
+    : customerSummaryHighlightItems
+
   const customerSummaryItems = customer
     ? [
         { title: 'رقم الهاتف', value: customer.phone || 'غير مضاف' },
@@ -1444,7 +1488,15 @@ function CustomerDetailsPage() {
 
   const followUpDescription = customerUnavailable
     ? 'يتم تجهيز حالة متابعة العميل الحالية.'
-    : overpaidTransfersCount > 0
+    : isCompactMobileLayout && overpaidTransfersCount > 0
+      ? `يوجد ${overpaidTransfersCount} حوالة تتطلب مراجعة مباشرة.`
+      : isCompactMobileLayout && partialTransfersCount > 0
+        ? `يوجد ${partialTransfersCount} حوالة جزئية تحتاج استكمالا.`
+        : isCompactMobileLayout && openTransfersCount > 0
+          ? `يوجد ${openTransfersCount} حوالة بانتظار أول دفعة.`
+          : isCompactMobileLayout && totalsAreSettled
+            ? 'لا توجد متابعة عاجلة حاليا.'
+            : overpaidTransfersCount > 0
       ? `يوجد ${overpaidTransfersCount} حوالة برصيد سالب أو زيادة دفع. الأولوية الآن لمراجعة هذه السجلات قبل أي تحصيل إضافي.`
       : partialTransfersCount > 0
         ? `يوجد ${partialTransfersCount} حوالة بتحصيل جزئي. الخطوة التالية هي متابعة العميل لاستكمال التحصيل المفتوح.`
@@ -1513,6 +1565,8 @@ function CustomerDetailsPage() {
           ),
         },
       ]
+
+  const overviewFollowUpItems = isCompactMobileLayout ? followUpItems.slice(0, 1) : followUpItems
 
   const followUpChips = customerUnavailable
     ? []
@@ -1591,29 +1645,36 @@ function CustomerDetailsPage() {
         title={customer?.full_name || 'ملف العميل'}
         description={resolvedPageDescription}
         actions={
-          <>
-            <Link className="button secondary" to="/customers">
-              العودة إلى العملاء
-            </Link>
+          <div className="customer-details-hero-actions">
             {customerId ? (
-              <Link className="button primary" to={`/transfers/new?customerId=${customerId}`}>
+              <Link
+                className="button primary customer-details-primary-action"
+                to={`/transfers/new?customerId=${customerId}`}
+              >
                 حوالة جديدة للعميل
               </Link>
             ) : null}
-            <button
-              type="button"
-              className="button secondary"
-              onClick={handleToggleEditCustomer}
-              disabled={editDisabled}
-            >
-              {isEditingCustomer
-                ? '\u0625\u063a\u0644\u0627\u0642 \u0627\u0644\u062a\u0639\u062f\u064a\u0644'
-                : '\u062a\u0639\u062f\u064a\u0644 \u0628\u064a\u0627\u0646\u0627\u062a \u0627\u0644\u0639\u0645\u064a\u0644'}
-            </button>
-            <button type="button" className="button secondary" onClick={handleTransfersRefresh}>
-              تحديث الحوالات
-            </button>
-          </>
+            <div className="customer-details-hero-utility-row">
+              <Link className="button secondary customer-details-utility-action" to="/customers">
+                العودة
+              </Link>
+              <button
+                type="button"
+                className="button secondary customer-details-utility-action"
+                onClick={handleToggleEditCustomer}
+                disabled={editDisabled}
+              >
+                {isEditingCustomer ? 'إغلاق التعديل' : 'تعديل البيانات'}
+              </button>
+              <button
+                type="button"
+                className="button secondary customer-details-utility-action"
+                onClick={handleTransfersRefresh}
+              >
+                تحديث الحوالات
+              </button>
+            </div>
+          </div>
         }
       />
 
@@ -1657,8 +1718,8 @@ function CustomerDetailsPage() {
 
       <div className="app-section-workspace">
         <SectionCard
-          title="لوحة المتابعة المالية للعميل"
-          description="افهم وضع العميل المالي خلال ثوان: إجمالي المستحق، المدفوع، المتبقي، وما يحتاج متابعة الآن."
+          title="نظرة عامة"
+          description="ملخص سريع لوضع العميل الحالي."
           className={[
             'app-section-panel',
             'customer-details-summary-section',
@@ -1686,7 +1747,7 @@ function CustomerDetailsPage() {
                 {resolvedCustomerStateLabel}
               </span>
             }
-            highlightItems={customerSummaryHighlightItems}
+            highlightItems={overviewHighlightItems}
             items={[]}
           />
 
@@ -1696,42 +1757,44 @@ function CustomerDetailsPage() {
               description={followUpDescription}
               tone={customerStateTone}
               chips={followUpChips}
-              items={followUpItems}
+              items={overviewFollowUpItems}
             />
           ) : null}
 
-          <CustomerTotals
-            metrics={totalMetrics}
-            remainingCard={{
-              title: 'إجمالي المتبقي بالروبل',
-              value: customerNotFound ? '--' : totalRemainingValue,
-              className: totalsAreOverpaid
-                ? 'info-card--danger'
-                : totalsAreSettled
-                  ? 'info-card--success'
-                  : 'info-card--accent',
-              valueClassName:
-                totalsAreOverpaid
-                  ? 'info-card-value--metric info-card-value--danger'
+          {!isCompactMobileLayout ? (
+            <CustomerTotals
+              metrics={totalMetrics}
+              remainingCard={{
+                title: 'إجمالي المتبقي بالروبل',
+                value: customerNotFound ? '--' : totalRemainingValue,
+                className: totalsAreOverpaid
+                  ? 'info-card--danger'
                   : totalsAreSettled
-                    ? 'info-card-value--metric info-card-value--success'
-                    : 'info-card-value--metric',
-              children:
-                paymentTotalsError && !customerNotFound ? (
-                  <p className="support-text text-danger">{paymentTotalsError}</p>
-                ) : totalsAreOverpaid ? (
-                  <p className="support-text text-danger">
-                    يوجد رصيد سالب مجمّع على هذا العميل ويجب مراجعة الحوالات ذات الزيادة.
-                  </p>
-                ) : null,
-            }}
-            errorMessage=""
-          />
+                    ? 'info-card--success'
+                    : 'info-card--accent',
+                valueClassName:
+                  totalsAreOverpaid
+                    ? 'info-card-value--metric info-card-value--danger'
+                    : totalsAreSettled
+                      ? 'info-card-value--metric info-card-value--success'
+                      : 'info-card-value--metric',
+                children:
+                  paymentTotalsError && !customerNotFound ? (
+                    <p className="support-text text-danger">{paymentTotalsError}</p>
+                  ) : totalsAreOverpaid ? (
+                    <p className="support-text text-danger">
+                      يوجد رصيد سالب مجمّع على هذا العميل ويجب مراجعة الحوالات ذات الزيادة.
+                    </p>
+                  ) : null,
+              }}
+              errorMessage=""
+            />
+          ) : null}
         </SectionCard>
 
         <SectionCard
           title="طابور حوالات العميل"
-          description="ترتيب الحوالات حسب أولوية المتابعة: مراجعة مالية ثم تحصيل جزئي ثم الحوالات المفتوحة."
+          description="قائمة الحوالات حسب أولوية المتابعة."
           className={[
             'app-section-panel',
             'customer-details-queue-section',
@@ -1752,12 +1815,13 @@ function CustomerDetailsPage() {
             onFilterChange={setTransferStatusFilter}
             filterOptions={TRANSFER_STATUS_FILTER_OPTIONS}
             warningMessage={queueWarningMessage}
+            compactView={isCompactMobileLayout}
           />
         </SectionCard>
 
         <SectionCard
           title="الحركة الأخيرة لهذا العميل"
-          description="سجل سريع لأحدث الدفعات والحوالات المرتبطة بالعميل لتسهيل المتابعة اليومية."
+          description="خلاصة موجزة لأحدث الحركة."
           className={[
             'app-section-panel',
             'customer-details-recent-section',
@@ -1778,7 +1842,7 @@ function CustomerDetailsPage() {
 
         <SectionCard
           title="الإجراءات على ملف العميل"
-          description="اختصارات تشغيلية آمنة تسهل بدء الحركات ذات الصلة بهذا العميل."
+          description="اختصارات سريعة للعمل على الملف."
           className={[
             'app-section-panel',
             'customer-details-actions-section',
@@ -1807,17 +1871,10 @@ function CustomerDetailsPage() {
 
           <InfoGrid className="customer-details-secondary-grid">
             <InfoCard
-              title={'\u062a\u0639\u062f\u064a\u0644 \u0628\u064a\u0627\u0646\u0627\u062a \u0627\u0644\u0639\u0645\u064a\u0644'}
-              value={
-                '\u062d\u062f\u0651\u062b \u0627\u0644\u0627\u0633\u0645 \u0648\u0631\u0642\u0645 \u0627\u0644\u0647\u0627\u062a\u0641 \u0648\u0627\u0644\u0645\u0644\u0627\u062d\u0638\u0627\u062a \u0627\u0644\u062f\u0627\u062e\u0644\u064a\u0629 \u0641\u0642\u0637 \u062f\u0648\u0646 \u0627\u0644\u0645\u0633\u0627\u0633 \u0628\u0627\u0644\u062d\u0648\u0627\u0644\u0627\u062a \u0623\u0648 \u0633\u062c\u0644 \u0627\u0644\u062a\u062d\u0635\u064a\u0644.'
-              }
+              title="تعديل بيانات العميل"
+              value="حدّث الاسم أو الهاتف أو الملاحظات."
               className={isEditingCustomer ? 'info-card--accent' : ''}
             >
-              <p className="support-text">
-                {isOffline
-                  ? '\u0627\u0644\u062a\u062d\u062f\u064a\u062b \u0627\u0644\u0645\u0628\u0627\u0634\u0631 \u0644\u0628\u064a\u0627\u0646\u0627\u062a \u0627\u0644\u0639\u0645\u064a\u0644 \u0645\u062a\u0627\u062d \u0641\u0642\u0637 \u0623\u062b\u0646\u0627\u0621 \u0627\u0644\u0627\u062a\u0635\u0627\u0644\u060c \u0648\u0644\u0627 \u064a\u062a\u0645 \u0625\u0646\u0634\u0627\u0621 \u0637\u0627\u0628\u0648\u0631 \u062a\u0639\u062f\u064a\u0644 \u0645\u062d\u0644\u064a \u0641\u064a \u0647\u0630\u0627 \u0627\u0644\u0645\u0633\u0627\u0631.'
-                  : '\u064a\u0628\u0642\u0649 \u0643\u0644 \u062a\u0627\u0631\u064a\u062e \u0627\u0644\u062d\u0648\u0627\u0644\u0627\u062a \u0648\u0627\u0644\u0645\u062f\u0641\u0648\u0639\u0627\u062a \u0643\u0645\u0627 \u0647\u0648\u060c \u0648\u064a\u062a\u0645 \u062a\u062d\u062f\u064a\u062b \u0628\u064a\u0627\u0646\u0627\u062a \u0627\u0644\u0645\u0644\u0641 \u0641\u0642\u0637.'}
-              </p>
               <button
                 type="button"
                 className="button secondary"
@@ -1831,13 +1888,10 @@ function CustomerDetailsPage() {
             </InfoCard>
             {canCreateTransfer ? (
               <InfoCard
-                title="إنشاء حوالة جديدة لهذا العميل"
-                value="استخدم هذا الاختصار للانتقال مباشرة إلى نموذج إنشاء حوالة جديدة مع اختيار هذا العميل مسبقا."
+                title="حوالة جديدة للعميل"
+                value="يفتح نموذج الحوالة مع اختيار العميل."
                 className="info-card--accent"
               >
-                <p className="support-text">
-                  لن يتم إنشاء أي حركة فعلية إلا بعد حفظ الحوالة من الشاشة التالية.
-                </p>
                 <Link className="button primary" to={`/transfers/new?customerId=${customerId}`}>
                   حوالة جديدة للعميل
                 </Link>
@@ -1846,11 +1900,8 @@ function CustomerDetailsPage() {
 
             <InfoCard
               title="عرض كل حوالات العميل"
-              value="يمكنك مراجعة الحوالات المرتبطة بهذا العميل من طابور الحوالات التشغيلي."
+              value="افتح صف الحوالات العام."
             >
-              <p className="support-text">
-                يتم الحفاظ على نفس منطق الصف التشغيلي، ولا يتم تغيير طريقة المتابعة المالية الحالية.
-              </p>
               <Link className="button secondary" to="/transfers">
                 فتح صف الحوالات
               </Link>
@@ -1860,7 +1911,7 @@ function CustomerDetailsPage() {
           {isArchivedCustomer ? (
             <InfoCard
               title="الملف مؤرشف"
-              value="تم إيقاف هذا العميل عن الظهور في الاختيارات التشغيلية النشطة، مع الإبقاء على ملفه وحوالاته للمراجعة التاريخية."
+              value="هذا الملف متاح للمراجعة التاريخية فقط."
               className="customer-lifecycle-confirm-card"
             >
               <p className="support-text">
@@ -1874,8 +1925,8 @@ function CustomerDetailsPage() {
               title={canDeleteCustomer ? 'حذف العميل' : 'أرشفة العميل'}
               value={
                 canDeleteCustomer
-                  ? 'لا توجد حوالات مرتبطة بهذا العميل حاليا، لذلك يمكن حذفه نهائيا بعد التأكيد.'
-                  : 'هذا العميل مرتبط بحوالات محفوظة، لذلك لا يمكن حذفه نهائيا. يمكنك أرشفته لإخراجه من الاختيارات التشغيلية النشطة.'
+                  ? 'احذف الملف نهائيا بعد التأكيد.'
+                  : 'أخرج الملف من الاستخدام التشغيلي النشط.'
               }
               className={[
                 'customer-lifecycle-confirm-card',
@@ -1888,11 +1939,6 @@ function CustomerDetailsPage() {
                 .filter(Boolean)
                 .join(' ')}
             >
-              <p className="support-text">
-                {canDeleteCustomer
-                  ? 'سيزال هذا الملف من القوائم والاختيارات النشطة بعد نجاح الحذف.'
-                  : 'ستبقى كل الحوالات والسجل المالي كما هما، لكن العميل لن يظهر ضمن إنشاء الحوالات الجديدة أو القوائم النشطة.'}
-              </p>
               <button
                 type="button"
                 className={[
@@ -1916,8 +1962,8 @@ function CustomerDetailsPage() {
               title={pendingLifecycleAction === 'delete' ? 'تأكيد حذف العميل' : 'تأكيد أرشفة العميل'}
               value={
                 pendingLifecycleAction === 'delete'
-                  ? 'سيتم حذف ملف العميل نهائيا لأنه لا يملك حوالات مرتبطة. راجع الاسم قبل المتابعة.'
-                  : 'سيتم تحويل هذا العميل إلى ملف مؤرشف مع الإبقاء على جميع الحوالات والسجل المرتبط به.'
+                  ? 'سيتم حذف الملف نهائيا بعد التأكيد.'
+                  : 'سيتم تحويل الملف إلى أرشيف بعد التأكيد.'
               }
               className={[
                 'customer-lifecycle-confirm-card',
@@ -1927,9 +1973,7 @@ function CustomerDetailsPage() {
                 .join(' ')}
             >
               <p className="support-text">
-                {pendingLifecycleAction === 'delete'
-                  ? `الاسم الحالي: ${customer.full_name || 'عميل بدون اسم'}. سيختفي العميل من القوائم ومحددات الإنشاء بعد نجاح الحذف.`
-                  : `الاسم الحالي: ${customer.full_name || 'عميل بدون اسم'}. بعد الأرشفة سيبقى الملف متاحا للمراجعة التاريخية فقط.`}
+                {customer.full_name || 'عميل بدون اسم'}
               </p>
               <div className="customers-form-actions customer-lifecycle-actions">
                 <button
@@ -1967,10 +2011,8 @@ function CustomerDetailsPage() {
 
           {isEditingCustomer && customer ? (
             <CustomersFormSection
-              title={'\u062a\u0639\u062f\u064a\u0644 \u0645\u0644\u0641 \u0627\u0644\u0639\u0645\u064a\u0644'}
-              description={
-                '\u062d\u062f\u0651\u062b \u0628\u064a\u0627\u0646\u0627\u062a \u0627\u0644\u0627\u0633\u0645 \u0648\u0627\u0644\u0647\u0627\u062a\u0641 \u0648\u0627\u0644\u0645\u0644\u0627\u062d\u0638\u0627\u062a \u0627\u0644\u062f\u0627\u062e\u0644\u064a\u0629 \u0644\u0644\u0639\u0645\u064a\u0644 \u0627\u0644\u062d\u0627\u0644\u064a \u0641\u0642\u0637. \u0644\u0646 \u064a\u062a\u0645 \u062a\u0639\u062f\u064a\u0644 \u0627\u0644\u062d\u0648\u0627\u0644\u0627\u062a \u0623\u0648 \u0633\u062c\u0644 \u0627\u0644\u0645\u062f\u0641\u0648\u0639\u0627\u062a.'
-              }
+              title="تعديل ملف العميل"
+              description="حدّث بيانات الملف فقط."
               className="customer-edit-form-section"
               submitError={editSubmitError}
               submitSuccess={editSubmitSuccess}
@@ -2003,8 +2045,8 @@ function CustomerDetailsPage() {
 
         {customer ? (
           <SectionCard
-            title="تفاصيل ملف العميل"
-            description="ملاحظات الملف وبياناته الداخلية عند الحاجة إلى مراجعة أعمق."
+            title="معلومات الملف"
+            description="بيانات داخلية مرجعية عند الحاجة."
             className={[
               'app-section-panel',
               'customer-details-secondary-section',

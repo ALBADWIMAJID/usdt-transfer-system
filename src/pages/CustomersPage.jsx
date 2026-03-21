@@ -9,16 +9,13 @@ import CustomersRecentActivitySection from '../components/customers/CustomersRec
 import InlineMessage from '../components/ui/InlineMessage.jsx'
 import OfflineSnapshotNotice from '../components/ui/OfflineSnapshotNotice.jsx'
 import OperationsDrillDownSheet from '../components/ui/OperationsDrillDownSheet.jsx'
-import PendingMutationNotice from '../components/ui/PendingMutationNotice.jsx'
 import RecordCard from '../components/ui/RecordCard.jsx'
 import RecordHeader from '../components/ui/RecordHeader.jsx'
-import SectionCard from '../components/ui/SectionCard.jsx'
 import { useAuth } from '../context/auth-context.js'
 import { useTenant } from '../context/tenant-context.js'
 import useNetworkStatus from '../hooks/useNetworkStatus.js'
 import useOfflineSnapshot from '../hooks/useOfflineSnapshot.js'
 import usePendingCustomers from '../hooks/usePendingCustomers.js'
-import useReplayQueue from '../hooks/useReplayQueue.js'
 import { MISSING_CURRENT_ORG_MESSAGE, withOrgScope, withStampedOrg } from '../lib/orgScope.js'
 import { getCustomersListSnapshotKey } from '../lib/offline/cacheKeys.js'
 import { queueOfflineCustomer } from '../lib/offline/customerQueue.js'
@@ -92,6 +89,8 @@ const CUSTOMER_PAGE_SECTIONS = [
     description: 'آخر الحركة عبر العملاء',
   },
 ]
+
+const MOBILE_CUSTOMERS_QUERY = '(max-width: 767px)'
 
 function roundCurrency(value) {
   return Math.round((value + Number.EPSILON) * 100) / 100
@@ -492,6 +491,13 @@ function CustomersPage() {
   const { isOffline } = useNetworkStatus()
   const { clearSnapshotState, markCachedSnapshot, markLiveSnapshot, snapshotState } =
     useOfflineSnapshot()
+  const [isCompactMobileLayout, setIsCompactMobileLayout] = useState(() => {
+    if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') {
+      return false
+    }
+
+    return window.matchMedia(MOBILE_CUSTOMERS_QUERY).matches
+  })
   const [customers, setCustomers] = useState([])
   const [archivedCustomers, setArchivedCustomers] = useState([])
   const [loading, setLoading] = useState(Boolean(isConfigured))
@@ -513,15 +519,26 @@ function CustomersPage() {
   const {
     activeCount: pendingCustomerCount,
     failedCount: failedPendingCustomerCount,
-    pendingCustomers,
-    pendingCustomersLoading,
     refreshPendingCustomers,
   } = usePendingCustomers()
-  const {
-    customerQueueCount,
-    isSyncing,
-    replayCustomersNow,
-  } = useReplayQueue()
+
+  useEffect(() => {
+    if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') {
+      return undefined
+    }
+
+    const mediaQuery = window.matchMedia(MOBILE_CUSTOMERS_QUERY)
+    const handleChange = (event) => {
+      setIsCompactMobileLayout(event.matches)
+    }
+
+    setIsCompactMobileLayout(mediaQuery.matches)
+    mediaQuery.addEventListener('change', handleChange)
+
+    return () => {
+      mediaQuery.removeEventListener('change', handleChange)
+    }
+  }, [])
 
   useEffect(() => {
     if (!isConfigured || !supabase) {
@@ -1205,39 +1222,6 @@ function CustomersPage() {
     setRefreshKey((current) => current + 1)
   }
 
-  const handleSyncPendingCustomers = async () => {
-    setSubmitError('')
-    setSubmitSuccess('')
-
-    const result = await replayCustomersNow()
-
-    if (!result.started) {
-      setSubmitSuccess('لا توجد ملفات عملاء محلية جاهزة للمزامنة حاليا.')
-      return
-    }
-
-    if (result.failedCount > 0) {
-      setSubmitError(
-        `تعذر إرسال ${result.failedCount} ملف عميل محلي. راجع العناصر المحلية ثم أعد المحاولة.`
-      )
-      return
-    }
-
-    const messages = []
-
-    if (result.replayedCount > 0) {
-      messages.push(`تم إرسال ${result.replayedCount} ملف عميل محلي إلى الخادم`)
-    }
-
-    if (result.dedupedCount > 0) {
-      messages.push(`تمت تسوية ${result.dedupedCount} ملف عميل موجود مسبقا على الخادم`)
-    }
-
-    setSubmitSuccess(messages.join('، ') || 'اكتملت مزامنة ملفات العملاء المحلية.')
-    await refreshPendingCustomers()
-    handleRefresh()
-  }
-
   const openDrillDown = (key) => {
     setActiveDrillDownKey(key)
   }
@@ -1342,11 +1326,12 @@ function CustomersPage() {
     })
   }
 
+  const customersDirectoryItems = customerGroups.flatMap((group) => group.items)
+
   const activePortfolioFilterLabel = PORTFOLIO_FILTER_LABELS[portfolioFilter] || ''
   const followUpCustomersInView = filteredCustomers.filter((customer) => customer.needsFollowUp).length
   const pendingCustomerLabel =
     pendingCustomerCount > 0 ? ` • ${pendingCustomerCount} محلي بانتظار الإرسال` : ''
-  const customerQueueSyncing = isSyncing && customerQueueCount > 0
   const totalVisibleCustomers = filteredCustomers.length + filteredArchivedCustomers.length
   const customerCountLabel = loading
     ? 'جار تحميل محفظة العملاء...'
@@ -1366,25 +1351,31 @@ function CustomersPage() {
   void visibleListScopeLabel
   const customerHeaderCountLabel = loading
     ? '\u062c\u0627\u0631 \u062a\u062d\u0645\u064a\u0644 \u0645\u062d\u0641\u0638\u0629 \u0627\u0644\u0639\u0645\u0644\u0627\u0621...'
-    : `\u0639\u0631\u0636 ${totalVisibleCustomers} \u0645\u0646 \u0623\u0635\u0644 ${customers.length + archivedCustomers.length} \u0639\u0645\u064a\u0644 \u2022 ${followUpCustomersInView} \u0628\u062d\u0627\u062c\u0629 \u0645\u062a\u0627\u0628\u0639\u0629${archivedCustomers.length > 0 ? ` \u2022 ${archivedCustomers.length} \u0645\u0624\u0631\u0634\u0641` : ''}${pendingCustomerLabel}`
+    : isCompactMobileLayout
+      ? `عرض ${totalVisibleCustomers} من أصل ${customers.length + archivedCustomers.length} عميل${archivedCustomers.length > 0 ? ` • ${archivedCustomers.length} مؤرشف` : ''}`
+      : `\u0639\u0631\u0636 ${totalVisibleCustomers} \u0645\u0646 \u0623\u0635\u0644 ${customers.length + archivedCustomers.length} \u0639\u0645\u064a\u0644 \u2022 ${followUpCustomersInView} \u0628\u062d\u0627\u062c\u0629 \u0645\u062a\u0627\u0628\u0639\u0629${archivedCustomers.length > 0 ? ` \u2022 ${archivedCustomers.length} \u0645\u0624\u0631\u0634\u0641` : ''}${pendingCustomerLabel}`
   const customersListScopeLabel = activePortfolioFilterLabel
     ? `\u064a\u062a\u0645 \u0627\u0644\u0622\u0646 \u0627\u0644\u062a\u0631\u0643\u064a\u0632 \u0639\u0644\u0649: ${activePortfolioFilterLabel}. \u0645\u0627 \u0632\u0627\u0644 \u0628\u0625\u0645\u0643\u0627\u0646\u0643 \u0627\u0633\u062a\u062e\u062f\u0627\u0645 \u0627\u0644\u0628\u062d\u062b \u0623\u0648 \u0625\u0644\u063a\u0627\u0621 \u0627\u0644\u062a\u0631\u0643\u064a\u0632 \u0644\u0644\u0639\u0648\u062f\u0629 \u0625\u0644\u0649 \u0643\u0644 \u0627\u0644\u0645\u062d\u0641\u0638\u0629\u060c \u0645\u0639 \u0628\u0642\u0627\u0621 \u0627\u0644\u0645\u0644\u0641\u0627\u062a \u0627\u0644\u0645\u0624\u0631\u0634\u0641\u0629 \u0636\u0645\u0646 \u0645\u062c\u0645\u0648\u0639\u0629 \u0645\u0633\u062a\u0642\u0644\u0629 \u0639\u0646\u062f \u0648\u062c\u0648\u062f\u0647\u0627.`
     : '\u0627\u0644\u0639\u0645\u0644\u0627\u0621 \u0627\u0644\u0646\u0634\u0637\u0648\u0646 \u0645\u0631\u062a\u0628\u0648\u0646 \u0647\u0646\u0627 \u062d\u0633\u0628 \u0623\u0648\u0644\u0648\u064a\u0629 \u0627\u0644\u0645\u062a\u0627\u0628\u0639\u0629: \u0641\u0648\u0642 \u0627\u0644\u0645\u0637\u0644\u0648\u0628\u060c \u062b\u0645 \u0627\u0644\u062a\u062d\u0635\u064a\u0644 \u0627\u0644\u062c\u0632\u0626\u064a\u060c \u062b\u0645 \u0627\u0644\u0645\u0644\u0641\u0627\u062a \u0627\u0644\u0645\u0641\u062a\u0648\u062d\u0629\u060c \u0645\u0639 \u0639\u0631\u0636 \u0627\u0644\u0645\u0644\u0641\u0627\u062a \u0627\u0644\u0645\u0624\u0631\u0634\u0641\u0629 \u0641\u064a \u0645\u062c\u0645\u0648\u0639\u0629 \u0645\u0633\u062a\u0642\u0644\u0629 \u0639\u0646\u062f \u0648\u062c\u0648\u062f\u0647\u0627.'
-  const customerFormDescription = isOffline
-    ? 'يمكنك حفظ ملف عميل محليا أثناء انقطاع الاتصال. سيبقى منفصلا عن ملفات العملاء المؤكدة حتى تنجح المزامنة.'
-    : 'أضف عميلا جديدا حتى يتمكن فريق التشغيل من إنشاء الحوالات ومتابعة التسويات له.'
-  const customerFormInfoMessage = isOffline
-    ? 'سيحفظ هذا العميل داخل المتصفح فقط ولن يصبح متاحا كسجل مؤكد أو كعميل صالح لإنشاء حوالة محلية جديدة حتى تنجح المزامنة.'
-    : ''
+  const customerFormDescription = isCompactMobileLayout
+    ? isOffline
+      ? 'يحفظ الملف محليا حتى تعود الشبكة.'
+      : 'أضف العميل الجديد بسرعة ثم انتقل مباشرة إلى القائمة.'
+    : isOffline
+      ? 'يمكنك حفظ ملف عميل محليا أثناء انقطاع الاتصال. سيبقى منفصلا عن ملفات العملاء المؤكدة حتى تنجح المزامنة.'
+      : 'أضف عميلا جديدا حتى يتمكن فريق التشغيل من إنشاء الحوالات ومتابعة التسويات له.'
+  const customerFormInfoMessage = isCompactMobileLayout
+    ? isOffline
+      ? 'يبقى محليا حتى تنجح المزامنة.'
+      : ''
+    : isOffline
+      ? 'سيحفظ هذا العميل داخل المتصفح فقط ولن يصبح متاحا كسجل مؤكد أو كعميل صالح لإنشاء حوالة محلية جديدة حتى تنجح المزامنة.'
+      : ''
 
   const customersSectionDescription =
-    failedPendingCustomerCount > 0
-      ? `يضم أيضا ${failedPendingCustomerCount} ملف عميل محلي يحتاج إعادة محاولة.`
-      : pendingCustomerCount > 0
-        ? `يضم أيضا ${pendingCustomerCount} ملف عميل محلي بانتظار الإرسال.`
-        : activePortfolioFilterLabel
-          ? `يتم التركيز الآن على ${activePortfolioFilterLabel}.`
-          : 'إنشاء العملاء والبحث وقائمة المتابعة في مساحة واحدة.'
+    activePortfolioFilterLabel
+      ? `التركيز الحالي: ${activePortfolioFilterLabel}.`
+      : 'إضافة عميل، البحث، ثم قائمة العملاء.'
   const showCrossSectionQueueNotice = activeSection !== 'customers' && pendingCustomerCount > 0
 
   const summaryCards = [
@@ -1485,25 +1476,26 @@ function CustomersPage() {
     }
   })
 
+  const portfolioSummaryCards = isCompactMobileLayout
+    ? ['follow-up', 'overpaid', 'outstanding', 'customers']
+        .map((key) => summaryCards.find((card) => card.key === key))
+        .filter(Boolean)
+    : summaryCards
+
   const sectionNavItems = CUSTOMER_PAGE_SECTIONS.map((section) => {
     if (section.key === 'customers') {
       return {
         ...section,
         description: customersSectionDescription,
-        countLabel: loading ? '...' : pendingCustomerCount > 0 ? pendingCustomerCount : filteredCustomers.length,
-        tone:
-          failedPendingCustomerCount > 0
-            ? 'danger'
-            : pendingCustomerCount > 0
-              ? 'warning'
-              : 'neutral',
+        countLabel: loading ? '...' : totalVisibleCustomers,
+        tone: activePortfolioFilterLabel ? 'brand' : 'neutral',
       }
     }
 
     if (section.key === 'portfolio') {
       return {
         ...section,
-        countLabel: summaryCards.length,
+        countLabel: portfolioSummaryCards.length,
         tone: 'brand',
       }
     }
@@ -1623,6 +1615,11 @@ function CustomersPage() {
   }
 
   const activeDrillDown = activeDrillDownKey ? drillDownConfigs[activeDrillDownKey] : null
+  const customersListSummaryLabel = isCompactMobileLayout
+    ? activePortfolioFilterLabel
+      ? `التركيز الحالي: ${activePortfolioFilterLabel}.`
+      : 'ابحث ثم افتح ملف العميل مباشرة.'
+    : customersListScopeLabel
 
   const handleSubmit = async (event) => {
     event.preventDefault()
@@ -1705,56 +1702,59 @@ function CustomersPage() {
           {portfolioWarning}
         </InlineMessage>
 
-        <div className="app-section-nav-shell">
-          <nav className="app-section-nav" aria-label="أقسام صفحة العملاء">
-            {sectionNavItems.map((section) => {
-              const isActiveSection = activeSection === section.key
+        <div className="customers-page-toolbar">
+          <div className="app-section-nav-shell">
+            <nav className="app-section-nav" aria-label="أقسام صفحة العملاء">
+              {sectionNavItems.map((section) => {
+                const isActiveSection = activeSection === section.key
 
-              return (
-                <button
-                  key={section.key}
-                  type="button"
-                  className={['app-section-tab app-section-tab--row', isActiveSection ? 'active' : '']
-                    .filter(Boolean)
-                    .join(' ')}
-                  aria-pressed={isActiveSection}
-                  onClick={() => setActiveSection(section.key)}
-                >
-                  <span className="app-section-tab-copy">
-                    <strong>{section.label}</strong>
-                    <small>{section.description}</small>
-                  </span>
-                  <span
-                    className={[
-                      'app-section-tab-count',
-                      `app-section-tab-count--${section.tone}`,
-                    ].join(' ')}
+                return (
+                  <button
+                    key={section.key}
+                    type="button"
+                    className={['app-section-tab app-section-tab--row', isActiveSection ? 'active' : '']
+                      .filter(Boolean)
+                      .join(' ')}
+                    aria-pressed={isActiveSection}
+                    onClick={() => setActiveSection(section.key)}
                   >
-                    {section.countLabel}
-                  </span>
-                </button>
-              )
-            })}
-          </nav>
-        </div>
+                    <span className="app-section-tab-copy">
+                      <strong>{section.label}</strong>
+                      <small>{section.description}</small>
+                    </span>
+                    <span
+                      className={[
+                        'app-section-tab-count',
+                        `app-section-tab-count--${section.tone}`,
+                      ].join(' ')}
+                    >
+                      {section.countLabel}
+                    </span>
+                  </button>
+                )
+              })}
+            </nav>
+          </div>
 
-        <InlineMessage
-          kind={failedPendingCustomerCount > 0 ? 'warning' : 'info'}
-          className="app-section-inline-status customers-portfolio-queue-inline"
-        >
-          {showCrossSectionQueueNotice
-            ? failedPendingCustomerCount > 0
-              ? `يوجد ${failedPendingCustomerCount} ملف عميل محلي يحتاج إعادة محاولة. افتح قسم العملاء لمراجعته وتشغيل المزامنة يدويا عند الحاجة.`
-              : `يوجد ${pendingCustomerCount} ملف عميل محلي بانتظار الإرسال. افتح قسم العملاء لرؤيته ومتابعة المزامنة.`
-            : ''}
-        </InlineMessage>
+          <InlineMessage
+            kind={failedPendingCustomerCount > 0 ? 'warning' : 'info'}
+            className="app-section-inline-status customers-portfolio-queue-inline"
+          >
+            {showCrossSectionQueueNotice
+              ? failedPendingCustomerCount > 0
+                ? `يوجد ${failedPendingCustomerCount} ملف عميل محلي يحتاج إعادة محاولة. افتح قسم العملاء لمراجعته وتشغيل المزامنة يدويا عند الحاجة.`
+                : `يوجد ${pendingCustomerCount} ملف عميل محلي بانتظار الإرسال. افتح قسم العملاء لرؤيته ومتابعة المزامنة.`
+              : ''}
+          </InlineMessage>
+        </div>
 
         <div className="app-section-workspace">
 
         {activeSection === 'portfolio' ? (
         <CustomersPortfolioSummary
-          cards={summaryCards}
-          note="يمكنك النقر على أي مؤشر لفتح تفصيله أولا، ثم تركيز محفظة العملاء على نفس الشريحة إذا أردت المتابعة من الصفحة نفسها."
+          cards={portfolioSummaryCards}
+          note="يمكنك فتح أي مؤشر للتفصيل ثم متابعة نفس الشريحة من الصفحة."
+          compactView={isCompactMobileLayout}
         />
         ) : null}
 
@@ -1763,6 +1763,7 @@ function CustomersPage() {
           loading={loading}
           customers={attentionCustomers}
           onOpenPortfolioDrillDown={portfolioWarning ? undefined : () => openDrillDown('followUp')}
+          compactView={isCompactMobileLayout}
         />
         ) : null}
 
@@ -1774,117 +1775,46 @@ function CustomersPage() {
           items={recentActivityItems}
           onRetry={handleRefresh}
           onOpenActivityDrillDown={portfolioWarning ? undefined : () => openDrillDown('recentActivity')}
+          compactView={isCompactMobileLayout}
         />
         ) : null}
 
         {activeSection === 'customers' ? (
-          <>
-        <CustomersFormSection
-          description={customerFormDescription}
-          submitError={submitError}
-          submitLabel={isOffline ? 'حفظ العميل محليا' : 'إنشاء العميل'}
-          submitSuccess={submitSuccess}
-          submittingLabel={isOffline ? 'جار الحفظ المحلي...' : 'جار الحفظ...'}
-          formValues={formValues}
-          infoMessage={customerFormInfoMessage}
-          onChange={handleChange}
-          onSubmit={handleSubmit}
-          submitting={submitting}
-          isConfigured={isConfigured}
-        />
+          <div className="customers-workspace-flow">
+            <div className="customers-workspace-utility">
+              <CustomersFormSection
+                title="إضافة عميل"
+                description={customerFormDescription}
+                className="customers-form-section--utility"
+                submitError={submitError}
+                submitLabel={isOffline ? 'حفظ العميل محليا' : 'إنشاء العميل'}
+                submitSuccess={submitSuccess}
+                submittingLabel={isOffline ? 'جار الحفظ المحلي...' : 'جار الحفظ...'}
+                formValues={formValues}
+                infoMessage={customerFormInfoMessage}
+                onChange={handleChange}
+                onSubmit={handleSubmit}
+                submitting={submitting}
+                isConfigured={isConfigured}
+              />
+            </div>
 
-        {pendingCustomersLoading || pendingCustomerCount > 0 ? (
-          <SectionCard
-            title="عملاء محليون بانتظار الإرسال"
-            description="هذه الملفات محفوظة داخل المتصفح فقط. لن تصبح ملفات عملاء مؤكدة أو صالحة للاعتماد الكامل أو لإنشاء حوالة محلية جديدة حتى تنجح المزامنة مع الخادم."
-            className="pending-transfer-section"
-          >
-            <PendingMutationNotice
-              activeCount={pendingCustomerCount}
-              failedCount={failedPendingCustomerCount}
-              isOffline={isOffline}
-              syncing={customerQueueSyncing}
-              onSyncNow={handleSyncPendingCustomers}
-              variant="customer"
-            />
-
-            {pendingCustomersLoading && pendingCustomerCount === 0 ? (
-              <p className="support-text">جار فحص ملفات العملاء المحلية المحفوظة...</p>
-            ) : (
-              <div className="pending-transfer-list">
-                {pendingCustomers.map((record) => {
-                  const statusMeta = getPendingCustomerStatusMeta(record.status)
-                  const phoneLabel = record.payload?.phone || 'بدون هاتف'
-
-                  return (
-                    <RecordCard
-                      key={record.id}
-                      className={[
-                        'pending-transfer-card',
-                        record.status === 'failed' ? 'pending-transfer-card--failed' : '',
-                      ]
-                        .filter(Boolean)
-                        .join(' ')}
-                    >
-                      <RecordHeader
-                        eyebrow="عميل محلي"
-                        title={record.payload?.full_name || 'عميل محفوظ محليا'}
-                        subtitle={phoneLabel}
-                        metaItems={[
-                          {
-                            label: 'وقت الحفظ',
-                            value: formatDate(record.createdAt),
-                          },
-                        ]}
-                        aside={
-                          <span
-                            className={[
-                              'offline-snapshot-chip',
-                              statusMeta.chipClassName,
-                              'pending-transfer-status-chip',
-                            ]
-                              .filter(Boolean)
-                              .join(' ')}
-                          >
-                            {statusMeta.label}
-                          </span>
-                        }
-                      />
-
-                      <dl className="pending-transfer-grid">
-                        <div>
-                          <dt>المرجع المحلي</dt>
-                          <dd>{record.localMeta?.localReference || 'مرجع محلي مؤقت'}</dd>
-                        </div>
-                        <div>
-                          <dt>الهاتف</dt>
-                          <dd>{phoneLabel}</dd>
-                        </div>
-                      </dl>
-
-                      <p className="record-note pending-transfer-note">{buildPendingCustomerNote(record)}</p>
-                    </RecordCard>
-                  )
-                })}
-              </div>
-            )}
-          </SectionCard>
-        ) : null}
-
-        <CustomersList
-          searchQuery={searchQuery}
-          onSearchChange={setSearchQuery}
-          errorMessage={loadError}
-          loading={loading}
-          hasCustomers={customers.length + archivedCustomers.length > 0}
-          hasFilteredCustomers={filteredCustomers.length + filteredArchivedCustomers.length > 0}
-          groups={customerGroups}
-          scopeLabel={customersListScopeLabel}
-          activePortfolioFilterLabel={activePortfolioFilterLabel}
-          onClearPortfolioFilter={() => setPortfolioFilter('all')}
-          onRetry={handleRefresh}
-        />
-          </>
+            <div className="customers-workspace-content">
+              <CustomersList
+                searchQuery={searchQuery}
+                onSearchChange={setSearchQuery}
+                errorMessage={loadError}
+                loading={loading}
+                hasCustomers={customers.length + archivedCustomers.length > 0}
+                hasFilteredCustomers={customersDirectoryItems.length > 0}
+                items={customersDirectoryItems}
+                scopeLabel={customersListSummaryLabel}
+                activePortfolioFilterLabel={activePortfolioFilterLabel}
+                onClearPortfolioFilter={() => setPortfolioFilter('all')}
+                onRetry={handleRefresh}
+              />
+            </div>
+          </div>
         ) : null}
         </div>
       </div>

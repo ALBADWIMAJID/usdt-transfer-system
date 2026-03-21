@@ -115,6 +115,10 @@ function formatDate(value) {
   }).format(parsedDate)
 }
 
+function getOptionLabel(options, value, fallback = '') {
+  return options.find((option) => option.value === value)?.label || fallback
+}
+
 function formatRelativeAge(value) {
   const parsedDate = parseDateValue(value)
 
@@ -321,16 +325,28 @@ function TransfersPage() {
   )
   const [createdAfter, setCreatedAfter] = useState(() => searchParams.get('createdAfter') || '')
   const [activeSection, setActiveSection] = useState('queue')
+  const [advancedFiltersOpen, setAdvancedFiltersOpen] = useState(() => {
+    const initialStatus = getValidFilterValue(
+      searchParams.get('statusFilter'),
+      TRANSFER_STATUS_FILTER_OPTIONS
+    )
+    return initialStatus !== 'all' || Boolean(searchParams.get('createdAfter'))
+  })
   const transfersListSnapshotKey = getTransfersListSnapshotKey(orgId)
 
   useEffect(() => {
     const timeoutId = window.setTimeout(() => {
-      setSearchQuery(searchParams.get('q') || '')
-      setStatusFilter(
-        getValidFilterValue(searchParams.get('statusFilter'), TRANSFER_STATUS_FILTER_OPTIONS)
+      const nextStatusFilter = getValidFilterValue(
+        searchParams.get('statusFilter'),
+        TRANSFER_STATUS_FILTER_OPTIONS
       )
+      const nextCreatedAfter = searchParams.get('createdAfter') || ''
+
+      setSearchQuery(searchParams.get('q') || '')
+      setStatusFilter(nextStatusFilter)
       setQueueFilter(getValidFilterValue(searchParams.get('queueFilter'), QUEUE_FILTER_OPTIONS))
-      setCreatedAfter(searchParams.get('createdAfter') || '')
+      setCreatedAfter(nextCreatedAfter)
+      setAdvancedFiltersOpen(nextStatusFilter !== 'all' || Boolean(nextCreatedAfter))
     }, 0)
 
     return () => {
@@ -741,6 +757,32 @@ function TransfersPage() {
     statusFilter !== 'all' ||
     queueFilter !== 'all' ||
     Boolean(createdAfter)
+  const activeFilterItems = [
+    normalizedSearchQuery
+      ? {
+          key: 'search',
+          label: `بحث: ${searchQuery.trim()}`,
+        }
+      : null,
+    queueFilter !== 'all'
+      ? {
+          key: 'queue',
+          label: getOptionLabel(QUEUE_FILTER_OPTIONS, queueFilter, queueFilter),
+        }
+      : null,
+    statusFilter !== 'all'
+      ? {
+          key: 'status',
+          label: getOptionLabel(TRANSFER_STATUS_FILTER_OPTIONS, statusFilter, statusFilter),
+        }
+      : null,
+    createdAfter
+      ? {
+          key: 'createdAfter',
+          label: `من ${createdAfter}`,
+        }
+      : null,
+  ].filter(Boolean)
   const openedFromDashboard = searchParams.get('from') === 'dashboard'
   const dashboardFocus = String(searchParams.get('focus') || '').trim()
   const dashboardFocusLabel = DASHBOARD_FOCUS_LABELS[dashboardFocus] || ''
@@ -852,6 +894,17 @@ function TransfersPage() {
   const queueScopeLabel = hasActiveFilters
     ? 'الأولوية الحالية مبنية على نتائج البحث والتصفية المعروضة أمامك.'
     : 'الحوالات مرتبة هنا حسب أولوية المتابعة اليومية: فوق المطلوب، ثم الجزئية، ثم المفتوحة.'
+  const queueContextTitle = hasActiveFilters ? 'نتائج التصفية الحالية' : 'ترتيب المتابعة اليومي'
+  const queueContextSummary = hasActiveFilters
+    ? transferCountLabel
+    : 'تبدأ الأولوية من الحوالات فوق المطلوب، ثم المدفوعة جزئيا، ثم المفتوحة.'
+  const handleClearFilters = () => {
+    setSearchQuery('')
+    setStatusFilter('all')
+    setQueueFilter('all')
+    setCreatedAfter('')
+    setAdvancedFiltersOpen(false)
+  }
 
   const sectionNavItems = TRANSFERS_PAGE_SECTIONS.map((section) => {
     if (section.key === 'summary') {
@@ -874,8 +927,13 @@ function TransfersPage() {
       <TransfersHeader transferCountLabel={transferCountLabel} onRefresh={handleRefresh} />
 
       <InlineMessage kind="success">{location.state?.successMessage}</InlineMessage>
-      <InlineMessage kind="info">{dashboardContextMessage}</InlineMessage>
-      <OfflineSnapshotNotice snapshotState={snapshotState} />
+      <InlineMessage kind="info" className="transfers-page-context-banner">
+        {dashboardContextMessage}
+      </InlineMessage>
+      <OfflineSnapshotNotice
+        className="transfers-page-snapshot-banner"
+        snapshotState={snapshotState}
+      />
 
       <div className="app-section-nav-shell">
         <nav className="app-section-nav app-section-nav--two" aria-label="أقسام صفحة الحوالات">
@@ -919,6 +977,7 @@ function TransfersPage() {
           description="أرقام وأداء صف الحوالات في نظرة واحدة."
           className={[
             'app-section-panel',
+            'transfers-queue-summary-panel',
             activeSection === 'summary' ? 'is-active' : '',
           ]
             .filter(Boolean)
@@ -930,7 +989,7 @@ function TransfersPage() {
 
         <SectionCard
           title="صف المتابعة"
-          description="استخدم البحث والتصفية والعرض التشغيلي للوصول بسرعة إلى الحوالات التي تحتاج حركة اليوم."
+          description="ابحث بسرعة وافتح الحوالات التي تحتاج حركة اليوم."
           className={[
             'app-section-panel',
             'transfers-queue-panel',
@@ -939,6 +998,11 @@ function TransfersPage() {
             .filter(Boolean)
             .join(' ')}
         >
+          <div className="transfers-queue-context-strip" aria-label="سياق صف المتابعة">
+            <strong>{queueContextTitle}</strong>
+            <p>{queueContextSummary}</p>
+          </div>
+
           <TransfersFilterBar
             searchQuery={searchQuery}
             onSearchChange={setSearchQuery}
@@ -950,9 +1014,12 @@ function TransfersPage() {
             onCreatedAfterChange={setCreatedAfter}
             statusOptions={TRANSFER_STATUS_FILTER_OPTIONS}
             queueOptions={QUEUE_FILTER_OPTIONS}
+            advancedOpen={advancedFiltersOpen}
+            onToggleAdvanced={() => setAdvancedFiltersOpen((current) => !current)}
+            onClearFilters={handleClearFilters}
+            hasActiveFilters={hasActiveFilters}
+            activeFilterItems={activeFilterItems}
           />
-
-          <p className="support-text transfers-queue-note">{queueScopeLabel}</p>
 
           <TransfersList
             errorMessage={loadError}

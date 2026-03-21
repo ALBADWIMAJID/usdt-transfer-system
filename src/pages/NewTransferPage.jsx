@@ -665,7 +665,7 @@ function NewTransferPage() {
     <div className="stack new-transfer-page">
       <NewTransferHeader onRefresh={handleCustomerRefresh} />
 
-      <OfflineSnapshotNotice snapshotState={snapshotState} />
+      <OfflineSnapshotNotice className="new-transfer-snapshot-banner" snapshotState={snapshotState} />
 
       <TransferFormSection
         customersError={customersError}

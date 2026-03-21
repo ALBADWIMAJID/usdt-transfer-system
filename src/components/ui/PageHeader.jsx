@@ -1,12 +1,37 @@
 import PageActions from './PageActions.jsx'
 
-function PageHeader({ eyebrow, title, description, actions, className = '', children }) {
+function PageHeader({
+  eyebrow,
+  title,
+  description,
+  actions,
+  className = '',
+  children,
+  showDescriptionOnMobile = false,
+}) {
   return (
-    <section className={['page-hero', className].filter(Boolean).join(' ')}>
-      {eyebrow ? <p className="eyebrow">{eyebrow}</p> : null}
-      {title ? <h1>{title}</h1> : null}
-      {description ? <p className="page-hero-description">{description}</p> : null}
-      {actions ? <PageActions>{actions}</PageActions> : null}
+    <section className={['page-hero', 'page-hero--compact', className].filter(Boolean).join(' ')}>
+      <div className="page-hero-main">
+        <div className="page-hero-copy">
+          {eyebrow ? <p className="eyebrow">{eyebrow}</p> : null}
+          {title ? <h1>{title}</h1> : null}
+          {description ? (
+            <p
+              className={[
+                'page-hero-description',
+                showDescriptionOnMobile ? 'page-hero-description--mobile-visible' : '',
+              ]
+                .filter(Boolean)
+                .join(' ')}
+            >
+              {description}
+            </p>
+          ) : null}
+        </div>
+
+        {actions ? <PageActions>{actions}</PageActions> : null}
+      </div>
+
       {children}
     </section>
   )

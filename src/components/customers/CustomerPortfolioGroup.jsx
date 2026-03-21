@@ -13,7 +13,7 @@ function CustomerPortfolioGroup({ title, description, count, tone = 'default', c
 
       <div className="record-list customer-portfolio-group-list">
         {customers.map((customer) => (
-          <CustomerRecordCard key={customer.id} customer={customer} />
+          <CustomerRecordCard key={customer.id} customer={customer} compact />
         ))}
       </div>
     </section>

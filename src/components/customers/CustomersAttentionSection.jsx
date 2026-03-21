@@ -7,9 +7,10 @@ function CustomersAttentionSection({
   loading,
   customers = [],
   onOpenPortfolioDrillDown,
+  compactView = false,
 }) {
   const leadCustomer = customers[0]
-  const previewCustomers = customers.slice(0, 2)
+  const previewCustomers = customers.slice(0, compactView ? 2 : 2)
   const hiddenCustomersCount = Math.max(customers.length - previewCustomers.length, 0)
   const overpaidCustomersCount = customers.filter((customer) => customer.hasOverpaid).length
   const activeCollectionCustomersCount = customers.filter(
@@ -23,7 +24,11 @@ function CustomersAttentionSection({
   return (
     <SectionCard
       title="من يحتاج متابعة الآن؟"
-      description="ملخص مضغوط للأولوية الحالية، مع تفاصيل كاملة داخل لوحة drill-down عند الحاجة."
+      description={
+        compactView
+          ? 'قائمة تشغيل سريعة للأولوية الحالية.'
+          : 'ملخص مضغوط للأولوية الحالية، مع تفاصيل كاملة داخل لوحة drill-down عند الحاجة.'
+      }
       className="customers-attention-section"
       actions={
         onOpenPortfolioDrillDown ? (
@@ -44,14 +49,17 @@ function CustomersAttentionSection({
           <div className="customer-portfolio-preview-summary">
             <div className="customer-portfolio-preview-headline">
               <strong>{customers.length} عميل يحتاج متابعة الآن</strong>
-              {leadCustomer ? (
+              {compactView && leadCustomer ? (
+                <p>ابدأ بـ {leadCustomer.name}</p>
+              ) : null}
+              {!compactView && leadCustomer ? (
                 <p>
                   ابدأ بملف <strong>{leadCustomer.name}</strong> إذا أردت فتح أعلى أولوية مباشرة.
                 </p>
               ) : null}
             </div>
 
-            {hiddenCustomersCount > 0 ? (
+            {!compactView && hiddenCustomersCount > 0 ? (
               <p className="support-text customer-portfolio-attention-note">
                 +{hiddenCustomersCount} ملف إضافي داخل لوحة التفاصيل
               </p>
@@ -83,8 +91,12 @@ function CustomersAttentionSection({
               <Link key={customer.id} to={customer.to} className="customer-portfolio-preview-item">
                 <div className="customer-portfolio-preview-copy">
                   <span className="customer-portfolio-preview-title">{customer.name}</span>
-                  <span className="customer-portfolio-preview-meta">{customer.phone}</span>
-                  <span className="customer-portfolio-preview-meta">{customer.followUpNote}</span>
+                  <span className="customer-portfolio-preview-meta">
+                    {compactView ? customer.queueLabel || customer.stateSummary : customer.phone}
+                  </span>
+                  <span className="customer-portfolio-preview-meta">
+                    {compactView ? `المتبقي ${customer.outstandingRubLabel}` : customer.followUpNote}
+                  </span>
                 </div>
 
                 <div className="customer-portfolio-preview-aside">
@@ -93,10 +105,12 @@ function CustomersAttentionSection({
                       {customer.queueLabel}
                     </span>
                   ) : null}
-                  <span className="customer-portfolio-preview-meta">
-                    المتبقي: {customer.outstandingRubLabel}
-                  </span>
-                  <span className="customer-portfolio-preview-link">فتح ملف العميل</span>
+                  {!compactView ? (
+                    <span className="customer-portfolio-preview-meta">
+                      المتبقي: {customer.outstandingRubLabel}
+                    </span>
+                  ) : null}
+                  {!compactView ? <span className="customer-portfolio-preview-link">فتح ملف العميل</span> : null}
                 </div>
               </Link>
             ))}

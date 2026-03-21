@@ -17,6 +17,7 @@ function PaymentForm({
   submitting,
   disabled,
   submitLabel,
+  compactView = false,
 }) {
   return (
     <>
@@ -27,7 +28,15 @@ function PaymentForm({
         ]}
       />
 
-      <div className={['payment-action-panel', `payment-action-panel--${actionTone}`].join(' ')}>
+      <div
+        className={[
+          'payment-action-panel',
+          `payment-action-panel--${actionTone}`,
+          compactView ? 'payment-action-panel--compact' : '',
+        ]
+          .filter(Boolean)
+          .join(' ')}
+      >
         <div className="payment-action-head">
           <div className="payment-action-copy">
             <p className="eyebrow">منطقة الإجراء</p>
@@ -48,7 +57,17 @@ function PaymentForm({
         ) : null}
       </div>
 
-      <form className="form-grid payment-action-form transfer-payment-action-form" onSubmit={onSubmit}>
+      <form
+        className={[
+          'form-grid',
+          'payment-action-form',
+          'transfer-payment-action-form',
+          compactView ? 'transfer-payment-action-form--compact' : '',
+        ]
+          .filter(Boolean)
+          .join(' ')}
+        onSubmit={onSubmit}
+      >
         <div className="payment-form-row">
           <FieldShell
             label="المبلغ بالروبل"

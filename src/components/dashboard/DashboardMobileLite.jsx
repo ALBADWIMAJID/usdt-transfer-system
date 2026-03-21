@@ -49,17 +49,22 @@ function DashboardMobileLite({
         className="dashboard-mobile-lite-header"
         title="لوحة التشغيل"
         actions={
-          <>
-            <button type="button" className="button secondary" onClick={loadDashboard} disabled={loading}>
-              {loading ? '…' : 'تحديث'}
-            </button>
-            <Link className="button primary" to="/transfers/new">
-              حوالة جديدة
-            </Link>
-          </>
+          <Link className="button primary dashboard-mobile-lite-primary-action" to="/transfers/new">
+            حوالة جديدة
+          </Link>
         }
       >
-        {lastUpdatedLabel ? <p className="dashboard-mobile-lite-updated support-text">{lastUpdatedLabel}</p> : null}
+        <div className="dashboard-mobile-lite-header-meta">
+          {lastUpdatedLabel ? <p className="dashboard-mobile-lite-updated support-text">{lastUpdatedLabel}</p> : null}
+          <button
+            type="button"
+            className="dashboard-mobile-lite-refresh-utility"
+            onClick={loadDashboard}
+            disabled={loading}
+          >
+            {loading ? '…' : 'تحديث'}
+          </button>
+        </div>
       </PageHeader>
 
       <div className="dashboard-mobile-lite-status-strip">
@@ -76,10 +81,10 @@ function DashboardMobileLite({
             const classes = ['dashboard-mobile-lite-kpi', card.className].filter(Boolean).join(' ')
             const inner = (
               <>
-                <span className="dashboard-mobile-lite-kpi-label">{card.label}</span>
                 <strong className={['dashboard-mobile-lite-kpi-value', card.valueClassName].filter(Boolean).join(' ')}>
                   {card.value}
                 </strong>
+                <span className="dashboard-mobile-lite-kpi-label">{card.label}</span>
                 {card.copy ? <span className="dashboard-mobile-lite-kpi-meta">{card.copy}</span> : null}
               </>
             )

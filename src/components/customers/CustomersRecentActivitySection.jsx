@@ -11,14 +11,15 @@ function CustomersRecentActivitySection({
   items = [],
   onRetry,
   onOpenActivityDrillDown,
+  compactView = false,
 }) {
-  const previewItems = items.slice(0, 2)
+  const previewItems = items.slice(0, compactView ? 3 : 2)
   const latestItem = items[0]
 
   return (
     <SectionCard
       title="الحركة الأخيرة عبر العملاء"
-      description="معاينة قصيرة لأحدث الحركة، مع فتح التفاصيل الكاملة داخل اللوحة الجانبية."
+      description={compactView ? 'خلاصة الحركة الحديثة.' : 'معاينة قصيرة لأحدث الحركة، مع فتح التفاصيل الكاملة داخل اللوحة الجانبية.'}
       className="customers-recent-activity-section"
       actions={
         onOpenActivityDrillDown ? (
@@ -54,13 +55,18 @@ function CustomersRecentActivitySection({
           <div className="customer-activity-preview-head">
             <div className="customer-activity-preview-copy">
               <strong>{items.length} حركة حديثة متاحة للمراجعة</strong>
-              <p>
+              {compactView && latestItem ? (
+                <p>{latestItem.title}</p>
+              ) : null}
+              {!compactView ? (
+                <p>
                 أحدث حركة: <strong>{latestItem?.title}</strong>
                 {latestItem?.timeLabel ? ` • ${latestItem.timeLabel}` : ''}
-              </p>
+                </p>
+              ) : null}
             </div>
 
-            {items.length > previewItems.length ? (
+            {!compactView && items.length > previewItems.length ? (
               <p className="support-text customer-portfolio-attention-note">
                 +{items.length - previewItems.length} حركات أخرى داخل لوحة التفاصيل
               </p>
@@ -73,7 +79,7 @@ function CustomersRecentActivitySection({
                 <div className="customer-activity-preview-item-copy">
                   <span className="customer-activity-preview-item-title">{item.title}</span>
                   <span className="customer-activity-preview-item-subtitle">{item.subtitle}</span>
-                  {item.noteText ? (
+                  {!compactView && item.noteText ? (
                     <span className="customer-activity-preview-item-subtitle">{item.noteText}</span>
                   ) : null}
                 </div>

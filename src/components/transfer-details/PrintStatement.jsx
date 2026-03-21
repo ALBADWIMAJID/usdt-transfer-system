@@ -23,8 +23,18 @@ function PrintStatement({
   remainingValue,
   remainingClassName,
   finalAmountValue,
+  compactView = false,
+  onPrint,
 }) {
-  const rootClassName = ['page-card', 'print-statement-card', className].filter(Boolean).join(' ')
+  const rootClassName = [
+    'page-card',
+    'print-statement-card',
+    compactView ? 'print-statement-card--compact' : '',
+    className,
+  ]
+    .filter(Boolean)
+    .join(' ')
+  const previewPaymentRows = paymentRows.slice(0, 4)
 
   if (errorMessage) {
     return (
@@ -44,7 +54,89 @@ function PrintStatement({
 
   return (
     <section className={rootClassName}>
-      <div className="statement-sheet">
+      {compactView ? (
+        <div className="statement-screen-preview">
+          <div className="statement-preview-head">
+            <div className="statement-preview-copy">
+              <p className="eyebrow">معاينة الطباعة</p>
+              <h3>{referenceNumber || `حوالة #${transferId}`}</h3>
+              <p>مراجعة سريعة قبل الطباعة أو المشاركة.</p>
+            </div>
+            <button type="button" className="button primary statement-preview-print-button" onClick={onPrint}>
+              طباعة الكشف
+            </button>
+          </div>
+
+          <div className="statement-preview-totals">
+            <article className="statement-preview-card">
+              <span>المبلغ النهائي</span>
+              <strong>{finalAmountValue}</strong>
+            </article>
+            <article className="statement-preview-card">
+              <span>إجمالي المدفوع</span>
+              <strong>{totalPaidValue}</strong>
+            </article>
+            <article className="statement-preview-card">
+              <span>المتبقي</span>
+              <strong className={remainingClassName}>{remainingValue}</strong>
+            </article>
+          </div>
+
+          <details className="statement-preview-disclosure">
+            <summary>عرض معاينة مختصرة</summary>
+            <div className="statement-preview-stack">
+              <div className="statement-preview-section">
+                <strong>بيانات الحوالة</strong>
+                <div className="statement-preview-list">
+                  {transferRows.slice(0, 3).map((row) => (
+                    <div key={`${row.label}-${row.value}`} className="statement-preview-row">
+                      <span>{row.label}</span>
+                      <bdi>{row.value}</bdi>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              <div className="statement-preview-section">
+                <strong>التسعير</strong>
+                <div className="statement-preview-list">
+                  {pricingRows.slice(0, 3).map((row) => (
+                    <div key={`${row.label}-${row.value}`} className="statement-preview-row">
+                      <span>{row.label}</span>
+                      <bdi>{row.value}</bdi>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              <div className="statement-preview-section">
+                <strong>آخر المدفوعات</strong>
+                {paymentsError ? (
+                  <InlineMessage kind="error">{paymentsError}</InlineMessage>
+                ) : paymentsLoading && paymentRows.length === 0 ? (
+                  <p>جار تحميل المدفوعات...</p>
+                ) : previewPaymentRows.length === 0 ? (
+                  <p>لا توجد مدفوعات مسجلة حتى الآن.</p>
+                ) : (
+                  <div className="statement-preview-payments">
+                    {previewPaymentRows.map((payment) => (
+                      <article key={payment.id} className="statement-preview-payment">
+                        <div>
+                          <strong>{payment.amountLabel}</strong>
+                          <p>{payment.methodLabel}</p>
+                        </div>
+                        <time>{payment.paidAtLabel}</time>
+                      </article>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+          </details>
+        </div>
+      ) : null}
+
+      <div className="statement-sheet statement-sheet-full">
         <div className="statement-header">
           <div className="statement-branding">
             <BrandLogo variant="print" className="statement-brand-logo" />

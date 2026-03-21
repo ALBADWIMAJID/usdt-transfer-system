@@ -1,11 +1,11 @@
 import MetricCard from '../ui/MetricCard.jsx'
 import SectionCard from '../ui/SectionCard.jsx'
 
-function CustomersPortfolioSummary({ cards = [], note = '' }) {
+function CustomersPortfolioSummary({ cards = [], note = '', compactView = false }) {
   return (
     <SectionCard
-      title="ملخص محفظة العملاء"
-      description="مؤشرات سريعة تفتح تفاصيل المحفظة عند الطلب."
+      title={compactView ? 'ملخص المحفظة' : 'ملخص محفظة العملاء'}
+      description={compactView ? 'أرقام سريعة عالية الإشارة.' : 'مؤشرات سريعة تفتح تفاصيل المحفظة عند الطلب.'}
       className="customers-portfolio-summary"
     >
       <section className="stats-grid" aria-label="ملخص محفظة العملاء">
@@ -24,7 +24,7 @@ function CustomersPortfolioSummary({ cards = [], note = '' }) {
         ))}
       </section>
 
-      {note ? <p className="support-text customer-portfolio-note">{note}</p> : null}
+      {!compactView && note ? <p className="support-text customer-portfolio-note">{note}</p> : null}
     </SectionCard>
   )
 }

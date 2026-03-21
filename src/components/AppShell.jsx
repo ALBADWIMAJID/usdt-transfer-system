@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom'
-import { branding } from '../config/branding.js'
 import { useAuth } from '../context/auth-context.js'
+import useSyncStatus from '../hooks/useSyncStatus.js'
 import BrandLockup from './ui/BrandLockup.jsx'
 import ConnectionBadge from './ui/ConnectionBadge.jsx'
 import ThemePreferenceControl from './ui/ThemePreferenceControl.jsx'
@@ -119,56 +119,42 @@ function Icon({ name }) {
 
 function getCurrentSection(pathname) {
   if (pathname.startsWith('/customers/')) {
-    return {
-      title: 'ملف العميل',
-      description: 'مراجعة بيانات العميل وحوالاته وإجمالي الرصيد المرتبط به.',
-    }
+    return { title: 'العميل' }
   }
 
   if (pathname.startsWith('/customers')) {
-    return {
-      title: 'إدارة العملاء',
-      description: 'إنشاء ملفات العملاء والوصول السريع إلى سجل الحوالات لكل عميل.',
-    }
+    return { title: 'العملاء' }
   }
 
   if (pathname.startsWith('/transfers/new')) {
-    return {
-      title: 'إنشاء حوالة جديدة',
-      description: 'إدخال البيانات التجارية للحوالة مع معاينة فورية قبل الحفظ.',
-    }
+    return { title: 'حوالة جديدة' }
   }
 
   if (pathname.startsWith('/transfers/') && pathname !== '/transfers/new') {
-    return {
-      title: 'تفاصيل الحوالة',
-      description: 'متابعة الحالة والمدفوعات والطباعة من شاشة تشغيل واحدة.',
-    }
+    return { title: 'الحوالة' }
   }
 
   if (pathname.startsWith('/transfers')) {
-    return {
-      title: 'إدارة الحوالات',
-      description: 'بحث وتصفية ومراجعة الحوالات وربطها بالعملاء والمدفوعات.',
-    }
+    return { title: 'الحوالات' }
   }
 
-  return {
-    title: 'لوحة التحكم',
-    description: 'ملخص تشغيلي يومي للحوالات والعملاء والأرصدة الحالية.',
-  }
+  return { title: 'لوحة التحكم' }
 }
 
 function AppShell() {
   const location = useLocation()
   const navigate = useNavigate()
   const { signOut, user } = useAuth()
+  const syncStatus = useSyncStatus()
   const [signOutError, setSignOutError] = useState('')
   const [mobileNavOpen, setMobileNavOpen] = useState(false)
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
 
   const currentSection = getCurrentSection(location.pathname)
   const todayLabel = new Intl.DateTimeFormat('ar', { dateStyle: 'full' }).format(new Date())
+  const shouldShowShellBanner = ['offline', 'pending', 'blocked', 'syncing', 'error'].includes(
+    syncStatus.status
+  )
 
   const handleSignOut = async () => {
     setSignOutError('')
@@ -267,20 +253,18 @@ function AppShell() {
             </button>
 
             <div className="page-intro">
-              <p className="eyebrow">{branding.systemName}</p>
               <h2>{currentSection.title}</h2>
-              <p>{currentSection.description}</p>
             </div>
           </div>
 
           <div className="topbar-actions">
-            <ConnectionBadge />
+            <ConnectionBadge className="topbar-connection-badge" />
             <div className="topbar-badge desktop-only">
               <span>اليوم</span>
               <strong>{todayLabel}</strong>
             </div>
 
-            <div className="topbar-user">
+            <div className="topbar-user desktop-only">
               <p className="eyebrow">المشغل الحالي</p>
               <strong className="ltr">{user?.email || '--'}</strong>
             </div>
@@ -295,9 +279,11 @@ function AppShell() {
           </div>
         </header>
 
-        <div className="shell-status-strip">
-          <SyncStatusBanner />
-        </div>
+        {shouldShowShellBanner ? (
+          <div className="shell-status-strip">
+            <SyncStatusBanner className="shell-sync-status-banner" />
+          </div>
+        ) : null}
 
         <main className="page-content">
           <InlineMessage kind="error">{signOutError}</InlineMessage>

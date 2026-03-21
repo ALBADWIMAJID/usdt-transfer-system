@@ -1374,23 +1374,25 @@ function DashboardPage() {
   return (
     <>
       {dashboardMobileLite ? (
-        <DashboardMobileLite
-          loading={loading}
-          loadDashboard={loadDashboard}
-          lastUpdatedLabel={lastUpdatedLabel}
-          snapshotState={snapshotState}
-          isConfigured={isConfigured}
-          loadError={loadError}
-          headlineCards={headlineCards}
-          openDrillDown={openDrillDown}
-          attentionItems={attentionItems}
-          queueItems={queueItems}
-          recentTransfers={recentTransfers}
-          recentPayments={recentPayments}
-          quickActionItem={quickActionItem}
-          stats={stats}
-          buildTransfersQueueHref={buildTransfersQueueHref}
-        />
+        <div className="dashboard-page dashboard-page--mobile-lite">
+          <DashboardMobileLite
+            loading={loading}
+            loadDashboard={loadDashboard}
+            lastUpdatedLabel={lastUpdatedLabel}
+            snapshotState={snapshotState}
+            isConfigured={isConfigured}
+            loadError={loadError}
+            headlineCards={headlineCards}
+            openDrillDown={openDrillDown}
+            attentionItems={attentionItems}
+            queueItems={queueItems}
+            recentTransfers={recentTransfers}
+            recentPayments={recentPayments}
+            quickActionItem={quickActionItem}
+            stats={stats}
+            buildTransfersQueueHref={buildTransfersQueueHref}
+          />
+        </div>
       ) : (
         <div className="stack dashboard-page">
           <PageHeader

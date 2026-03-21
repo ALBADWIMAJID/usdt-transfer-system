@@ -17,6 +17,7 @@ function CustomerTransfersList({
   onFilterChange,
   filterOptions,
   warningMessage,
+  compactView = false,
 }) {
   return (
     <>
@@ -56,6 +57,7 @@ function CustomerTransfersList({
                 count={group.items.length}
                 tone={group.tone}
                 transfers={group.items}
+                compactCards={compactView}
               />
             ))}
           </div>

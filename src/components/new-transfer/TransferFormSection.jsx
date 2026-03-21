@@ -35,17 +35,22 @@ function TransferFormSection({
         ? 'new-transfer-rate-assist--success'
         : ''
   const rateAssistButtonLabel = rateAssist?.isOffline
-    ? 'يتطلب اتصالًا'
+    ? 'بدون اتصال'
     : rateAssist?.isLoading
       ? 'جارٍ التحديث...'
       : rateAssist?.fetchedRateLabel
         ? 'تحديث السعر'
-        : 'جلب السعر الحالي'
+        : 'جلب السعر'
+  const rateAssistStatus = rateAssist?.error
+    ? rateAssist.error
+    : rateAssist?.fetchedRateLabel
+      ? `آخر سعر: ${rateAssist.fetchedRateLabel} RUB`
+      : ''
 
   return (
     <SectionCard
       className="new-transfer-form-section"
-      title="نموذج الحوالة"
+      title="البيانات"
       description={
         description ||
         'يبقى سير العمل مبسطا للمشغل، ويتم تخصيص رقم المرجع تلقائيا عند إنشاء الحوالة.'
@@ -90,19 +95,12 @@ function TransferFormSection({
               title="العميل المختار"
               value={selectedCustomer.full_name}
               className="info-card--accent info-card--full new-transfer-selected-customer"
-            >
-              <p className="support-text">سيتم حفظ هذه الحوالة مباشرة ضمن ملف العميل المحدد.</p>
-            </InfoCard>
+            />
           ) : null}
         </div>
 
         <div className="new-transfer-step new-transfer-step--pricing">
-          <FieldShell
-            label="كمية USDT"
-            htmlFor="amount"
-            helpText="أدخل كمية الحوالة المطلوب تسويتها لهذا العميل."
-            className="new-transfer-field-amount"
-          >
+          <FieldShell label="كمية USDT" htmlFor="amount" className="new-transfer-field-amount">
             <input
               id="amount"
               name="amount"
@@ -116,12 +114,7 @@ function TransferFormSection({
             />
           </FieldShell>
 
-          <FieldShell
-            label="السعر العام"
-            htmlFor="global_rate"
-            helpText="السعر الأساسي قبل تطبيق النسبة على الحوالة."
-            className="new-transfer-field-rate"
-          >
+          <FieldShell label="السعر العام" htmlFor="global_rate" className="new-transfer-field-rate">
             <>
               <input
                 id="global_rate"
@@ -136,66 +129,33 @@ function TransferFormSection({
               />
 
               {rateAssist ? (
-                <div
-                  className={['new-transfer-rate-assist', rateAssistTone].filter(Boolean).join(' ')}
-                  aria-live="polite"
-                >
-                  <div className="new-transfer-rate-assist-head">
-                    <div className="new-transfer-rate-assist-copy">
-                      <span className="new-transfer-rate-assist-label">مساعدة سعر USD/RUB</span>
-                      <p className="new-transfer-rate-assist-value">
-                        {rateAssist.fetchedRateLabel
-                          ? `${rateAssist.fetchedRateLabel} RUB`
-                          : 'لم يتم جلب سعر بعد'}
-                      </p>
-                      <p className="new-transfer-rate-assist-hint">
-                        {rateAssist.isOffline
-                          ? 'أنت تعمل دون اتصال. يظل الإدخال اليدوي متاحًا بالكامل.'
-                          : 'السعر المجلوب اختياري للمساعدة فقط، ويمكنك تعديل الحقل يدويًا قبل الحفظ.'}
-                      </p>
-                    </div>
+                <div className="new-transfer-rate-inline" aria-live="polite">
+                  <button
+                    type="button"
+                    className={[
+                      'button secondary new-transfer-rate-inline-button',
+                      rateAssistTone,
+                    ]
+                      .filter(Boolean)
+                      .join(' ')}
+                    onClick={rateAssist.onFetchRate}
+                    disabled={rateAssist.isLoading || rateAssist.isOffline}
+                  >
+                    {rateAssistButtonLabel}
+                  </button>
 
-                    <button
-                      type="button"
-                      className="button secondary new-transfer-rate-assist-button"
-                      onClick={rateAssist.onFetchRate}
-                      disabled={rateAssist.isLoading || rateAssist.isOffline}
+                  {rateAssistStatus ? (
+                    <span
+                      className={[
+                        'new-transfer-rate-inline-status',
+                        rateAssist?.error ? 'new-transfer-rate-inline-status--error' : '',
+                        rateAssist?.fetchedRateLabel ? 'new-transfer-rate-inline-status--success' : '',
+                      ]
+                        .filter(Boolean)
+                        .join(' ')}
                     >
-                      {rateAssistButtonLabel}
-                    </button>
-                  </div>
-
-                  {rateAssist.sourceLabel ||
-                  rateAssist.publishedAtLabel ||
-                  rateAssist.sourceUpdatedAtLabel ||
-                  rateAssist.fetchedAtLabel ? (
-                    <p className="new-transfer-rate-assist-meta">
-                      {rateAssist.sourceLabel ? (
-                        <>
-                          <span>المصدر: </span>
-                          {rateAssist.sourceUrl ? (
-                            <a href={rateAssist.sourceUrl} target="_blank" rel="noreferrer">
-                              {rateAssist.sourceLabel}
-                            </a>
-                          ) : (
-                            <span>{rateAssist.sourceLabel}</span>
-                          )}
-                        </>
-                      ) : null}
-                      {rateAssist.publishedAtLabel ? (
-                        <span> · نشرة السعر: {rateAssist.publishedAtLabel}</span>
-                      ) : null}
-                      {rateAssist.sourceUpdatedAtLabel ? (
-                        <span> · تحديث المصدر: {rateAssist.sourceUpdatedAtLabel}</span>
-                      ) : null}
-                      {rateAssist.fetchedAtLabel ? (
-                        <span> · تم الجلب: {rateAssist.fetchedAtLabel}</span>
-                      ) : null}
-                    </p>
-                  ) : null}
-
-                  {rateAssist.error ? (
-                    <p className="new-transfer-rate-assist-error">{rateAssist.error}</p>
+                      {rateAssistStatus}
+                    </span>
                   ) : null}
                 </div>
               ) : null}
@@ -209,15 +169,7 @@ function TransferFormSection({
             placeholder="يتم احتسابها تلقائيا"
           />
 
-          <FieldShell
-            label="نسبة الزيادة"
-            htmlFor="percentage"
-            helpText={
-              <>
-                إدخال <code>2</code> يعني <code>2%</code>.
-              </>
-            }
-          >
+          <FieldShell label="نسبة الزيادة" htmlFor="percentage">
             <input
               id="percentage"
               name="percentage"

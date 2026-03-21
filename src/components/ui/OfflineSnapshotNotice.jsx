@@ -1,3 +1,4 @@
+import { useEffect, useState } from 'react'
 import useNetworkStatus from '../../hooks/useNetworkStatus.js'
 import { getSnapshotFreshnessMeta } from '../../lib/offline/freshness.js'
 import InlineMessage from './InlineMessage.jsx'
@@ -21,6 +22,29 @@ function OfflineSnapshotNotice({ className = '', snapshotState }) {
     : 'هذه الشاشة تعمل على البيانات المباشرة حاليا، وتم حفظ نسخة محلية للقراءة عند انقطاع الاتصال.'
   const bannerKind = isFromCache || freshnessMeta.isStale ? 'warning' : 'info'
   const metaToneClass = `offline-snapshot-chip--${freshnessMeta.tone}`
+  const shouldPersist =
+    isOffline || isFromCache || freshnessMeta.isStale || freshnessMeta.tone === 'warning'
+  const [isVisible, setIsVisible] = useState(true)
+
+  useEffect(() => {
+    setIsVisible(true)
+
+    if (shouldPersist) {
+      return undefined
+    }
+
+    const timeoutId = window.setTimeout(() => {
+      setIsVisible(false)
+    }, 2600)
+
+    return () => {
+      window.clearTimeout(timeoutId)
+    }
+  }, [shouldPersist, snapshotState?.savedAt])
+
+  if (!isVisible) {
+    return null
+  }
 
   return (
     <InlineMessage kind={bannerKind} className={className}>

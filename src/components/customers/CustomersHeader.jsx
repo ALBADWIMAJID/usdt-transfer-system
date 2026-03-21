@@ -3,21 +3,24 @@ import PageHeader from '../ui/PageHeader.jsx'
 function CustomersHeader({ customerCountLabel, onRefresh }) {
   return (
     <PageHeader
-      eyebrow="محفظة العملاء"
-      title="مركز متابعة العملاء"
-      description="اعمل من هذه الصفحة كمشهد محفظة كامل: راقب العملاء الأعلى متبقيا، الملفات الجزئية أو فوق المطلوب، وافتح ملف العميل المناسب مباشرة للمتابعة."
+      title="العملاء"
       className="customers-page-hero"
       actions={
-        <>
-          <button type="button" className="button secondary" onClick={onRefresh}>
-            تحديث القائمة
+        onRefresh ? (
+          <button
+            type="button"
+            className="button secondary customers-page-refresh-button"
+            onClick={onRefresh}
+          >
+            تحديث
           </button>
-          <div className="customers-page-hero-meta">
-            <span className="support-text support-text-inline">{customerCountLabel}</span>
-          </div>
-        </>
+        ) : null
       }
-    />
+    >
+      <div className="customers-page-hero-meta">
+        <p className="support-text support-text-inline page-header-meta">{customerCountLabel}</p>
+      </div>
+    </PageHeader>
   )
 }
 

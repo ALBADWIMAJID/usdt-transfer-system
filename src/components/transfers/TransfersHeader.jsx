@@ -5,24 +5,22 @@ function TransfersHeader({ transferCountLabel, onRefresh }) {
   return (
     <PageHeader
       className="transfers-queue-page-header"
-      eyebrow="صف المتابعة المالية"
-      title="قائمة عمل الحوالات"
-      description="اعمل من هذه الصفحة كصف متابعة يومي: ابحث بسرعة، فرز حسب أولوية المتابعة، وافتح أي حوالة تحتاج تحصيلا أو مراجعة مالية."
+      title="الحوالات"
       actions={
         <>
-          <Link className="button secondary" to="/dashboard">
-            لوحة التشغيل
-          </Link>
-          <button type="button" className="button secondary" onClick={onRefresh}>
-            تحديث الصف
-          </button>
+          {onRefresh ? (
+            <button type="button" className="button secondary" onClick={onRefresh}>
+              تحديث
+            </button>
+          ) : null}
           <Link className="button primary" to="/transfers/new">
-            إنشاء حوالة
+            حوالة جديدة
           </Link>
-          <span className="support-text support-text-inline">{transferCountLabel}</span>
         </>
       }
-    />
+    >
+      <p className="support-text support-text-inline page-header-meta">{transferCountLabel}</p>
+    </PageHeader>
   )
 }
 

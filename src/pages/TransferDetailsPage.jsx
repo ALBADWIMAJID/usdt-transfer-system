@@ -137,6 +137,44 @@ function formatDate(value) {
   }).format(parsedDate)
 }
 
+function formatAgeLabel(value) {
+  if (!value) {
+    return '--'
+  }
+
+  const parsedDate = new Date(value)
+
+  if (Number.isNaN(parsedDate.getTime())) {
+    return formatDate(value)
+  }
+
+  const diffMs = Date.now() - parsedDate.getTime()
+
+  if (diffMs < 0) {
+    return formatDate(value)
+  }
+
+  const diffMinutes = Math.floor(diffMs / 60000)
+
+  if (diffMinutes < 60) {
+    return `منذ ${Math.max(diffMinutes, 1)} دقيقة`
+  }
+
+  const diffHours = Math.floor(diffMinutes / 60)
+
+  if (diffHours < 24) {
+    return `منذ ${diffHours} ساعة`
+  }
+
+  const diffDays = Math.floor(diffHours / 24)
+
+  if (diffDays < 30) {
+    return `منذ ${diffDays} يوم`
+  }
+
+  return formatDate(value)
+}
+
 function formatDateTimeLocalInput(value) {
   if (!value) {
     return ''
@@ -394,6 +432,8 @@ const TRANSFER_DETAILS_SECTIONS = [
   { key: 'print', label: 'الطباعة', description: 'كشف الحوالة' },
 ]
 
+const MOBILE_TRANSFER_DETAILS_QUERY = '(max-width: 767px)'
+
 function TransferDetailsPage() {
   const { transferId } = useParams()
   const location = useLocation()
@@ -402,6 +442,13 @@ function TransferDetailsPage() {
   const { isOffline } = useNetworkStatus()
   const { clearSnapshotState, markCachedSnapshot, markLiveSnapshot, snapshotState } =
     useOfflineSnapshot()
+  const [isCompactMobileLayout, setIsCompactMobileLayout] = useState(() => {
+    if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') {
+      return false
+    }
+
+    return window.matchMedia(MOBILE_TRANSFER_DETAILS_QUERY).matches
+  })
   const [activeSections, setActiveSections] = useState({})
   const [transfer, setTransfer] = useState(null)
   const [transferLoading, setTransferLoading] = useState(Boolean(isConfigured))
@@ -462,6 +509,24 @@ function TransferDetailsPage() {
   } = usePendingPayments(transferId)
   const { isSyncing: queueSyncing, replayPaymentsNow } = useReplayQueue()
   const activeSection = activeSections[transferId] || 'summary'
+
+  useEffect(() => {
+    if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') {
+      return undefined
+    }
+
+    const mediaQuery = window.matchMedia(MOBILE_TRANSFER_DETAILS_QUERY)
+    const handleChange = (event) => {
+      setIsCompactMobileLayout(event.matches)
+    }
+
+    setIsCompactMobileLayout(mediaQuery.matches)
+    mediaQuery.addEventListener('change', handleChange)
+
+    return () => {
+      mediaQuery.removeEventListener('change', handleChange)
+    }
+  }, [])
 
   const handleSectionChange = (nextSection) => {
     setActiveSections((current) => {
@@ -2290,6 +2355,28 @@ function TransferDetailsPage() {
             ? `تم تسجيل دفعات جزئية وما زال المتبقي ${formatNumber(remainingRub, 2)} RUB. تتطلب الحوالة متابعة واستكمال تحصيل.${hasLocalPendingPayments ? ` يوجد أيضا ${localPaymentCount} دفعة محلية بانتظار الإرسال.` : ''}`
             : 'لم تُسجل أي دفعة بعد. هذه الحوالة تنتظر أول حركة تحصيل.'
 
+  const resolvedPageDescription = isCompactMobileLayout
+    ? !transfer
+      ? 'راجع الحوالة ورصيدها الحالي بسرعة.'
+      : hasPartialTransferOnlyOfflineState
+        ? 'تفاصيل الحوالة متاحة، لكن سجل الدفعات المؤكد غير مكتمل حاليا.'
+        : hasResolvedCurrentOverpayment
+          ? 'الزيادة الحالية عليها معالجة مسجلة.'
+          : hasUnknownOverpaymentResolutionState
+            ? 'الرصيد السالب يحتاج تحققًا من آخر معالجة.'
+            : hasLocalPendingPayments && !hasPayments
+              ? `توجد ${localPaymentCount} دفعة محلية بانتظار الإرسال.`
+              : hasUnresolvedCurrentOverpayment
+                ? `يوجد دفع زائد بمقدار ${formatNumber(overpaidAmountRub, 2)} RUB.`
+                : isCancelled
+                  ? 'الحوالة ملغاة حاليا.'
+                  : isSettled
+                    ? 'الحوالة مسددة حاليا.'
+                    : hasPayments
+                      ? `المتبقي الحالي ${formatNumber(remainingRub, 2)} RUB.`
+                      : 'بانتظار أول دفعة.'
+    : pageDescription
+
   const highlightItems = transfer
     ? [
         {
@@ -2327,6 +2414,8 @@ function TransferDetailsPage() {
             },
       ]
     : []
+
+  const overviewHighlightItems = isCompactMobileLayout ? highlightItems.slice(0, 3) : highlightItems
 
   const summaryItems = transfer
     ? [
@@ -2383,6 +2472,26 @@ function TransferDetailsPage() {
         : hasPayments
             ? `تم تسجيل دفعات جزئية وما زال على الحوالة ${formatNumber(remainingRub, 2)} RUB. الخطوة التالية هي متابعة العميل وتسجيل التحصيل التالي.${hasLocalPendingPayments ? ` توجد أيضا ${localPaymentCount} دفعة محلية بانتظار الإرسال.` : ''}`
             : 'لم تُسجل أي دفعة بعد. الخطوة التالية الطبيعية هي تسجيل أول دفعة أو متابعة العميل لبدء التحصيل.'
+
+  const compactFollowUpDescription = !transfer
+    ? 'يتم تجهيز حالة الحوالة.'
+    : hasPartialTransferOnlyOfflineState
+      ? 'سجل الدفعات غير مكتمل حاليا.'
+      : hasResolvedCurrentOverpayment
+        ? 'المعالجة التشغيلية مسجلة لهذه الزيادة.'
+        : hasUnknownOverpaymentResolutionState
+          ? 'تحقق من آخر معالجة قبل اعتماد الحالة.'
+          : hasUnresolvedCurrentOverpayment
+            ? `زيادة دفع حالية: ${formatNumber(overpaidAmountRub, 2)} RUB.`
+            : isCancelled
+              ? 'راجع الإلغاء قبل أي حركة جديدة.'
+              : isSettled
+                ? 'لا توجد متابعة مالية عاجلة حاليا.'
+                : hasLocalPendingPayments && !hasPayments
+                  ? `توجد ${localPaymentCount} دفعة محلية بانتظار الإرسال.`
+                  : hasPayments
+                    ? `المتبقي ${formatNumber(remainingRub, 2)} RUB.`
+                    : 'الخطوة التالية هي تسجيل أول دفعة.'
 
   const followUpChips = [
     {
@@ -2551,14 +2660,25 @@ function TransferDetailsPage() {
     },
   ]
 
+  const overviewFollowUpItems = isCompactMobileLayout ? followUpItems.slice(0, 1) : followUpItems
+  const overviewFollowUpChips = isCompactMobileLayout ? followUpChips.slice(0, 3) : followUpChips
+
   const paymentEntries = payments.map((payment, index) => ({
     id: payment.id ?? `${payment.created_at}-${payment.amount_rub}`,
     amountLabel: `${formatNumber(payment.amount_rub, 2)} RUB`,
     methodLabel: extractPaymentMethod(payment),
-    paidAtLabel: formatDate(payment.paid_at),
-    createdAtLabel: formatDate(payment.created_at),
-    noteText: extractPaymentNote(payment),
-    activityLabel: index === 0 ? 'آخر تحصيل مسجل' : 'دفعة متابعة',
+    paidAtLabel: isCompactMobileLayout ? formatAgeLabel(payment.paid_at) : formatDate(payment.paid_at),
+    createdAtLabel: isCompactMobileLayout
+      ? formatAgeLabel(payment.created_at)
+      : formatDate(payment.created_at),
+    noteText: isCompactMobileLayout ? '' : extractPaymentNote(payment),
+    activityLabel: isCompactMobileLayout
+      ? index === 0
+        ? 'أحدث دفعة'
+        : 'دفعة'
+      : index === 0
+        ? 'آخر تحصيل مسجل'
+        : 'دفعة متابعة',
     isLatest: index === 0,
     badgeClassName: isOverpaid
       ? 'activity-chip--danger'
@@ -2592,10 +2712,16 @@ function TransferDetailsPage() {
     return {
       ...entry,
       activityLabel: isVoidedPayment
-        ? 'دفعة مؤكدة ملغاة'
+        ? isCompactMobileLayout
+          ? 'ملغاة'
+          : 'دفعة مؤكدة ملغاة'
         : isLatestActivePayment
-          ? 'آخر دفعة مؤكدة فعالة'
-          : 'دفعة متابعة',
+          ? isCompactMobileLayout
+            ? 'نشطة'
+            : 'آخر دفعة مؤكدة فعالة'
+          : isCompactMobileLayout
+            ? 'دفعة'
+            : 'دفعة متابعة',
       isLatest: isLatestActivePayment,
       badgeLabel: isVoidedPayment ? 'دفعة ملغاة' : '',
       badgeClassName: isVoidedPayment ? 'activity-chip--warning' : '',
@@ -2611,38 +2737,50 @@ function TransferDetailsPage() {
       extraContent: isVoidedPayment ? (
         <>
           <InlineMessage kind="warning">
-            تم إلغاء اعتماد هذه الدفعة المؤكدة. لم تعد تدخل في إجمالي التحصيل الحالي.
+            {isCompactMobileLayout
+              ? 'هذه الدفعة ملغاة ولا تدخل في الإجمالي الحالي.'
+              : 'تم إلغاء اعتماد هذه الدفعة المؤكدة. لم تعد تدخل في إجمالي التحصيل الحالي.'}
           </InlineMessage>
-          <div className="payment-entry-grid detail-mobile-secondary">
-            <RecordMeta
-              label="سبب الإلغاء"
-              value={getPaymentVoidReasonTypeLabel(latestPaymentVoid?.void_reason_type)}
-            />
-            <RecordMeta label="وقت الإلغاء" value={formatDate(latestPaymentVoid?.created_at)} />
-          </div>
-          <p className="support-text">
-            ملاحظة الإلغاء: {latestPaymentVoid?.note || 'لا توجد ملاحظة إلغاء إضافية.'}
-          </p>
+          {!isCompactMobileLayout ? (
+            <>
+              <div className="payment-entry-grid detail-mobile-secondary">
+                <RecordMeta
+                  label="سبب الإلغاء"
+                  value={getPaymentVoidReasonTypeLabel(latestPaymentVoid?.void_reason_type)}
+                />
+                <RecordMeta label="وقت الإلغاء" value={formatDate(latestPaymentVoid?.created_at)} />
+              </div>
+              <p className="support-text">
+                ملاحظة الإلغاء: {latestPaymentVoid?.note || 'لا توجد ملاحظة إلغاء إضافية.'}
+              </p>
+            </>
+          ) : null}
           {replacementPayment ? (
             <>
               <InlineMessage kind="success">
-                تم تسجيل دفعة بديلة مصححة من هذه البطاقة في هذه الجلسة، مع بقاء الدفعة الأصلية ملغاة.
+                {isCompactMobileLayout
+                  ? 'تم تسجيل دفعة بديلة مصححة لهذه البطاقة.'
+                  : 'تم تسجيل دفعة بديلة مصححة من هذه البطاقة في هذه الجلسة، مع بقاء الدفعة الأصلية ملغاة.'}
               </InlineMessage>
-              <div className="payment-entry-grid detail-mobile-secondary">
-                <RecordMeta
-                  label="الدفعة البديلة"
-                  value={`${formatNumber(replacementPayment.amount_rub, 2)} RUB`}
-                />
-                <RecordMeta
-                  label="وقت الدفعة البديلة"
-                  value={formatDate(replacementPayment.paid_at || replacementPayment.created_at)}
-                />
-              </div>
+              {!isCompactMobileLayout ? (
+                <div className="payment-entry-grid detail-mobile-secondary">
+                  <RecordMeta
+                    label="الدفعة البديلة"
+                    value={`${formatNumber(replacementPayment.amount_rub, 2)} RUB`}
+                  />
+                  <RecordMeta
+                    label="وقت الدفعة البديلة"
+                    value={formatDate(replacementPayment.paid_at || replacementPayment.created_at)}
+                  />
+                </div>
+              ) : null}
             </>
           ) : isReplacementFormOpen ? (
             <form className="form-grid" onSubmit={handleReplacementPaymentSubmit}>
               <InlineMessage kind="info">
-                ستُسجل هذه الدفعة كسطر جديد مستقل، ولن يجري تعديل الدفعة الملغاة أو حذفها.
+                {isCompactMobileLayout
+                  ? 'ستُسجل هذه الدفعة كسطر جديد مستقل.'
+                  : 'ستُسجل هذه الدفعة كسطر جديد مستقل، ولن يجري تعديل الدفعة الملغاة أو حذفها.'}
               </InlineMessage>
               {replacementPaymentActionDisabledReason ? (
                 <InlineMessage kind="warning">{replacementPaymentActionDisabledReason}</InlineMessage>
@@ -2650,10 +2788,12 @@ function TransferDetailsPage() {
               {replacementPaymentSubmitError ? (
                 <InlineMessage kind="error">{replacementPaymentSubmitError}</InlineMessage>
               ) : null}
-              <div className="payment-entry-grid detail-mobile-secondary">
-                <RecordMeta label="مرجع التصحيح" value={`${formatNumber(payment.amount_rub, 2)} RUB`} />
-                <RecordMeta label="الوقت الاقتصادي الأصلي" value={formatDate(payment.paid_at)} />
-              </div>
+              {!isCompactMobileLayout ? (
+                <div className="payment-entry-grid detail-mobile-secondary">
+                  <RecordMeta label="مرجع التصحيح" value={`${formatNumber(payment.amount_rub, 2)} RUB`} />
+                  <RecordMeta label="الوقت الاقتصادي الأصلي" value={formatDate(payment.paid_at)} />
+                </div>
+              ) : null}
               <div className="field">
                 <label htmlFor={`replacement-payment-amount-${entry.id}`}>المبلغ البديل بالروبل</label>
                 <input
@@ -2698,7 +2838,9 @@ function TransferDetailsPage() {
                   required
                 />
                 <p className="support-text">
-                  هذا الحقل مملوء افتراضيا من وقت الدفعة الأصلية الملغاة، ويمكن تعديله عند الحاجة.
+                  {isCompactMobileLayout
+                    ? 'يمكن تعديل هذا الوقت عند الحاجة.'
+                    : 'هذا الحقل مملوء افتراضيا من وقت الدفعة الأصلية الملغاة، ويمكن تعديله عند الحاجة.'}
                 </p>
               </div>
               <div className="field">
@@ -2763,13 +2905,17 @@ function TransferDetailsPage() {
           {paymentVoidSubmitError ? (
             <InlineMessage kind="error">{paymentVoidSubmitError}</InlineMessage>
           ) : null}
-          <div className="payment-entry-grid detail-mobile-secondary">
-            <RecordMeta label="المبلغ الأصلي" value={`${formatNumber(payment.amount_rub, 2)} RUB`} />
-            <RecordMeta label="وسيلة التحصيل" value={extractPaymentMethod(payment)} />
-            <RecordMeta label="وقت الدفع" value={formatDate(payment.paid_at)} />
-            <RecordMeta label="وقت التسجيل" value={formatDate(payment.created_at)} />
-          </div>
-          <p className="support-text">ملاحظة الدفع الأصلية: {extractPaymentNote(payment)}</p>
+          {!isCompactMobileLayout ? (
+            <>
+              <div className="payment-entry-grid detail-mobile-secondary">
+                <RecordMeta label="المبلغ الأصلي" value={`${formatNumber(payment.amount_rub, 2)} RUB`} />
+                <RecordMeta label="وسيلة التحصيل" value={extractPaymentMethod(payment)} />
+                <RecordMeta label="وقت الدفع" value={formatDate(payment.paid_at)} />
+                <RecordMeta label="وقت التسجيل" value={formatDate(payment.created_at)} />
+              </div>
+              <p className="support-text">ملاحظة الدفع الأصلية: {extractPaymentNote(payment)}</p>
+            </>
+          ) : null}
           <div className="field">
             <label htmlFor={`payment-void-reason-${entry.id}`}>سبب الإلغاء</label>
             <select
@@ -2846,10 +2992,18 @@ function TransferDetailsPage() {
     id: payment.id ?? `${payment.created_at}-${payment.amount_rub}`,
     amountLabel: `${formatNumber(payment.amount_rub, 2)} RUB`,
     methodLabel: extractPaymentMethod(payment),
-    paidAtLabel: formatDate(payment.paid_at),
-    createdAtLabel: formatDate(payment.created_at),
-    noteText: extractPaymentNote(payment),
-    activityLabel: index === 0 ? 'آخر تحصيل مسجل' : 'دفعة متابعة',
+    paidAtLabel: isCompactMobileLayout ? formatAgeLabel(payment.paid_at) : formatDate(payment.paid_at),
+    createdAtLabel: isCompactMobileLayout
+      ? formatAgeLabel(payment.created_at)
+      : formatDate(payment.created_at),
+    noteText: isCompactMobileLayout ? '' : extractPaymentNote(payment),
+    activityLabel: isCompactMobileLayout
+      ? index === 0
+        ? 'أحدث دفعة'
+        : 'دفعة'
+      : index === 0
+        ? 'آخر تحصيل مسجل'
+        : 'دفعة متابعة',
     isLatest: index === 0,
     badgeClassName: isOverpaid
       ? 'activity-chip--danger'
@@ -2866,26 +3020,48 @@ function TransferDetailsPage() {
         : '',
   }))
 
+  const printPaymentRows = activePayments.map((payment) => ({
+    id: payment.id ?? `${payment.created_at}-${payment.amount_rub}`,
+    amountLabel: `${formatNumber(payment.amount_rub, 2)} RUB`,
+    methodLabel: extractPaymentMethod(payment),
+    paidAtLabel: formatDate(payment.paid_at),
+    createdAtLabel: formatDate(payment.created_at),
+    noteText: extractPaymentNote(payment),
+  }))
+
   const pendingPaymentEntries = pendingPayments.map((payment) => ({
     id: payment.id,
     amountLabel: `${formatNumber(payment.payload.amount_rub, 2)} RUB`,
     methodLabel: getPaymentMethodLabel(payment.payload.payment_method),
-    paidAtLabel: formatDate(payment.payload.paid_at || payment.createdAt),
-    createdAtLabel: formatDate(payment.updatedAt || payment.createdAt),
-    noteText:
-      payment.status === 'failed'
+    paidAtLabel: isCompactMobileLayout
+      ? formatAgeLabel(payment.payload.paid_at || payment.createdAt)
+      : formatDate(payment.payload.paid_at || payment.createdAt),
+    createdAtLabel: isCompactMobileLayout
+      ? formatAgeLabel(payment.updatedAt || payment.createdAt)
+      : formatDate(payment.updatedAt || payment.createdAt),
+    noteText: isCompactMobileLayout
+      ? ''
+      : payment.status === 'failed'
         ? `${payment.payload.note || 'لا توجد ملاحظة على الدفعة.'} ${payment.lastError ? `• ${payment.lastError}` : ''}`
         : payment.status === 'blocked'
           ? payment.blockedReason || payment.payload.note || 'هذه الدفعة المحلية بانتظار اعتماد حوالة مرتبطة قبل إرسالها.'
-        : payment.payload.note || 'دفعة محفوظة محليا داخل هذا المتصفح بانتظار الإرسال.',
+          : payment.payload.note || 'دفعة محفوظة محليا داخل هذا المتصفح بانتظار الإرسال.',
     activityLabel:
-      payment.status === 'failed'
-        ? 'فشلت المزامنة'
-        : payment.status === 'blocked'
-          ? 'بانتظار حوالة مرتبطة'
-        : payment.status === 'syncing'
-          ? 'جار الإرسال الآن'
-          : 'محفوظة محليا بانتظار الإرسال',
+      isCompactMobileLayout
+        ? payment.status === 'failed'
+          ? 'فشل'
+          : payment.status === 'blocked'
+            ? 'محجوبة'
+            : payment.status === 'syncing'
+              ? 'جار الإرسال'
+              : 'محلية'
+        : payment.status === 'failed'
+          ? 'فشلت المزامنة'
+          : payment.status === 'blocked'
+            ? 'بانتظار حوالة مرتبطة'
+            : payment.status === 'syncing'
+              ? 'جار الإرسال الآن'
+              : 'محفوظة محليا بانتظار الإرسال',
     badgeClassName:
       payment.status === 'failed'
         ? 'activity-chip--danger'
@@ -2895,13 +3071,21 @@ function TransferDetailsPage() {
           ? 'activity-chip--warning'
           : 'activity-chip--warning',
     badgeLabel:
-      payment.status === 'failed'
-        ? 'تحتاج إعادة محاولة'
-        : payment.status === 'blocked'
-          ? 'محجوبة مؤقتا'
-        : payment.status === 'syncing'
-          ? 'جار الإرسال'
-          : 'محفوظة محليا',
+      isCompactMobileLayout
+        ? payment.status === 'failed'
+          ? 'إعادة'
+          : payment.status === 'blocked'
+            ? 'محجوبة'
+            : payment.status === 'syncing'
+              ? 'إرسال'
+              : 'محلية'
+        : payment.status === 'failed'
+          ? 'تحتاج إعادة محاولة'
+          : payment.status === 'blocked'
+            ? 'محجوبة مؤقتا'
+            : payment.status === 'syncing'
+              ? 'جار الإرسال'
+              : 'محفوظة محليا',
     className:
       payment.status === 'failed'
         ? 'payment-entry--danger'
@@ -2972,6 +3156,20 @@ function TransferDetailsPage() {
           ? `أضف الدفعة التالية مع وسيلة الدفع المناسبة، وسيتم تحديث الرصيد الحالي مباشرة.${hasLocalPendingPayments ? ' توجد أيضا دفعات محلية بانتظار الإرسال بشكل منفصل.' : ''}`
           : 'هذه هي منطقة الإجراء الأساسية لبدء التحصيل على الحوالة الحالية.'
 
+  const compactPaymentActionDescription = isOverpaid
+    ? 'راجع الزيادة الحالية قبل أي دفعة جديدة.'
+    : isCancelled
+      ? 'راجع حالة الإلغاء قبل أي حركة جديدة.'
+      : hasPartialTransferOnlyOfflineState
+        ? 'يمكن تسجيل حركة جديدة مع بقاء السجل المؤكد غير مكتمل.'
+        : isSettled
+          ? 'استخدم هذا القسم فقط عند وجود حركة إضافية فعلية.'
+          : hasLocalPendingPayments && !hasPayments
+            ? `توجد ${localPaymentCount} دفعة محلية بانتظار الإرسال.`
+            : hasPayments
+              ? 'سجّل الدفعة التالية وراجع الرصيد مباشرة.'
+              : 'ابدأ بتسجيل أول دفعة.'
+
   const paymentActionMeta = [
     { label: 'مبلغ التسوية', value: `${formatNumber(valueAfterPercentage, 2)} RUB` },
     { label: 'الرصيد الحالي', value: remainingMessage },
@@ -2990,6 +3188,10 @@ function TransferDetailsPage() {
           : 'لا توجد دفعات بعد',
     },
   ]
+
+  const resolvedPaymentActionMeta = isCompactMobileLayout
+    ? paymentActionMeta.filter((_, index) => index < 2)
+    : paymentActionMeta
 
   const paymentSubmitLabel =
     !hasPartialTransferOnlyOfflineState &&
@@ -3021,39 +3223,45 @@ function TransferDetailsPage() {
       <PageHeader
         eyebrow="الحوالة"
         title={transfer?.reference_number || (transferId ? `حوالة #${transferId}` : 'حوالة')}
-        description={pageDescription}
+        description={resolvedPageDescription}
         className="no-print transfer-details-page-hero"
         actions={
-          <>
-            <Link className="button secondary" to="/transfers">
-              العودة إلى الحوالات
-            </Link>
+          <div className="transfer-details-hero-actions">
             <button
               type="button"
-              className="button secondary"
-              onClick={handleOpenTransferEdit}
-              disabled={
-                transferLoading ||
-                Boolean(transferError) ||
-                !transfer ||
-                Boolean(transferEditActionDisabledReason)
-              }
-              title={transferEditActionDisabledReason || ''}
-            >
-              تعديل الحوالة
-            </button>
-            <button
-              type="button"
-              className="button primary"
+              className="button primary transfer-details-primary-action"
               onClick={handlePrint}
               disabled={transferLoading || Boolean(transferError) || !transfer}
             >
               طباعة الكشف
             </button>
-            <button type="button" className="button secondary" onClick={handlePaymentsRefresh}>
-              تحديث المدفوعات
-            </button>
-          </>
+            <div className="transfer-details-hero-utility-row">
+              <Link className="button secondary transfer-details-utility-action" to="/transfers">
+                العودة
+              </Link>
+              <button
+                type="button"
+                className="button secondary transfer-details-utility-action"
+                onClick={handleOpenTransferEdit}
+                disabled={
+                  transferLoading ||
+                  Boolean(transferError) ||
+                  !transfer ||
+                  Boolean(transferEditActionDisabledReason)
+                }
+                title={transferEditActionDisabledReason || ''}
+              >
+                تعديل الحوالة
+              </button>
+              <button
+                type="button"
+                className="button secondary transfer-details-utility-action"
+                onClick={handlePaymentsRefresh}
+              >
+                تحديث المدفوعات
+              </button>
+            </div>
+          </div>
         }
       />
 
@@ -3099,8 +3307,8 @@ function TransferDetailsPage() {
 
       <div className="app-section-workspace no-print">
         <SectionCard
-          title="لوحة المتابعة المالية"
-          description="افهم وضع الحوالة خلال ثوان: المرجع، العميل، الرصيد الحالي، وما الخطوة التشغيلية التالية."
+          title="نظرة عامة"
+          description="ملخص سريع لوضع الحوالة."
           className={[
             'app-section-panel',
             'transfer-details-summary-section',
@@ -3125,57 +3333,59 @@ function TransferDetailsPage() {
                 className="detail-mobile-secondary"
               />
             }
-            highlightItems={highlightItems}
+            highlightItems={overviewHighlightItems}
             items={[]}
           />
 
           {!transferError && !transferLoading && transfer ? (
             <TransferFollowUpPanel
               title={followUpTitle}
-              description={followUpDescription}
+              description={isCompactMobileLayout ? compactFollowUpDescription : followUpDescription}
               status={transfer.status}
               tone={followUpState}
-              chips={followUpChips}
-              items={followUpItems}
+              chips={overviewFollowUpChips}
+              items={overviewFollowUpItems}
             />
           ) : null}
         </SectionCard>
 
-        <SectionCard
-          title="الوضع المالي الحالي"
-          description="يتم احتساب الرصيد من مبلغ التسوية وجميع المدفوعات الجزئية المسجلة على الحوالة."
-          className={[
-            'app-section-panel',
-            'transfer-details-balance-section',
-            activeSection === 'summary' ? 'is-active' : '',
-          ]
-            .filter(Boolean)
-            .join(' ')}
-        >
-          {hasPartialTransferOnlyOfflineState ? (
-            <InlineMessage kind="warning" className="transfer-details-partial-offline-notice">
-              {paymentsError} لذلك تُعرض تفاصيل الحوالة الأساسية فقط، بينما تبقى إجماليات التحصيل والرصيد الحالي غير مكتملة حتى يعود سجل المدفوعات المؤكد.
-            </InlineMessage>
-          ) : null}
-          <BalanceSummary
-            settlementValue={formatNumber(valueAfterPercentage, 2)}
-            totalPaidValue={
-              paymentsLoading && payments.length === 0
-                ? 'جار تحميل المدفوعات...'
-                : formatNumber(totalPaidRub, 2)
-            }
-            remainingTitle={isOverpaid ? 'رصيد سالب' : isSettled ? 'حالة التسوية' : 'المتبقي بالروبل'}
-            remainingValue={remainingMessage}
-            remainingCardClass={balanceCardClass}
-            remainingValueClass={balanceValueClass}
-            remainingNote={isOverpaid ? 'المبلغ المدفوع تجاوز بالفعل القيمة النهائية للحوالة.' : ''}
-          />
-        </SectionCard>
+        {!isCompactMobileLayout ? (
+          <SectionCard
+            title="الوضع المالي الحالي"
+            description="يتم احتساب الرصيد من مبلغ التسوية وجميع المدفوعات الجزئية المسجلة على الحوالة."
+            className={[
+              'app-section-panel',
+              'transfer-details-balance-section',
+              activeSection === 'summary' ? 'is-active' : '',
+            ]
+              .filter(Boolean)
+              .join(' ')}
+          >
+            {hasPartialTransferOnlyOfflineState ? (
+              <InlineMessage kind="warning" className="transfer-details-partial-offline-notice">
+                {paymentsError} لذلك تُعرض تفاصيل الحوالة الأساسية فقط، بينما تبقى إجماليات التحصيل والرصيد الحالي غير مكتملة حتى يعود سجل المدفوعات المؤكد.
+              </InlineMessage>
+            ) : null}
+            <BalanceSummary
+              settlementValue={formatNumber(valueAfterPercentage, 2)}
+              totalPaidValue={
+                paymentsLoading && payments.length === 0
+                  ? 'جار تحميل المدفوعات...'
+                  : formatNumber(totalPaidRub, 2)
+              }
+              remainingTitle={isOverpaid ? 'رصيد سالب' : isSettled ? 'حالة التسوية' : 'المتبقي بالروبل'}
+              remainingValue={remainingMessage}
+              remainingCardClass={balanceCardClass}
+              remainingValueClass={balanceValueClass}
+              remainingNote={isOverpaid ? 'المبلغ المدفوع تجاوز بالفعل القيمة النهائية للحوالة.' : ''}
+            />
+          </SectionCard>
+        ) : null}
 
         {transfer ? (
           <SectionCard
             title="تعديل الحوالة"
-            description="عدّل بيانات الحوالة من هذه الشاشة فقط ضمن النطاق الآمن المعتمد، مع إبقاء رقم المرجع وتاريخ الإنشاء ثابتين دائما."
+            description="تعديل آمن لبيانات الحوالة."
             className={[
               'app-section-panel',
               'transfer-details-edit-section',
@@ -3599,7 +3809,7 @@ function TransferDetailsPage() {
 
         <SectionCard
           title="إجراء التحصيل"
-          description="هذه هي منطقة الإجراء الأساسية لتسجيل الحركة المالية التالية على الحوالة."
+          description="منطقة التحصيل التالية."
           className={[
             'app-section-panel',
             'transfer-details-action-section',
@@ -3619,9 +3829,11 @@ function TransferDetailsPage() {
           />
           <PaymentForm
             actionTitle={paymentActionTitle}
-            actionDescription={paymentActionDescription}
+            actionDescription={
+              isCompactMobileLayout ? compactPaymentActionDescription : paymentActionDescription
+            }
             actionTone={followUpState}
-            actionMeta={paymentActionMeta}
+            actionMeta={resolvedPaymentActionMeta}
             errorMessage={paymentSubmitError}
             successMessage={paymentSubmitSuccess}
             values={paymentForm}
@@ -3633,12 +3845,13 @@ function TransferDetailsPage() {
             submitting={paymentSubmitting}
             disabled={paymentSubmitting || Boolean(transferError) || !transfer || !isConfigured}
             submitLabel={paymentSubmitLabel}
+            compactView={isCompactMobileLayout}
           />
         </SectionCard>
 
         <SectionCard
           title="سجل التحصيل والحركة المالية"
-          description="يعرض الحركات من الأحدث إلى الأقدم مع إبراز آخر دفعة مسجلة لتسهيل المتابعة اليومية."
+          description="قائمة موجزة للحركات المالية."
           className={[
             'app-section-panel',
             'transfer-details-history-section',
@@ -3678,13 +3891,14 @@ function TransferDetailsPage() {
             payments={paymentEntriesWithVoidState}
             pendingPayments={pendingPaymentEntries}
             onRetry={handlePaymentsRefresh}
+            compactView={isCompactMobileLayout}
           />
         </SectionCard>
 
         {transfer ? (
           <SectionCard
-            title="تفاصيل الحوالة والتسعير"
-            description="مرجع الحوالة وبيانات التسعير والملاحظات الداخلية عند الحاجة إلى مراجعة أعمق."
+            title="تفاصيل إضافية"
+            description="مرجع وتسعير وملاحظات الحوالة."
             className={[
               'app-section-panel',
               'transfer-details-secondary-section',
@@ -3714,7 +3928,7 @@ function TransferDetailsPage() {
 
         <SectionCard
           title="قفل البيانات الأساسية"
-          description="يجب اعتبار القيم الأساسية للحوالة مقفلة بعد تسجيل أي دفعات عليها."
+          description="حالة قفل الحقول الأساسية."
           className={[
             'app-section-panel',
             'transfer-details-lock-section',
@@ -3760,11 +3974,13 @@ function TransferDetailsPage() {
         pricingRows={pricingRows}
         paymentsError={paymentsError}
         paymentsLoading={paymentsLoading}
-        paymentRows={activePaymentEntries}
+        paymentRows={printPaymentRows}
         totalPaidValue={`${formatNumber(totalPaidRub, 2)} RUB`}
         remainingValue={remainingMessage}
         remainingClassName={printRemainingClass}
         finalAmountValue={`${formatNumber(valueAfterPercentage, 2)} RUB`}
+        compactView={isCompactMobileLayout}
+        onPrint={handlePrint}
       />
     </div>
   )
