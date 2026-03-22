@@ -1396,9 +1396,8 @@ function DashboardPage() {
       ) : (
         <div className="stack dashboard-page">
           <PageHeader
-            eyebrow="مركز العمليات المالية اليومية"
-            title="الرئيسية المالية"
-            description="ابدأ يوم العمل من هنا: ماذا دُفع اليوم، ما المتبقي القائم، أين توجد المخاطر، وما الحوالات التي تحتاج حركة مباشرة الآن."
+            title="الرئيسية"
+            description="ماذا دُفع اليوم، ما المتبقي القائم، أين توجد المخاطر، وما الحوالات التي تحتاج حركة مباشرة الآن."
             actions={
               <>
                 <button type="button" className="button secondary" onClick={loadDashboard} disabled={loading}>

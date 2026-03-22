@@ -1,9 +1,13 @@
 import { useId } from 'react'
 
-function BrandOrbitMark({ className = '', size = 'md', animated = false, title = 'Eduquest brand mark' }) {
-  const gradientId = useId().replace(/:/g, '')
-  const accentId = useId().replace(/:/g, '')
-  const frameId = useId().replace(/:/g, '')
+/**
+ * Simplified monogram mark: "EQ" letterform with a calm orbit ring.
+ * Designed to read cleanly at 20px–96px across all placements.
+ */
+function BrandOrbitMark({ className = '', size = 'md', animated = false, title = 'EDUQUEST' }) {
+  const gradId = useId().replace(/:/g, '')
+  const inkId = useId().replace(/:/g, '')
+  const haloId = useId().replace(/:/g, '')
 
   return (
     <div
@@ -19,75 +23,63 @@ function BrandOrbitMark({ className = '', size = 'md', animated = false, title =
       aria-label={title || undefined}
       role={title ? 'img' : undefined}
     >
+      {/* Outer halo ring — subtle, not toy-like */}
       <span className="brand-orbit-mark__ring" aria-hidden="true" />
-      <span className="brand-orbit-mark__ring brand-orbit-mark__ring--inner" aria-hidden="true" />
-      <span className="brand-orbit-mark__orbit" aria-hidden="true" />
-      <span className="brand-orbit-mark__spark brand-orbit-mark__spark--one" aria-hidden="true" />
-      <span className="brand-orbit-mark__spark brand-orbit-mark__spark--two" aria-hidden="true" />
 
-      <svg className="brand-orbit-mark__svg" viewBox="0 0 64 64" fill="none" aria-hidden="true">
+      {/* Accent orbit dot */}
+      <span className="brand-orbit-mark__spark brand-orbit-mark__spark--one" aria-hidden="true" />
+
+      <svg
+        className="brand-orbit-mark__svg"
+        viewBox="0 0 64 64"
+        fill="none"
+        aria-hidden="true"
+      >
         <defs>
-          <linearGradient id={gradientId} x1="14" y1="12" x2="50" y2="52" gradientUnits="userSpaceOnUse">
-            <stop stopColor="rgba(17, 41, 59, 1)" />
-            <stop offset="1" stopColor="rgba(13, 122, 114, 1)" />
+          {/* Dark teal-to-navy fill for the badge */}
+          <linearGradient id={gradId} x1="12" y1="10" x2="52" y2="54" gradientUnits="userSpaceOnUse">
+            <stop stopColor="#11293b" />
+            <stop offset="1" stopColor="#0d7a72" />
           </linearGradient>
-          <linearGradient id={accentId} x1="20" y1="18" x2="48" y2="44" gradientUnits="userSpaceOnUse">
-            <stop stopColor="rgba(255, 255, 255, 0.98)" />
-            <stop offset="1" stopColor="rgba(237, 243, 255, 0.82)" />
+          {/* White ink for strokes */}
+          <linearGradient id={inkId} x1="18" y1="16" x2="46" y2="48" gradientUnits="userSpaceOnUse">
+            <stop stopColor="rgba(255,255,255,0.97)" />
+            <stop offset="1" stopColor="rgba(230,243,255,0.80)" />
           </linearGradient>
-          <linearGradient id={frameId} x1="16" y1="16" x2="48" y2="48" gradientUnits="userSpaceOnUse">
-            <stop stopColor="rgba(255,255,255,0.18)" />
+          {/* Subtle inner frame */}
+          <linearGradient id={haloId} x1="12" y1="12" x2="52" y2="52" gradientUnits="userSpaceOnUse">
+            <stop stopColor="rgba(255,255,255,0.20)" />
             <stop offset="1" stopColor="rgba(255,255,255,0.02)" />
           </linearGradient>
         </defs>
 
-        <rect x="10" y="10" width="44" height="44" rx="14" fill={`url(#${gradientId})`} />
-        <rect x="11" y="11" width="42" height="42" rx="13" stroke={`url(#${frameId})`} strokeWidth="1.2" />
-        <rect x="16" y="16" width="32" height="32" rx="10" stroke="rgba(255,255,255,0.08)" strokeWidth="1" />
+        {/* Badge background */}
+        <rect x="9" y="9" width="46" height="46" rx="15" fill={`url(#${gradId})`} />
+        {/* Inner edge highlight */}
+        <rect x="10" y="10" width="44" height="44" rx="14" fill="none" stroke={`url(#${haloId})`} strokeWidth="1.5" />
 
-        <path
-          d="M21 21.2v21.6"
-          stroke={`url(#${accentId})`}
-          strokeWidth="4.5"
-          strokeLinecap="round"
-        />
-        <path
-          d="M21.2 21.8h13"
-          stroke={`url(#${accentId})`}
-          strokeWidth="4.5"
-          strokeLinecap="round"
-        />
-        <path
-          d="M21.2 32h10"
-          stroke={`url(#${accentId})`}
-          strokeWidth="4.5"
-          strokeLinecap="round"
-        />
-        <path
-          d="M21.2 43h13"
-          stroke={`url(#${accentId})`}
-          strokeWidth="4.5"
-          strokeLinecap="round"
-        />
-        <path
-          d="M39.8 21.3a10.4 10.4 0 1 0 0 20.8 10.4 10.4 0 0 0 0-20.8Z"
-          stroke={`url(#${accentId})`}
-          strokeWidth="4.5"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-        />
-        <path
-          d="M43.5 39.6 48 44"
-          stroke={`url(#${accentId})`}
-          strokeWidth="4.5"
-          strokeLinecap="round"
-        />
-        <path
-          d="M44.8 19.5c2 0 3.6 1.5 3.9 3.4"
-          stroke="rgba(200, 154, 67, 0.96)"
-          strokeWidth="2.1"
-          strokeLinecap="round"
-        />
+        {/*
+          "EQ" monogram strokes:
+          E  — left vertical + three horizontals
+          Q  — circle + tail
+        */}
+
+        {/* E — vertical stem */}
+        <path d="M18 20v24" stroke={`url(#${inkId})`} strokeWidth="4.2" strokeLinecap="round" />
+        {/* E — top bar */}
+        <path d="M18.5 20.5h10" stroke={`url(#${inkId})`} strokeWidth="4.2" strokeLinecap="round" />
+        {/* E — mid bar (slightly shorter) */}
+        <path d="M18.5 32h8" stroke={`url(#${inkId})`} strokeWidth="4.2" strokeLinecap="round" />
+        {/* E — bottom bar */}
+        <path d="M18.5 43.5h10" stroke={`url(#${inkId})`} strokeWidth="4.2" strokeLinecap="round" />
+
+        {/* Q — circle */}
+        <circle cx="42.5" cy="31" r="8.5" stroke={`url(#${inkId})`} strokeWidth="4" />
+        {/* Q — tail stroke */}
+        <path d="M47.5 37.5L52.5 44" stroke={`url(#${inkId})`} strokeWidth="4" strokeLinecap="round" />
+
+        {/* Accent dot — brand gold */}
+        <circle cx="47" cy="18" r="3.2" fill="rgba(200,154,67,0.92)" />
       </svg>
     </div>
   )

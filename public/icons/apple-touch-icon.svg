@@ -1,22 +1,32 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="180" height="180" viewBox="0 0 180 180" role="img" aria-label="EDUQUEST">
   <defs>
-    <linearGradient id="eduquestBg180" x1="34" y1="28" x2="146" y2="154" gradientUnits="userSpaceOnUse">
+    <linearGradient id="bg180" x1="30" y1="24" x2="150" y2="156" gradientUnits="userSpaceOnUse">
       <stop stop-color="#11293b" />
       <stop offset="1" stop-color="#0d7a72" />
     </linearGradient>
-    <linearGradient id="eduquestInk180" x1="52" y1="46" x2="130" y2="130" gradientUnits="userSpaceOnUse">
-      <stop stop-color="#ffffff" />
-      <stop offset="1" stop-color="#edf3ff" />
+    <linearGradient id="ink180" x1="46" y1="38" x2="134" y2="142" gradientUnits="userSpaceOnUse">
+      <stop stop-color="rgba(255,255,255,0.97)" />
+      <stop offset="1" stop-color="rgba(230,243,255,0.80)" />
+    </linearGradient>
+    <linearGradient id="frame180" x1="28" y1="28" x2="152" y2="152" gradientUnits="userSpaceOnUse">
+      <stop stop-color="rgba(255,255,255,0.20)" />
+      <stop offset="1" stop-color="rgba(255,255,255,0.02)" />
     </linearGradient>
   </defs>
-  <rect width="180" height="180" rx="44" fill="#edf3ff" />
-  <rect x="30" y="30" width="120" height="120" rx="38" fill="url(#eduquestBg180)" />
-  <rect x="33" y="33" width="114" height="114" rx="35" fill="none" stroke="rgba(255,255,255,0.16)" stroke-width="3" />
-  <path d="M58 58v64" stroke="url(#eduquestInk180)" stroke-width="12.5" stroke-linecap="round" />
-  <path d="M58.5 60h35" stroke="url(#eduquestInk180)" stroke-width="12.5" stroke-linecap="round" />
-  <path d="M58.5 89.5H85" stroke="url(#eduquestInk180)" stroke-width="12.5" stroke-linecap="round" />
-  <path d="M58.5 120h35" stroke="url(#eduquestInk180)" stroke-width="12.5" stroke-linecap="round" />
-  <path d="M110 58a28 28 0 1 0 0 56 28 28 0 0 0 0-56Z" fill="none" stroke="url(#eduquestInk180)" stroke-width="12" stroke-linecap="round" stroke-linejoin="round" />
-  <path d="M120 108 133 121" stroke="url(#eduquestInk180)" stroke-width="11.5" stroke-linecap="round" />
-  <path d="M123 53c5.2 0 9.2 3.7 10.1 8.4" stroke="#c89a43" stroke-width="5.2" stroke-linecap="round" />
+  <rect width="180" height="180" rx="42" fill="url(#bg180)" />
+  <rect x="3" y="3" width="174" height="174" rx="40" fill="none" stroke="url(#frame180)" stroke-width="4" />
+  <!-- E stem -->
+  <path d="M50 56v68" stroke="url(#ink180)" stroke-width="12" stroke-linecap="round" />
+  <!-- E top bar -->
+  <path d="M51.5 57.5h28" stroke="url(#ink180)" stroke-width="12" stroke-linecap="round" />
+  <!-- E mid bar -->
+  <path d="M51.5 90h22" stroke="url(#ink180)" stroke-width="12" stroke-linecap="round" />
+  <!-- E bottom bar -->
+  <path d="M51.5 122.5h28" stroke="url(#ink180)" stroke-width="12" stroke-linecap="round" />
+  <!-- Q circle -->
+  <circle cx="119" cy="87" r="24" stroke="url(#ink180)" stroke-width="11.5" />
+  <!-- Q tail -->
+  <path d="M133 105L149 124" stroke="url(#ink180)" stroke-width="11" stroke-linecap="round" />
+  <!-- accent dot -->
+  <circle cx="132" cy="48" r="9" fill="rgba(200,154,67,0.92)" />
 </svg>

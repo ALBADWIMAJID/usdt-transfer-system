@@ -23,8 +23,7 @@ function AppLaunchScreen({
           <p className="eyebrow app-launch-kicker">{stageLabel}</p>
           <h1>{title}</h1>
           <p className="app-launch-message">{message}</p>
-          <p className="app-launch-detail">{detail}</p>
-          <p className="app-launch-subdetail">EQ monogram · secure financial workspace</p>
+          {detail ? <p className="app-launch-detail">{detail}</p> : null}
         </div>
 
         <div className="app-launch-progress" aria-hidden="true">

@@ -223,8 +223,6 @@ function PrintStatement({
                     <td>{payment.methodLabel}</td>
                     <td>
                       {formatStatementDate(payment.paidAtLabel)}
-                      <br />
-                      <small>تم التسجيل: {formatStatementDate(payment.createdAtLabel)}</small>
                     </td>
                     <td>{payment.noteText}</td>
                   </tr>
