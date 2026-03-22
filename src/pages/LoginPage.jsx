@@ -1,8 +1,7 @@
 import { useState } from 'react'
 import { Navigate, useLocation } from 'react-router-dom'
-import { branding } from '../config/branding.js'
 import AppLaunchScreen from '../components/ui/AppLaunchScreen.jsx'
-import BrandOrbitMark from '../components/ui/BrandOrbitMark.jsx'
+import BrandLogo from '../components/ui/BrandLogo.jsx'
 import ThemePreferenceControl from '../components/ui/ThemePreferenceControl.jsx'
 import { useAuth } from '../context/auth-context.js'
 
@@ -24,8 +23,7 @@ function LoginPage() {
     return (
       <AppLaunchScreen
         stageLabel="التحقق من الجلسة"
-        message="جار تجهيز الوصول الآمن إلى مساحة التشغيل."
-        detail={branding.systemName}
+        message="جار تجهيز الوصول الآمن إلى مساحة العمل."
       />
     )
   }
@@ -35,7 +33,6 @@ function LoginPage() {
       <AppLaunchScreen
         stageLabel="تسجيل الدخول"
         message="جار تأكيد بيانات المشغل وفتح مساحة العمل."
-        detail={branding.systemName}
       />
     )
   }
@@ -59,23 +56,14 @@ function LoginPage() {
   return (
     <div className="auth-screen">
       <section className="auth-card">
-        <div className="auth-brand-panel">
-          <div className="auth-brand-mark-shell">
-            <BrandOrbitMark size="lg" className="auth-brand-mark" />
-            <span className="auth-brand-pill">منصة تحويلات وتشغيل احترافية</span>
-          </div>
-          <div className="auth-brand-copy">
-            <p className="eyebrow">{branding.systemName}</p>
+        <div className="auth-brand-panel auth-brand-panel--minimal">
+          <BrandLogo className="auth-brand-logo" />
+
+          <div className="auth-brand-copy auth-brand-copy--minimal">
             <h1>تسجيل الدخول</h1>
             <p className="auth-copy">
-              ادخل باستخدام بيانات المشغل للوصول إلى لوحة عمليات احترافية للحوالات والعملاء
-              والمدفوعات والطباعة اليومية.
+              ادخل بيانات المشغل للوصول إلى مساحة العمل ومتابعة الحوالات والمدفوعات اليومية.
             </p>
-            <div className="auth-highlights" aria-hidden="true">
-              <span>تشغيل يومي منظم</span>
-              <span>متابعة دقيقة للمدفوعات</span>
-              <span>كشف طباعة مهني</span>
-            </div>
           </div>
         </div>
 
@@ -116,9 +104,7 @@ function LoginPage() {
 
         <ThemePreferenceControl className="auth-theme-preference" />
 
-        <p className="auth-footer">
-          بعد نجاح المصادقة سيتم تحويلك مباشرة إلى مساحة العمل الخاصة بـ {branding.shortName}.
-        </p>
+        <p className="auth-footer">بعد نجاح المصادقة سيتم تحويلك مباشرة إلى مساحة العمل الخاصة بك.</p>
       </section>
     </div>
   )

@@ -1,4 +1,4 @@
-const SHELL_CACHE = 'usdt-transfer-shell-v4'
+const SHELL_CACHE = 'usdt-transfer-shell-v8'
 const SCOPE_URL = new URL('./', self.location.href)
 const APP_SHELL_KEY = new URL('__app-shell__', SCOPE_URL).toString()
 
@@ -24,7 +24,12 @@ const PRECACHE_URLS = [
   './',
   'offline.html',
   'manifest.webmanifest',
+  'favicon.ico',
   'apple-touch-icon.png',
+  'icons/favicon.png',
+  'branding/image.png',
+  'branding/image-ui.png',
+  'branding/image-mark.png',
   'branding/eduquest-logo.png',
   'branding/eduquest-logo-print.png',
   'branding/eduquest-mark.png',

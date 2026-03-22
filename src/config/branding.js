@@ -6,18 +6,18 @@ function resolveBrandAsset(pathname) {
 }
 
 export const branding = {
-  systemName: 'EDUQUEST',
-  officeName: 'EDUQUEST',
-  shortName: 'EDUQUEST',
+  systemName: 'eduquest',
+  officeName: 'eduquest',
+  shortName: 'eduquest',
   tagline: 'تشغيل احترافي للحوالات والتسويات والمدفوعات اليومية',
   printTitle: 'كشف الحوالة الرسمي',
   logoMode: 'asset',
   assets: {
-    logo: resolveBrandAsset('branding/eduquest-logo.png'),
-    printLogo: resolveBrandAsset('branding/eduquest-logo-print.png'),
-    mark: resolveBrandAsset('branding/eduquest-mark.png'),
-    appIcon: resolveBrandAsset('icons/icon-512.svg'),
-    appleTouchIcon: resolveBrandAsset('icons/apple-touch-icon.svg'),
+    logo: resolveBrandAsset('branding/image-ui.png'),
+    printLogo: resolveBrandAsset('branding/image-ui.png'),
+    mark: resolveBrandAsset('branding/image-mark.png'),
+    appIcon: resolveBrandAsset('icons/icon-512.png'),
+    appleTouchIcon: resolveBrandAsset('apple-touch-icon.png'),
   },
   palette: {
     primary: '#0d7a72',

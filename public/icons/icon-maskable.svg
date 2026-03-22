@@ -1,28 +1,33 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512" role="img" aria-label="EDUQUEST maskable">
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 1024 1024" role="img" aria-label="EDUQUEST">
   <defs>
-    <linearGradient id="bgmask" x1="0" y1="0" x2="512" y2="512" gradientUnits="userSpaceOnUse">
-      <stop stop-color="#11293b" />
-      <stop offset="1" stop-color="#0d7a72" />
+    <linearGradient id="tile" x1="144" y1="128" x2="880" y2="896" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#ffffff"/>
+      <stop offset="1" stop-color="#eef3fc"/>
     </linearGradient>
-    <linearGradient id="inkmask" x1="130" y1="106" x2="382" y2="406" gradientUnits="userSpaceOnUse">
-      <stop stop-color="rgba(255,255,255,0.97)" />
-      <stop offset="1" stop-color="rgba(230,243,255,0.80)" />
+    <linearGradient id="teal" x1="280" y1="290" x2="600" y2="760" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#61e7dc"/>
+      <stop offset="1" stop-color="#0d7a72"/>
     </linearGradient>
+    <linearGradient id="gold" x1="470" y1="290" x2="870" y2="760" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#ffe084"/>
+      <stop offset="1" stop-color="#d69e2d"/>
+    </linearGradient>
+    <filter id="shadow" x="0" y="0" width="1024" height="1024" filterUnits="userSpaceOnUse">
+      <feDropShadow dx="0" dy="22" stdDeviation="18" flood-color="#11293b" flood-opacity="0.2"/>
+    </filter>
+    <filter id="markShadow" x="0" y="0" width="1024" height="1024" filterUnits="userSpaceOnUse">
+      <feDropShadow dx="10" dy="14" stdDeviation="10" flood-color="#11293b" flood-opacity="0.18"/>
+    </filter>
   </defs>
-  <!-- Full bleed background for maskable icon safe zone -->
-  <rect width="512" height="512" fill="url(#bgmask)" />
-  <!-- E stem -->
-  <path d="M138 160v192" stroke="url(#inkmask)" stroke-width="34" stroke-linecap="round" />
-  <!-- E top bar -->
-  <path d="M141 163h76" stroke="url(#inkmask)" stroke-width="34" stroke-linecap="round" />
-  <!-- E mid bar -->
-  <path d="M141 256h60" stroke="url(#inkmask)" stroke-width="34" stroke-linecap="round" />
-  <!-- E bottom bar -->
-  <path d="M141 349h76" stroke="url(#inkmask)" stroke-width="34" stroke-linecap="round" />
-  <!-- Q circle -->
-  <circle cx="338" cy="248" r="68" stroke="url(#inkmask)" stroke-width="32" />
-  <!-- Q tail -->
-  <path d="M378 298L424 354" stroke="url(#inkmask)" stroke-width="30" stroke-linecap="round" />
-  <!-- accent dot -->
-  <circle cx="374" cy="134" r="25" fill="rgba(200,154,67,0.92)" />
+  <g filter="url(#shadow)">
+    <rect x="112" y="112" width="800" height="800" rx="154" fill="url(#tile)" stroke="#d8dfef" stroke-width="6"/>
+  </g>
+  <g filter="url(#markShadow)">
+    <path d="M297 305h266l-92 101H297z" fill="url(#teal)"/>
+    <rect x="297" y="305" width="143" height="398" rx="30" fill="url(#teal)"/>
+    <rect x="297" y="468" width="215" height="98" rx="28" fill="url(#teal)"/>
+    <path d="M297 602h266l-92 101H297z" fill="url(#teal)"/>
+    <path d="M646 287c154 0 257 104 257 236c0 103-60 187-152 225l-86-76c75-26 124-84 124-155c0-90-67-154-161-154h-98l90-76h26z" fill="url(#gold)"/>
+    <path d="M612 563h100l128 127l-77 55z" fill="url(#gold)"/>
+  </g>
 </svg>

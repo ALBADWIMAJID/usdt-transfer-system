@@ -1,32 +1,33 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="180" height="180" viewBox="0 0 180 180" role="img" aria-label="EDUQUEST">
+<svg xmlns="http://www.w3.org/2000/svg" width="180" height="180" viewBox="0 0 1024 1024" role="img" aria-label="EDUQUEST">
   <defs>
-    <linearGradient id="bg180" x1="30" y1="24" x2="150" y2="156" gradientUnits="userSpaceOnUse">
-      <stop stop-color="#11293b" />
-      <stop offset="1" stop-color="#0d7a72" />
+    <linearGradient id="tile" x1="144" y1="128" x2="880" y2="896" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#ffffff"/>
+      <stop offset="1" stop-color="#eef3fc"/>
     </linearGradient>
-    <linearGradient id="ink180" x1="46" y1="38" x2="134" y2="142" gradientUnits="userSpaceOnUse">
-      <stop stop-color="rgba(255,255,255,0.97)" />
-      <stop offset="1" stop-color="rgba(230,243,255,0.80)" />
+    <linearGradient id="teal" x1="280" y1="290" x2="600" y2="760" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#61e7dc"/>
+      <stop offset="1" stop-color="#0d7a72"/>
     </linearGradient>
-    <linearGradient id="frame180" x1="28" y1="28" x2="152" y2="152" gradientUnits="userSpaceOnUse">
-      <stop stop-color="rgba(255,255,255,0.20)" />
-      <stop offset="1" stop-color="rgba(255,255,255,0.02)" />
+    <linearGradient id="gold" x1="470" y1="290" x2="870" y2="760" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#ffe084"/>
+      <stop offset="1" stop-color="#d69e2d"/>
     </linearGradient>
+    <filter id="shadow" x="0" y="0" width="1024" height="1024" filterUnits="userSpaceOnUse">
+      <feDropShadow dx="0" dy="22" stdDeviation="18" flood-color="#11293b" flood-opacity="0.2"/>
+    </filter>
+    <filter id="markShadow" x="0" y="0" width="1024" height="1024" filterUnits="userSpaceOnUse">
+      <feDropShadow dx="10" dy="14" stdDeviation="10" flood-color="#11293b" flood-opacity="0.18"/>
+    </filter>
   </defs>
-  <rect width="180" height="180" rx="42" fill="url(#bg180)" />
-  <rect x="3" y="3" width="174" height="174" rx="40" fill="none" stroke="url(#frame180)" stroke-width="4" />
-  <!-- E stem -->
-  <path d="M50 56v68" stroke="url(#ink180)" stroke-width="12" stroke-linecap="round" />
-  <!-- E top bar -->
-  <path d="M51.5 57.5h28" stroke="url(#ink180)" stroke-width="12" stroke-linecap="round" />
-  <!-- E mid bar -->
-  <path d="M51.5 90h22" stroke="url(#ink180)" stroke-width="12" stroke-linecap="round" />
-  <!-- E bottom bar -->
-  <path d="M51.5 122.5h28" stroke="url(#ink180)" stroke-width="12" stroke-linecap="round" />
-  <!-- Q circle -->
-  <circle cx="119" cy="87" r="24" stroke="url(#ink180)" stroke-width="11.5" />
-  <!-- Q tail -->
-  <path d="M133 105L149 124" stroke="url(#ink180)" stroke-width="11" stroke-linecap="round" />
-  <!-- accent dot -->
-  <circle cx="132" cy="48" r="9" fill="rgba(200,154,67,0.92)" />
+  <g filter="url(#shadow)">
+    <rect x="112" y="112" width="800" height="800" rx="154" fill="url(#tile)" stroke="#d8dfef" stroke-width="6"/>
+  </g>
+  <g filter="url(#markShadow)">
+    <path d="M297 305h266l-92 101H297z" fill="url(#teal)"/>
+    <rect x="297" y="305" width="143" height="398" rx="30" fill="url(#teal)"/>
+    <rect x="297" y="468" width="215" height="98" rx="28" fill="url(#teal)"/>
+    <path d="M297 602h266l-92 101H297z" fill="url(#teal)"/>
+    <path d="M646 287c154 0 257 104 257 236c0 103-60 187-152 225l-86-76c75-26 124-84 124-155c0-90-67-154-161-154h-98l90-76h26z" fill="url(#gold)"/>
+    <path d="M612 563h100l128 127l-77 55z" fill="url(#gold)"/>
+  </g>
 </svg>
