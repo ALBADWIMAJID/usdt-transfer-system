@@ -1,4 +1,5 @@
 import InfoCard from '../ui/InfoCard.jsx'
+import InitialsAvatar from '../ui/InitialsAvatar.jsx'
 import RecordCard from '../ui/RecordCard.jsx'
 import RecordHeader from '../ui/RecordHeader.jsx'
 import RecordMeta from '../ui/RecordMeta.jsx'
@@ -54,6 +55,7 @@ function CustomerRecordCard({ customer, compact = false, variant = 'default' }) 
         .join(' ')}
     >
       <RecordHeader
+        leading={<InitialsAvatar label={customer.name} className="record-header-avatar record-header-avatar--customer" />}
         eyebrow={compact || isCustomersListVariant ? '' : customer.eyebrow}
         title={customer.name}
         subtitle={customer.phone}

@@ -154,7 +154,7 @@ function AppShell() {
   const { signOut, user } = useAuth()
   const syncStatus = useSyncStatus()
   const [signOutError, setSignOutError] = useState('')
-  const [mobileNavOpen, setMobileNavOpen] = useState(false)
+  const [mobileNavLocationKey, setMobileNavLocationKey] = useState('')
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
 
   const currentSection = getCurrentSection(location.pathname)
@@ -162,10 +162,9 @@ function AppShell() {
   const shouldShowShellBanner = ['offline', 'pending', 'blocked', 'syncing', 'error'].includes(
     syncStatus.status
   )
+  const isMobileNavOpen = mobileNavLocationKey === location.key
 
   useEffect(() => {
-    setMobileNavOpen(false)
-
     if (typeof window !== 'undefined' && typeof window.__refreshAppViewport === 'function') {
       window.__refreshAppViewport()
       window.setTimeout(() => {
@@ -190,11 +189,11 @@ function AppShell() {
   return (
     <div className={`app-shell${sidebarCollapsed ? ' sidebar-collapsed' : ''}`}>
       <div
-        className={`mobile-drawer-backdrop${mobileNavOpen ? ' open' : ''}`}
-        onClick={() => setMobileNavOpen(false)}
+        className={`mobile-drawer-backdrop${isMobileNavOpen ? ' open' : ''}`}
+        onClick={() => setMobileNavLocationKey('')}
       />
 
-      <aside className={`sidebar${mobileNavOpen ? ' open' : ''}`} aria-label="التنقل الرئيسي">
+      <aside className={`sidebar${isMobileNavOpen ? ' open' : ''}`} aria-label="التنقل الرئيسي">
         <div className="sidebar-panel">
           <div className="sidebar-header">
             <BrandLockup tone="sidebar" size="md" showTagline={false} />
@@ -202,7 +201,7 @@ function AppShell() {
             <button
               type="button"
               className="icon-button mobile-only sidebar-close-button"
-              onClick={() => setMobileNavOpen(false)}
+              onClick={() => setMobileNavLocationKey('')}
               aria-label="إغلاق القائمة"
             >
               <Icon name="close" />
@@ -231,7 +230,7 @@ function AppShell() {
                     to={item.to}
                     className={`nav-link${isActive ? ' active' : ''}`}
                     aria-current={isActive ? 'page' : undefined}
-                    onClick={() => setMobileNavOpen(false)}
+                    onClick={() => setMobileNavLocationKey('')}
                   >
                     <span className="nav-link-icon">
                       <Icon name={item.icon} />
@@ -272,9 +271,9 @@ function AppShell() {
             <button
               type="button"
               className="icon-button mobile-only topbar-menu-button"
-              onClick={() => setMobileNavOpen(true)}
+              onClick={() => setMobileNavLocationKey(location.key)}
               aria-label="فتح القائمة"
-              aria-expanded={mobileNavOpen}
+              aria-expanded={isMobileNavOpen}
             >
               <Icon name="menu" />
             </button>

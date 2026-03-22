@@ -1644,6 +1644,7 @@ function CustomerDetailsPage() {
         eyebrow="العميل"
         title={customer?.full_name || 'ملف العميل'}
         description={resolvedPageDescription}
+        showDescriptionOnMobile
         actions={
           <div className="customer-details-hero-actions">
             {customerId ? (
@@ -1676,7 +1677,37 @@ function CustomerDetailsPage() {
             </div>
           </div>
         }
-      />
+      >
+        {customer ? (
+          <div className="page-hero-highlights customer-details-hero-highlights">
+            <p
+              className={[
+                'support-text',
+                'support-text-inline',
+                'page-hero-highlight',
+                `page-hero-highlight--${
+                  resolvedCustomerStateTone === 'accent'
+                    ? 'warning'
+                    : resolvedCustomerStateTone === 'neutral'
+                      ? 'muted'
+                      : resolvedCustomerStateTone
+                }`,
+              ]
+                .filter(Boolean)
+                .join(' ')}
+            >
+              {resolvedCustomerStateLabel}
+            </p>
+            <p className="support-text support-text-inline page-hero-highlight">
+              {customer.phone || 'لا يوجد رقم هاتف مسجل'}
+            </p>
+            <p className="support-text support-text-inline page-hero-highlight page-hero-highlight--accent">
+              المتبقي {totalRemainingValue}
+            </p>
+            <p className="support-text support-text-inline page-hero-highlight">{totalTransfers} حوالة</p>
+          </div>
+        ) : null}
+      </PageHeader>
 
       <OfflineSnapshotNotice snapshotState={snapshotState} />
 

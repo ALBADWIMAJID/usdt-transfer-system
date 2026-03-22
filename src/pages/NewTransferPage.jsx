@@ -561,6 +561,10 @@ function NewTransferPage() {
           payload: withStampedOrg(payload, orgId),
         })
 
+        if (!queuedRecord) {
+          throw new Error('تعذر حفظ الحوالة المحلية داخل المتصفح.')
+        }
+
         setFormValues(createEmptyForm(formValues.customer_id))
         setSubmitSuccess(
           queuedRecord?.localMeta?.localReference

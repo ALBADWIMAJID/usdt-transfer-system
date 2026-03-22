@@ -9,6 +9,7 @@ function RecordHeader({
   subtitleClassName = '',
   metaItems = [],
   aside,
+  leading,
   className = '',
   titleClassName = '',
   children,
@@ -25,6 +26,7 @@ function RecordHeader({
 
   return (
     <div className={['record-header', className].filter(Boolean).join(' ')}>
+      {leading ? <div className="record-header-leading">{leading}</div> : null}
       <div className="record-header-main">
         {eyebrow ? <p className="eyebrow">{eyebrow}</p> : null}
         {titleTo ? <Link to={titleTo}>{titleContent}</Link> : titleContent}

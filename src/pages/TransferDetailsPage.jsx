@@ -466,6 +466,7 @@ function TransferDetailsPage() {
   const [paymentVoidRows, setPaymentVoidRows] = useState([])
   const [paymentsLoading, setPaymentsLoading] = useState(Boolean(isConfigured))
   const [paymentsError, setPaymentsError] = useState(isConfigured ? '' : configError)
+  const [transferRefreshKey, setTransferRefreshKey] = useState(0)
   const [paymentsRefreshKey, setPaymentsRefreshKey] = useState(0)
   const [paymentForm, setPaymentForm] = useState(emptyPaymentForm)
   const [paymentSubmitting, setPaymentSubmitting] = useState(false)
@@ -712,6 +713,7 @@ function TransferDetailsPage() {
     isOffline,
     markCachedSnapshot,
     orgId,
+    transferRefreshKey,
     transferId,
     transferSnapshotKey,
   ])
@@ -1013,6 +1015,10 @@ function TransferDetailsPage() {
     transferSnapshotKey,
   ])
 
+  const handleTransferRefresh = () => {
+    setTransferRefreshKey((current) => current + 1)
+  }
+
   const handlePaymentsRefresh = () => {
     setPaymentsRefreshKey((current) => current + 1)
   }
@@ -1026,6 +1032,7 @@ function TransferDetailsPage() {
 
     if (!isOffline && previousPendingCount > 0 && localPaymentCount < previousPendingCount) {
       const scheduleRefresh = () => {
+        setTransferRefreshKey((current) => current + 1)
         setPaymentsRefreshKey((current) => current + 1)
       }
 
@@ -1591,6 +1598,7 @@ function TransferDetailsPage() {
     setReplacementPaymentSubmitting(false)
     setReplacementPaymentForm(emptyReplacementPaymentForm)
     setReplacementPaymentFormPaymentId('')
+    handleTransferRefresh()
     setReplacementPaymentSubmitSuccess(
       `تم تسجيل دفعة بديلة مصححة بقيمة ${formatNumber(savedReplacementPayment.amount_rub, 2)} RUB بنجاح.`
     )
@@ -1691,6 +1699,7 @@ function TransferDetailsPage() {
     setPaymentVoidSubmitting(false)
     setPaymentVoidForm(emptyPaymentVoidForm)
     setPaymentVoidFormPaymentId('')
+    handleTransferRefresh()
     setPaymentVoidSubmitSuccess(
       `تم إلغاء اعتماد الدفعة المؤكدة ${formatNumber(targetPayment.amount_rub, 2)} RUB بنجاح.`
     )
@@ -2054,6 +2063,7 @@ function TransferDetailsPage() {
         ? `تم تسجيل الدفعة بنجاح للحوالة ${transfer.reference_number}.`
         : 'تم تسجيل الدفعة بنجاح.'
     )
+    handleTransferRefresh()
     handlePaymentsRefresh()
   }
 
@@ -2095,6 +2105,7 @@ function TransferDetailsPage() {
           ? `تمت مزامنة ${syncedCount} دفعة محلية بنجاح، بينما بقيت ${result.blockedCount} دفعة بانتظار اعتماد مرتبط.`
           : `تمت مزامنة ${syncedCount} دفعة محلية بنجاح مع الخادم.`
       )
+      handleTransferRefresh()
       handlePaymentsRefresh()
     }
   }
@@ -2994,7 +3005,7 @@ function TransferDetailsPage() {
       ),
     }
   })
-  const activePaymentEntries = activePayments.map((payment, index) => ({
+  const _activePaymentEntries = activePayments.map((payment, index) => ({
     id: payment.id ?? `${payment.created_at}-${payment.amount_rub}`,
     amountLabel: `${formatNumber(payment.amount_rub, 2)} RUB`,
     methodLabel: extractPaymentMethod(payment),
@@ -3238,6 +3249,7 @@ function TransferDetailsPage() {
         eyebrow="الحوالة"
         title={transfer?.reference_number || (transferId ? `حوالة #${transferId}` : 'حوالة')}
         description={resolvedPageDescription}
+        showDescriptionOnMobile
         className="no-print transfer-details-page-hero"
         actions={
           <div className="transfer-details-hero-actions">
@@ -3269,7 +3281,31 @@ function TransferDetailsPage() {
             </div>
           </div>
         }
-      />
+      >
+        {transfer ? (
+          <div className="page-hero-highlights transfer-details-hero-highlights">
+            <p
+              className={[
+                'support-text',
+                'support-text-inline',
+                'page-hero-highlight',
+                `page-hero-highlight--${followUpState === 'neutral' ? 'muted' : followUpState}`,
+              ]
+                .filter(Boolean)
+                .join(' ')}
+            >
+              {statusLabel}
+            </p>
+            <p className="support-text support-text-inline page-hero-highlight">{displayCustomerName}</p>
+            <p className="support-text support-text-inline page-hero-highlight page-hero-highlight--accent">
+              المتبقي {remainingMessage}
+            </p>
+            <p className="support-text support-text-inline page-hero-highlight">
+              المحصل {totalPaidRub === null ? '--' : `${formatNumber(totalPaidRub, 2)} RUB`}
+            </p>
+          </div>
+        ) : null}
+      </PageHeader>
 
       <InlineMessage kind="success" className="no-print">
         {location.state?.successMessage}

@@ -24,18 +24,20 @@ function TransfersList({
       noResultsMessage="لا توجد حوالات مطابقة للبحث أو لعوامل التصفية الحالية. عدّل المرجع أو العميل أو الحالة أو التاريخ ثم أعد المحاولة."
       refreshingMessage="جار تحديث الحوالات..."
     >
-      <div className="transfer-queue-groups">
-        {groups.map((group) => (
-          <TransferQueueGroup
-            key={group.key}
-            title={group.title}
-            description={group.description}
-            count={group.items.length}
-            tone={group.tone}
-            transfers={group.items}
-            compactCards={compactCards}
-          />
-        ))}
+      <div className="transfers-queue-scroll-area" aria-label="نتائج صف الحوالات" tabIndex={0}>
+        <div className="transfer-queue-groups">
+          {groups.map((group) => (
+            <TransferQueueGroup
+              key={group.key}
+              title={group.title}
+              description={group.description}
+              count={group.items.length}
+              tone={group.tone}
+              transfers={group.items}
+              compactCards={compactCards}
+            />
+          ))}
+        </div>
       </div>
     </ListStateSwitcher>
   )

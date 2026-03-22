@@ -1,5 +1,6 @@
 import InfoCard from '../ui/InfoCard.jsx'
 import InfoGrid from '../ui/InfoGrid.jsx'
+import InitialsAvatar from '../ui/InitialsAvatar.jsx'
 import InlineMessage from '../ui/InlineMessage.jsx'
 import RecordHeader from '../ui/RecordHeader.jsx'
 import StatusBadge from '../ui/StatusBadge.jsx'
@@ -32,6 +33,13 @@ function TransferSummary({
   return (
     <>
       <RecordHeader
+        leading={
+          <InitialsAvatar
+            label={customerName}
+            fallback="TR"
+            className="record-header-avatar record-header-avatar--hero"
+          />
+        }
         eyebrow="العميل"
         title={customerName}
         titleTo={customerId ? `/customers/${customerId}` : ''}

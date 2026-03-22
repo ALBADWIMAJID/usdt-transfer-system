@@ -449,7 +449,7 @@ function renderCustomerActivityDrillDownCompactItem(item) {
   )
 }
 
-function getPendingCustomerStatusMeta(status) {
+function _getPendingCustomerStatusMeta(status) {
   if (status === 'failed') {
     return {
       chipClassName: 'offline-snapshot-chip--warning',
@@ -471,18 +471,6 @@ function getPendingCustomerStatusMeta(status) {
     label: 'بانتظار الإرسال',
     note: 'سيبقى هذا العميل محليا فقط حتى تنجح المزامنة ويصبح ملفه مؤكدا على الخادم.',
   }
-}
-
-function buildPendingCustomerNote(record) {
-  if (record.status === 'failed' && record.lastError) {
-    return `آخر خطأ: ${record.lastError}`
-  }
-
-  if (record.payload?.notes) {
-    return record.payload.notes
-  }
-
-  return getPendingCustomerStatusMeta(record.status).note
 }
 
 function CustomersPage() {

@@ -1,6 +1,7 @@
 import EmptyState from '../ui/EmptyState.jsx'
 import InfoCard from '../ui/InfoCard.jsx'
 import InfoGrid from '../ui/InfoGrid.jsx'
+import InitialsAvatar from '../ui/InitialsAvatar.jsx'
 import InlineMessage from '../ui/InlineMessage.jsx'
 import RecordHeader from '../ui/RecordHeader.jsx'
 
@@ -36,6 +37,7 @@ function CustomerSummary({
   return (
     <>
       <RecordHeader
+        leading={<InitialsAvatar label={title} className="record-header-avatar record-header-avatar--hero" />}
         eyebrow="ملف العميل"
         title={title}
         subtitle={subtitle}

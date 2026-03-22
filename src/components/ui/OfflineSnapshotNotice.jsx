@@ -5,13 +5,11 @@ import InlineMessage from './InlineMessage.jsx'
 
 function OfflineSnapshotNotice({ className = '', snapshotState }) {
   const { isOffline } = useNetworkStatus()
-
-  if (!snapshotState?.hasSnapshot) {
-    return null
-  }
-
-  const freshnessMeta = getSnapshotFreshnessMeta(snapshotState.savedAt)
-  const isFromCache = Boolean(snapshotState.isFromCache)
+  const [hiddenSavedAt, setHiddenSavedAt] = useState('')
+  const hasSnapshot = Boolean(snapshotState?.hasSnapshot)
+  const savedAt = snapshotState?.savedAt || ''
+  const freshnessMeta = getSnapshotFreshnessMeta(savedAt)
+  const isFromCache = Boolean(snapshotState?.isFromCache)
   const title = isFromCache
     ? 'يتم عرض نسخة محفوظة محليا'
     : 'البيانات الحالية مباشرة'
@@ -24,25 +22,23 @@ function OfflineSnapshotNotice({ className = '', snapshotState }) {
   const metaToneClass = `offline-snapshot-chip--${freshnessMeta.tone}`
   const shouldPersist =
     isOffline || isFromCache || freshnessMeta.isStale || freshnessMeta.tone === 'warning'
-  const [isVisible, setIsVisible] = useState(true)
+  const isVisible = hasSnapshot && (shouldPersist || hiddenSavedAt !== savedAt)
 
   useEffect(() => {
-    setIsVisible(true)
-
-    if (shouldPersist) {
+    if (!hasSnapshot || shouldPersist || !savedAt) {
       return undefined
     }
 
     const timeoutId = window.setTimeout(() => {
-      setIsVisible(false)
+      setHiddenSavedAt(savedAt)
     }, 2600)
 
     return () => {
       window.clearTimeout(timeoutId)
     }
-  }, [shouldPersist, snapshotState?.savedAt])
+  }, [hasSnapshot, savedAt, shouldPersist])
 
-  if (!isVisible) {
+  if (!hasSnapshot || !isVisible) {
     return null
   }
 
