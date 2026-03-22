@@ -102,7 +102,9 @@ function PaymentList({ errorMessage, loading, payments, pendingPayments = [], on
       {hasPendingPayments ? (
         <section className="payment-history-group payment-history-group--local" aria-label="دفعات محلية">
           <div className="payment-history-group-head">
-            <strong>{compactView ? 'محفوظة محليا' : 'دفعات محفوظة محليا'}</strong>
+            <strong>
+              {compactView ? `محفوظة محليا (${pendingPayments.length})` : 'دفعات محفوظة محليا'}
+            </strong>
             {!compactView ? (
               <p>
                 {hasBlockedPendingPayments
@@ -120,7 +122,7 @@ function PaymentList({ errorMessage, loading, payments, pendingPayments = [], on
       {hasConfirmedPayments ? (
         <section className="payment-history-group" aria-label="دفعات مؤكدة">
           <div className="payment-history-group-head">
-            <strong>{compactView ? 'دفعات مؤكدة' : 'دفعات مؤكدة من الخادم'}</strong>
+            <strong>{compactView ? `دفعات مؤكدة (${payments.length})` : 'دفعات مؤكدة من الخادم'}</strong>
             {!compactView && hasPendingPayments ? (
               <p>هذه الدفعات فقط تدخل في الإجماليات المؤكدة الحالية.</p>
             ) : null}

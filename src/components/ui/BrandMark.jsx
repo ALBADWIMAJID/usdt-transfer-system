@@ -1,21 +1,19 @@
-import { branding } from '../../config/branding.js'
+import BrandOrbitMark from './BrandOrbitMark.jsx'
 
 function BrandMark({ tone = 'default', size = 'md', className = '' }) {
   return (
-    <span
+    <BrandOrbitMark
       className={[
         'brand-mark-shell',
-        'brand-mark-shell--asset',
         `brand-mark-shell--${tone}`,
         `brand-mark-shell--${size}`,
         className,
       ]
         .filter(Boolean)
         .join(' ')}
-      aria-hidden="true"
-    >
-      <img className="brand-mark-image" src={branding.assets.mark} alt="" loading="eager" decoding="async" />
-    </span>
+      size={size}
+      title=""
+    />
   )
 }
 

@@ -105,13 +105,13 @@ function PaymentForm({
           </FieldShell>
         </div>
 
-        <FieldShell label="ملاحظة" htmlFor="note">
+        <FieldShell label={compactView ? 'ملاحظة قصيرة' : 'ملاحظة'} htmlFor="note">
           <textarea
             id="note"
             name="note"
             value={values.note}
             onChange={onChange}
-            placeholder="ملاحظة اختيارية على الدفعة"
+            placeholder={compactView ? 'ملاحظة اختيارية' : 'ملاحظة اختيارية على الدفعة'}
           />
         </FieldShell>
 

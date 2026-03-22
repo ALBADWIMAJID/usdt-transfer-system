@@ -16,8 +16,8 @@ export const branding = {
     logo: resolveBrandAsset('branding/eduquest-logo.png'),
     printLogo: resolveBrandAsset('branding/eduquest-logo-print.png'),
     mark: resolveBrandAsset('branding/eduquest-mark.png'),
-    appIcon: resolveBrandAsset('icons/eduquest-icon-512.png'),
-    appleTouchIcon: resolveBrandAsset('apple-touch-icon.png'),
+    appIcon: resolveBrandAsset('icons/icon-512.svg'),
+    appleTouchIcon: resolveBrandAsset('icons/apple-touch-icon.svg'),
   },
   palette: {
     primary: '#0d7a72',

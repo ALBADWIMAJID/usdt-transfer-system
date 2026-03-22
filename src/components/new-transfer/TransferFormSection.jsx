@@ -191,7 +191,7 @@ function TransferFormSection({
         </div>
 
         <div className="new-transfer-step new-transfer-step--notes">
-          <FieldShell label="ملاحظات" htmlFor="notes">
+          <FieldShell label="ملاحظات" htmlFor="notes" className="new-transfer-notes-field">
             <textarea
               id="notes"
               name="notes"

@@ -10,7 +10,16 @@ function PageHeader({
   showDescriptionOnMobile = false,
 }) {
   return (
-    <section className={['page-hero', 'page-hero--compact', className].filter(Boolean).join(' ')}>
+    <section
+      className={[
+        'page-hero',
+        'page-hero--compact',
+        actions ? 'page-hero--has-actions' : '',
+        className,
+      ]
+        .filter(Boolean)
+        .join(' ')}
+    >
       <div className="page-hero-main">
         <div className="page-hero-copy">
           {eyebrow ? <p className="eyebrow">{eyebrow}</p> : null}

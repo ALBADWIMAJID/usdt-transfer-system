@@ -1,6 +1,22 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="192" height="192" viewBox="0 0 192 192" role="img" aria-label="MD">
-  <rect width="192" height="192" rx="44" fill="#11293b" />
-  <rect x="18" y="18" width="156" height="156" rx="34" fill="#0d7a72" opacity="0.14" />
-  <circle cx="140" cy="52" r="18" fill="#c89a43" />
-  <path d="M45 130V62h16.4L96 99.4 130.6 62H147v68h-15.2V87.6l-30 34.4H90.2l-30-34.4V130Z" fill="#ffffff" />
+<svg xmlns="http://www.w3.org/2000/svg" width="192" height="192" viewBox="0 0 192 192" role="img" aria-label="EDUQUEST">
+  <defs>
+    <linearGradient id="eduquestBg192" x1="38" y1="30" x2="154" y2="162" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#11293b" />
+      <stop offset="1" stop-color="#0d7a72" />
+    </linearGradient>
+    <linearGradient id="eduquestInk192" x1="56" y1="48" x2="138" y2="136" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#ffffff" />
+      <stop offset="1" stop-color="#edf3ff" />
+    </linearGradient>
+  </defs>
+  <rect width="192" height="192" rx="46" fill="#edf3ff" />
+  <rect x="32" y="32" width="128" height="128" rx="40" fill="url(#eduquestBg192)" />
+  <rect x="35" y="35" width="122" height="122" rx="37" fill="none" stroke="rgba(255,255,255,0.16)" stroke-width="3.2" />
+  <path d="M62 62v68" stroke="url(#eduquestInk192)" stroke-width="13" stroke-linecap="round" />
+  <path d="M62.5 64h37" stroke="url(#eduquestInk192)" stroke-width="13" stroke-linecap="round" />
+  <path d="M62.5 96H90" stroke="url(#eduquestInk192)" stroke-width="13" stroke-linecap="round" />
+  <path d="M62.5 128h37" stroke="url(#eduquestInk192)" stroke-width="13" stroke-linecap="round" />
+  <path d="M114 62a30 30 0 1 0 0 60 30 30 0 0 0 0-60Z" fill="none" stroke="url(#eduquestInk192)" stroke-width="12.4" stroke-linecap="round" stroke-linejoin="round" />
+  <path d="M124.5 115.5 139 130" stroke="url(#eduquestInk192)" stroke-width="12" stroke-linecap="round" />
+  <path d="M127 57c5.6 0 9.9 3.9 10.8 8.9" stroke="#c89a43" stroke-width="5.4" stroke-linecap="round" />
 </svg>

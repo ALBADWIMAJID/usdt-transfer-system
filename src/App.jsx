@@ -2,6 +2,7 @@ import { useEffect } from 'react'
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom'
 import AppShell from './components/AppShell.jsx'
 import ProtectedRoute from './components/ProtectedRoute.jsx'
+import AppLaunchScreen from './components/ui/AppLaunchScreen.jsx'
 import { applyBrandingToDocument, branding } from './config/branding.js'
 import AuthProvider from './context/AuthProvider.jsx'
 import ThemePreferenceProvider from './context/ThemePreferenceProvider.jsx'
@@ -23,7 +24,17 @@ function HomeRedirect() {
   const { loading: tenantLoading } = useTenant()
 
   if (loading || (user && tenantLoading)) {
-    return <div className="screen-message">جار تحميل لوحة التشغيل...</div>
+    return (
+      <AppLaunchScreen
+        stageLabel={user ? 'فتح مساحة العمل' : 'بدء التشغيل'}
+        message={
+          user
+            ? 'جار تجهيز مساحة العمل وربط بيئة التشغيل الحالية.'
+            : 'جار تجهيز واجهة الدخول وتحميل تجربة التشغيل.'
+        }
+        detail={branding.systemName}
+      />
+    )
   }
 
   return <Navigate replace to={user ? '/dashboard' : '/login'} />

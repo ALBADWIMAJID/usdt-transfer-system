@@ -2866,7 +2866,9 @@ function TransferDetailsPage() {
                 >
                   {replacementPaymentSubmitting
                     ? 'جار حفظ الدفعة البديلة...'
-                    : 'حفظ الدفعة البديلة المصححة'}
+                    : isCompactMobileLayout
+                      ? 'حفظ البديلة'
+                      : 'حفظ الدفعة البديلة المصححة'}
                 </button>
                 <button
                   type="button"
@@ -2892,7 +2894,7 @@ function TransferDetailsPage() {
                 }
                 title={replacementPaymentActionDisabledReason || ''}
               >
-                تسجيل دفعة بديلة مصححة
+                {isCompactMobileLayout ? 'دفعة بديلة' : 'تسجيل دفعة بديلة مصححة'}
               </button>
             </div>
           )}
@@ -2956,7 +2958,11 @@ function TransferDetailsPage() {
                 Boolean(paymentVoidActionDisabledReason)
               }
             >
-              {paymentVoidSubmitting ? 'جار حفظ إلغاء الدفعة...' : 'حفظ إلغاء الدفعة'}
+              {paymentVoidSubmitting
+                ? 'جار حفظ إلغاء الدفعة...'
+                : isCompactMobileLayout
+                  ? 'حفظ الإلغاء'
+                  : 'حفظ إلغاء الدفعة'}
             </button>
             <button
               type="button"
@@ -2982,7 +2988,7 @@ function TransferDetailsPage() {
             }
             title={paymentVoidActionDisabledReason || ''}
           >
-            إلغاء الدفعة
+            {isCompactMobileLayout ? 'إلغاء' : 'إلغاء الدفعة'}
           </button>
         </div>
       ),
@@ -3218,6 +3224,14 @@ function TransferDetailsPage() {
   const hiddenPaymentStateKind =
     failedLocalPaymentCount > 0 ? 'error' : hiddenPaymentStateNotice ? 'warning' : 'info'
 
+  const compactLockMessage = !paymentsLoading && paymentsError
+    ? `${paymentsError} لا يمكن تأكيد حالة القفل بالكامل حاليا.`
+    : !paymentsLoading && hasConfirmedServerPayments
+      ? `الحوالة تحتوي على ${payments.length} دفعة، لذلك القيم الأساسية مقفلة.`
+      : !paymentsLoading && !paymentsError && !hasConfirmedServerPayments
+        ? 'لا توجد دفعات مؤكدة بعد، لذلك لم يُفعَّل القفل التشغيلي بعد.'
+        : ''
+
   return (
     <div className="stack transfer-details-page">
       <PageHeader
@@ -3227,14 +3241,6 @@ function TransferDetailsPage() {
         className="no-print transfer-details-page-hero"
         actions={
           <div className="transfer-details-hero-actions">
-            <button
-              type="button"
-              className="button primary transfer-details-primary-action"
-              onClick={handlePrint}
-              disabled={transferLoading || Boolean(transferError) || !transfer}
-            >
-              طباعة الكشف
-            </button>
             <div className="transfer-details-hero-utility-row">
               <Link className="button secondary transfer-details-utility-action" to="/transfers">
                 العودة
@@ -3251,14 +3257,14 @@ function TransferDetailsPage() {
                 }
                 title={transferEditActionDisabledReason || ''}
               >
-                تعديل الحوالة
+                تعديل
               </button>
               <button
                 type="button"
                 className="button secondary transfer-details-utility-action"
                 onClick={handlePaymentsRefresh}
               >
-                تحديث المدفوعات
+                تحديث
               </button>
             </div>
           </div>
@@ -3407,13 +3413,15 @@ function TransferDetailsPage() {
                   <InlineMessage kind="warning">{transferEditActionDisabledReason}</InlineMessage>
                 ) : canUseBroaderTransferEdit ? (
                   <InlineMessage kind="info">
-                    لا توجد دفعات مؤكدة على هذه الحوالة بعد، لذلك يمكن تعديل العميل وقيم التسعير الأساسية
-                    وإعادة احتساب مبلغ التسوية قبل الحفظ.
+                    {isCompactMobileLayout
+                      ? 'يمكن تعديل العميل والتسعير قبل أول دفعة.'
+                      : 'لا توجد دفعات مؤكدة على هذه الحوالة بعد، لذلك يمكن تعديل العميل وقيم التسعير الأساسية وإعادة احتساب مبلغ التسوية قبل الحفظ.'}
                   </InlineMessage>
                 ) : transferEditScopeKnown ? (
                   <InlineMessage kind="warning">
-                    تحتوي هذه الحوالة على دفعات مؤكدة، لذلك يبقى التعديل محصورا في الحالة والملاحظات فقط،
-                    بينما تبقى الحقول المالية وبيانات العميل مقفلة.
+                    {isCompactMobileLayout
+                      ? 'التعديل الآن محصور في الحالة والملاحظات فقط.'
+                      : 'تحتوي هذه الحوالة على دفعات مؤكدة، لذلك يبقى التعديل محصورا في الحالة والملاحظات فقط، بينما تبقى الحقول المالية وبيانات العميل مقفلة.'}
                   </InlineMessage>
                 ) : null}
 
@@ -3424,7 +3432,7 @@ function TransferDetailsPage() {
                     onClick={handleOpenTransferEdit}
                     disabled={Boolean(transferEditActionDisabledReason)}
                   >
-                    فتح نموذج التعديل
+                    {isCompactMobileLayout ? 'فتح التعديل' : 'فتح نموذج التعديل'}
                   </button>
                 </div>
               </>
@@ -3636,7 +3644,7 @@ function TransferDetailsPage() {
         {isOverpaid ? (
           <SectionCard
             title="معالجة زيادة الدفع"
-            description="تُسجل هذه المعالجة كسجل تشغيلي مستقل يشرح كيف تم حسم الزيادة الحالية، من دون تعديل المدفوعات أو مبلغ التسوية."
+            description="تسجيل المعالجة التشغيلية للزيادة الحالية."
             className={[
               'app-section-panel',
               'transfer-details-resolution-section',
@@ -3651,12 +3659,16 @@ function TransferDetailsPage() {
 
             {overpaymentResolutionLoading ? (
               <InlineMessage kind="info">
-                جار التحقق من آخر معالجة مسجلة لهذه الزيادة قبل عرض الإجراء المتاح.
+                {isCompactMobileLayout
+                  ? 'جار التحقق من آخر معالجة لهذه الزيادة.'
+                  : 'جار التحقق من آخر معالجة مسجلة لهذه الزيادة قبل عرض الإجراء المتاح.'}
               </InlineMessage>
             ) : hasResolvedCurrentOverpayment ? (
               <>
                 <InlineMessage kind="success">
-                  تم تسجيل معالجة مطابقة للزيادة الحالية، لذلك أصبحت هذه الزيادة محلولة تشغيليا مع بقاء التاريخ المالي كما هو.
+                  {isCompactMobileLayout
+                    ? 'الزيادة الحالية لها معالجة مسجلة بالفعل.'
+                    : 'تم تسجيل معالجة مطابقة للزيادة الحالية، لذلك أصبحت هذه الزيادة محلولة تشغيليا مع بقاء التاريخ المالي كما هو.'}
                 </InlineMessage>
                 <InfoGrid className="transfer-details-secondary-grid">
                   <InfoCard
@@ -3684,9 +3696,11 @@ function TransferDetailsPage() {
                   {overpaymentResolutionError ||
                     'تعذر التحقق من آخر معالجة مسجلة لهذه الزيادة حاليا.'}
                 </InlineMessage>
-                <p className="support-text">
-                  لا يتم فتح إجراء معالجة جديد قبل معرفة أحدث سجل معالجة محفوظ لهذه الحوالة. حدّث الصفحة أو أعد التحقق بعد عودة الاتصال.
-                </p>
+                {!isCompactMobileLayout ? (
+                  <p className="support-text">
+                    لا يتم فتح إجراء معالجة جديد قبل معرفة أحدث سجل معالجة محفوظ لهذه الحوالة. حدّث الصفحة أو أعد التحقق بعد عودة الاتصال.
+                  </p>
+                ) : null}
                 {!isOffline ? (
                   <div className="inline-actions">
                     <button
@@ -3694,7 +3708,7 @@ function TransferDetailsPage() {
                       className="button secondary"
                       onClick={handleOverpaymentResolutionRefresh}
                     >
-                      إعادة التحقق من آخر معالجة
+                      {isCompactMobileLayout ? 'إعادة التحقق' : 'إعادة التحقق من آخر معالجة'}
                     </button>
                   </div>
                 ) : null}
@@ -3787,9 +3801,11 @@ function TransferDetailsPage() {
                   </form>
                 ) : (
                   <>
-                    <p className="support-text">
-                      استخدم هذا الإجراء فقط بعد مراجعة الدفعات المؤكدة والتأكد من أن الزيادة الحالية قد استردت أو تمت تسويتها خارج هذا السجل، من دون تعديل الحقيقة المالية التاريخية.
-                    </p>
+                    {!isCompactMobileLayout ? (
+                      <p className="support-text">
+                        استخدم هذا الإجراء فقط بعد مراجعة الدفعات المؤكدة والتأكد من أن الزيادة الحالية قد استردت أو تمت تسويتها خارج هذا السجل، من دون تعديل الحقيقة المالية التاريخية.
+                      </p>
+                    ) : null}
                     <div className="inline-actions">
                       <button
                         type="button"
@@ -3797,7 +3813,7 @@ function TransferDetailsPage() {
                         onClick={handleOpenOverpaymentResolutionForm}
                         disabled={Boolean(overpaymentResolutionActionDisabledReason)}
                       >
-                        معالجة زيادة الدفع
+                        {isCompactMobileLayout ? 'فتح المعالجة' : 'معالجة زيادة الدفع'}
                       </button>
                     </div>
                   </>
@@ -3862,17 +3878,19 @@ function TransferDetailsPage() {
         >
           {hasPartialTransferOnlyOfflineState ? (
             <InlineMessage kind="warning" className="transfer-details-history-inline-status">
-              {paymentsError} سيظهر أدناه ما توفر فقط من السجل المؤكد والعناصر المحلية.
+              {isCompactMobileLayout
+                ? `${paymentsError} يظهر المتاح فقط من السجل.`
+                : `${paymentsError} سيظهر أدناه ما توفر فقط من السجل المؤكد والعناصر المحلية.`}
             </InlineMessage>
           ) : null}
           {paymentVoidSubmitSuccess ? (
             <InlineMessage kind="success" className="transfer-details-history-inline-status">
-              {paymentVoidSubmitSuccess}
+              {isCompactMobileLayout ? 'تم حفظ إلغاء الدفعة.' : paymentVoidSubmitSuccess}
             </InlineMessage>
           ) : null}
           {replacementPaymentSubmitSuccess ? (
             <InlineMessage kind="success" className="transfer-details-history-inline-status">
-              {replacementPaymentSubmitSuccess}
+              {isCompactMobileLayout ? 'تم حفظ الدفعة البديلة.' : replacementPaymentSubmitSuccess}
             </InlineMessage>
           ) : null}
           {paymentVoidActionDisabledReason && hasEligibleConfirmedPaymentForVoid ? (
@@ -3897,7 +3915,7 @@ function TransferDetailsPage() {
 
         {transfer ? (
           <SectionCard
-            title="تفاصيل إضافية"
+            title="معلومات الملف"
             description="مرجع وتسعير وملاحظات الحوالة."
             className={[
               'app-section-panel',
@@ -3942,17 +3960,23 @@ function TransferDetailsPage() {
           ) : null}
           {!paymentsLoading && paymentsError ? (
             <InlineMessage kind="warning">
-              {paymentsError} لذلك لا يمكن تأكيد حالة قفل الحوالة محليًا بشكل كامل حتى يعود سجل المدفوعات المؤكد أو يُعاد تحميله من الخادم.
+              {isCompactMobileLayout
+                ? compactLockMessage
+                : `${paymentsError} لذلك لا يمكن تأكيد حالة قفل الحوالة محليًا بشكل كامل حتى يعود سجل المدفوعات المؤكد أو يُعاد تحميله من الخادم.`}
             </InlineMessage>
           ) : null}
           {!paymentsLoading && hasConfirmedServerPayments ? (
             <InlineMessage kind="warning">
-              تحتوي هذه الحوالة بالفعل على {payments.length} دفعة. يجب اعتبار الحقول الأساسية مثل العميل والكمية والأسعار ووضع التسعير والعمولة والإجمالي والمبلغ المستحق مقفلة. كما أن قاعدة البيانات تمنع تعديل هذه القيم بعد وجود دفعات.
+              {isCompactMobileLayout
+                ? compactLockMessage
+                : `تحتوي هذه الحوالة بالفعل على ${payments.length} دفعة. يجب اعتبار الحقول الأساسية مثل العميل والكمية والأسعار ووضع التسعير والعمولة والإجمالي والمبلغ المستحق مقفلة. كما أن قاعدة البيانات تمنع تعديل هذه القيم بعد وجود دفعات.`}
             </InlineMessage>
           ) : null}
           {!paymentsLoading && !paymentsError && !hasConfirmedServerPayments ? (
             <p className="support-text">
-              لا توجد مدفوعات مسجلة بعد. إذا تمت إضافة واجهة تعديل لاحقًا فيمكن إبقاء القيم الأساسية قابلة للتعديل حتى أول دفعة.
+              {isCompactMobileLayout
+                ? compactLockMessage
+                : 'لا توجد مدفوعات مسجلة بعد. إذا تمت إضافة واجهة تعديل لاحقًا فيمكن إبقاء القيم الأساسية قابلة للتعديل حتى أول دفعة.'}
             </p>
           ) : null}
         </SectionCard>
@@ -3966,7 +3990,6 @@ function TransferDetailsPage() {
         loading={transferLoading}
         hasTransfer={Boolean(transfer)}
         referenceNumber={referenceNumber}
-        transferId={displayTransferId}
         customerName={displayCustomerName}
         status={transfer?.status || ''}
         createdAtLabel={transferCreatedAtLabel}

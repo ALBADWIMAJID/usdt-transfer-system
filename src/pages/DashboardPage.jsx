@@ -1397,7 +1397,7 @@ function DashboardPage() {
         <div className="stack dashboard-page">
           <PageHeader
             eyebrow="مركز العمليات المالية اليومية"
-            title="لوحة التشغيل المالي"
+            title="الرئيسية المالية"
             description="ابدأ يوم العمل من هنا: ماذا دُفع اليوم، ما المتبقي القائم، أين توجد المخاطر، وما الحوالات التي تحتاج حركة مباشرة الآن."
             actions={
               <>

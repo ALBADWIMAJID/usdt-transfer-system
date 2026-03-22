@@ -1,7 +1,8 @@
 import { useState } from 'react'
 import { Navigate, useLocation } from 'react-router-dom'
 import { branding } from '../config/branding.js'
-import BrandLogo from '../components/ui/BrandLogo.jsx'
+import AppLaunchScreen from '../components/ui/AppLaunchScreen.jsx'
+import BrandOrbitMark from '../components/ui/BrandOrbitMark.jsx'
 import ThemePreferenceControl from '../components/ui/ThemePreferenceControl.jsx'
 import { useAuth } from '../context/auth-context.js'
 
@@ -17,6 +18,26 @@ function LoginPage() {
 
   if (!loading && user) {
     return <Navigate replace to={redirectTo} />
+  }
+
+  if (loading) {
+    return (
+      <AppLaunchScreen
+        stageLabel="التحقق من الجلسة"
+        message="جار تجهيز الوصول الآمن إلى مساحة التشغيل."
+        detail={branding.systemName}
+      />
+    )
+  }
+
+  if (submitting) {
+    return (
+      <AppLaunchScreen
+        stageLabel="تسجيل الدخول"
+        message="جار تأكيد بيانات المشغل وفتح مساحة العمل."
+        detail={branding.systemName}
+      />
+    )
   }
 
   const handleSubmit = async (event) => {
@@ -39,7 +60,10 @@ function LoginPage() {
     <div className="auth-screen">
       <section className="auth-card">
         <div className="auth-brand-panel">
-          <BrandLogo variant="hero" className="auth-brand-logo" />
+          <div className="auth-brand-mark-shell">
+            <BrandOrbitMark size="lg" className="auth-brand-mark" />
+            <span className="auth-brand-pill">منصة تحويلات وتشغيل احترافية</span>
+          </div>
           <div className="auth-brand-copy">
             <p className="eyebrow">{branding.systemName}</p>
             <h1>تسجيل الدخول</h1>
@@ -93,7 +117,7 @@ function LoginPage() {
         <ThemePreferenceControl className="auth-theme-preference" />
 
         <p className="auth-footer">
-          بعد نجاح المصادقة سيتم تحويلك مباشرة إلى لوحة التشغيل الخاصة بـ {branding.shortName}.
+          بعد نجاح المصادقة سيتم تحويلك مباشرة إلى مساحة العمل الخاصة بـ {branding.shortName}.
         </p>
       </section>
     </div>

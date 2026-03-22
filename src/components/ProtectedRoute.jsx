@@ -1,4 +1,5 @@
 import { Navigate, Outlet, useLocation } from 'react-router-dom'
+import AppLaunchScreen from './ui/AppLaunchScreen.jsx'
 import { useAuth } from '../context/auth-context.js'
 import { useTenant } from '../context/tenant-context.js'
 
@@ -46,7 +47,12 @@ function ProtectedRoute() {
   const { bootstrapError, bootstrapStatus, loading: tenantLoading, refreshTenantContext } = useTenant()
 
   if (loading) {
-    return <div className="screen-message">جار التحقق من الجلسة...</div>
+    return (
+      <AppLaunchScreen
+        stageLabel="التحقق من الجلسة"
+        message="جار تأكيد صلاحية الجلسة وتأمين الدخول إلى مساحة العمل."
+      />
+    )
   }
 
   if (!user) {
@@ -54,7 +60,12 @@ function ProtectedRoute() {
   }
 
   if (tenantLoading) {
-    return <div className="screen-message">جار تهيئة جهة التشغيل الحالية...</div>
+    return (
+      <AppLaunchScreen
+        stageLabel="تهيئة جهة التشغيل"
+        message="جار فتح بيئة العمل وربط ملف التشغيل الحالي قبل الدخول."
+      />
+    )
   }
 
   if (bootstrapStatus === 'error') {

@@ -51,7 +51,7 @@ function Icon({ name }) {
     viewBox: '0 0 24 24',
     fill: 'none',
     stroke: 'currentColor',
-    strokeWidth: '1.8',
+    strokeWidth: '1.95',
     strokeLinecap: 'round',
     strokeLinejoin: 'round',
     'aria-hidden': true,
@@ -88,8 +88,8 @@ function Icon({ name }) {
     case 'plus':
       return (
         <svg {...commonProps}>
-          <path d="M12 5v14" />
-          <path d="M5 12h14" />
+          <path d="M12 6.25v11.5" />
+          <path d="M6.25 12h11.5" />
         </svg>
       )
     case 'menu':
@@ -110,6 +110,13 @@ function Icon({ name }) {
       return (
         <svg {...commonProps}>
           <path d="m9 6 6 6-6 6" />
+        </svg>
+      )
+    case 'close':
+      return (
+        <svg {...commonProps}>
+          <path d="m7 7 10 10" />
+          <path d="m17 7-10 10" />
         </svg>
       )
     default:
@@ -138,7 +145,7 @@ function getCurrentSection(pathname) {
     return { title: 'الحوالات' }
   }
 
-  return { title: 'لوحة التحكم' }
+  return { title: 'الرئيسية' }
 }
 
 function AppShell() {
@@ -191,6 +198,15 @@ function AppShell() {
         <div className="sidebar-panel">
           <div className="sidebar-header">
             <BrandLockup tone="sidebar" size="md" showTagline={false} />
+
+            <button
+              type="button"
+              className="icon-button mobile-only sidebar-close-button"
+              onClick={() => setMobileNavOpen(false)}
+              aria-label="إغلاق القائمة"
+            >
+              <Icon name="close" />
+            </button>
 
             <button
               type="button"
@@ -255,7 +271,7 @@ function AppShell() {
           <div className="topbar-leading">
             <button
               type="button"
-              className="icon-button mobile-only"
+              className="icon-button mobile-only topbar-menu-button"
               onClick={() => setMobileNavOpen(true)}
               aria-label="فتح القائمة"
               aria-expanded={mobileNavOpen}
@@ -282,7 +298,7 @@ function AppShell() {
 
             <button
               type="button"
-              className="button secondary desktop-only"
+              className="button secondary desktop-only topbar-utility-action"
               onClick={handleSignOut}
             >
               تسجيل الخروج

@@ -80,6 +80,8 @@ function OperationsDrillDownSheet({
 
       <aside className="operations-sheet" role="dialog" aria-modal="true" aria-label={title}>
         <div className="operations-sheet-panel">
+          <div className="operations-sheet-handle" aria-hidden="true" />
+
           <header className="operations-sheet-header">
             <div className="operations-sheet-copy">
               <p className="eyebrow operations-sheet-kicker">تفصيل المؤشر</p>
@@ -89,7 +91,7 @@ function OperationsDrillDownSheet({
 
             <button
               type="button"
-              className="icon-button operations-sheet-close"
+              className="icon-button operations-sheet-close operations-sheet-close-button"
               aria-label="إغلاق اللوحة"
               onClick={onClose}
             >
@@ -124,13 +126,21 @@ function OperationsDrillDownSheet({
               ) : null}
 
               {onViewAll ? (
-                <button type="button" className="button secondary" onClick={handleViewAll}>
+                <button
+                  type="button"
+                  className="button secondary operations-sheet-utility-action"
+                  onClick={handleViewAll}
+                >
                   {viewAllLabel}
                 </button>
               ) : null}
 
               {!onViewAll && viewAllTo ? (
-                <Link className="button secondary" to={viewAllTo} onClick={onClose}>
+                <Link
+                  className="button secondary operations-sheet-utility-action"
+                  to={viewAllTo}
+                  onClick={onClose}
+                >
                   {viewAllLabel}
                 </Link>
               ) : null}
@@ -139,7 +149,7 @@ function OperationsDrillDownSheet({
 
           <div className="operations-sheet-body">
             {filteredItems.length === 0 ? (
-              <EmptyState>
+              <EmptyState className="operations-sheet-empty-state">
                 {normalizedQuery ? 'لا توجد نتائج مطابقة داخل هذا التفصيل.' : emptyMessage}
               </EmptyState>
             ) : (

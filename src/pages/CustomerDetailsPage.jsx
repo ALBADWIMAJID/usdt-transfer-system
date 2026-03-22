@@ -1664,14 +1664,14 @@ function CustomerDetailsPage() {
                 onClick={handleToggleEditCustomer}
                 disabled={editDisabled}
               >
-                {isEditingCustomer ? 'إغلاق التعديل' : 'تعديل البيانات'}
+                {isEditingCustomer ? 'إغلاق' : 'تعديل'}
               </button>
               <button
                 type="button"
                 className="button secondary customer-details-utility-action"
                 onClick={handleTransfersRefresh}
               >
-                تحديث الحوالات
+                تحديث
               </button>
             </div>
           </div>

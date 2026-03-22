@@ -47,7 +47,7 @@ function DashboardMobileLite({
     <div className="stack dashboard-mobile-lite">
       <PageHeader
         className="dashboard-mobile-lite-header"
-        title="لوحة التشغيل"
+        title="الرئيسية"
         actions={
           <Link className="button primary dashboard-mobile-lite-primary-action" to="/transfers/new">
             حوالة جديدة

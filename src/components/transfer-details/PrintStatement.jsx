@@ -35,7 +35,6 @@ function PrintStatement({
   loading,
   hasTransfer,
   referenceNumber,
-  transferId,
   customerName,
   status,
   createdAtLabel,
@@ -92,7 +91,7 @@ function PrintStatement({
             <div className="statement-preview-copy">
               <p className="eyebrow">معاينة الطباعة</p>
               <h3>{displayReference}</h3>
-              <p>مراجعة سريعة قبل الطباعة أو المشاركة.</p>
+              <p>كشف مختصر باسم {customerName} قبل الطباعة.</p>
             </div>
             <button type="button" className="button primary statement-preview-print-button" onClick={onPrint}>
               طباعة الكشف
@@ -175,12 +174,13 @@ function PrintStatement({
             <div className="statement-brand-copy">
               <p className="eyebrow">{branding.printTitle}</p>
               <h2>{displayReference}</h2>
-              <p>صادر من {branding.officeName} لصالح {customerName}</p>
+              <p>كشف حوالة باسم {customerName}</p>
             </div>
           </div>
 
           <div className="statement-meta">
             <StatusBadge status={status} />
+            <p>جهة الإصدار: {branding.officeName}</p>
             <p>رقم المرجع: {displayReference}</p>
             <p>تاريخ الإنشاء: {displayCreatedAtLabel}</p>
           </div>
