@@ -3039,7 +3039,7 @@ input[type='password'],
   font: inherit;
   font-size: 0.63rem;
   font-weight: 700;
-  color: var(--brand-secondary);
+  color: rgba(223, 183, 98, 1);
   cursor: pointer;
   box-shadow: none;
 }
@@ -3261,7 +3261,7 @@ input[type='password'],
 
 .dashboard-mobile-lite-chip span {
   font-weight: 800;
-  color: var(--brand-secondary);
+  color: rgba(236, 208, 24, 1);
 }
 
 .dashboard-mobile-lite-block {
@@ -3303,12 +3303,13 @@ input[type='password'],
   font: inherit;
   font-size: 0.63rem;
   font-weight: 700;
-  color: var(--brand-secondary);
+  color: rgba(167, 243, 201, 1);
   cursor: pointer;
   text-decoration: none;
 }
 
 a.dashboard-mobile-lite-tertiary {
+  color: rgba(132, 191, 163, 1);
   text-decoration: none;
 }
 
@@ -3392,6 +3393,10 @@ a.dashboard-mobile-lite-tertiary {
   text-align: left;
   max-width: 42%;
   line-height: 1.25;
+}
+
+.dashboard-mobile-lite-row-meta.record-muted-strong {
+  color: rgba(133, 191, 165, 1);
 }
 
 .dashboard-mobile-lite-row-aside {
