@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/auth-context.js'
 import useSyncStatus from '../hooks/useSyncStatus.js'
@@ -155,6 +155,17 @@ function AppShell() {
   const shouldShowShellBanner = ['offline', 'pending', 'blocked', 'syncing', 'error'].includes(
     syncStatus.status
   )
+
+  useEffect(() => {
+    setMobileNavOpen(false)
+
+    if (typeof window !== 'undefined' && typeof window.__refreshAppViewport === 'function') {
+      window.__refreshAppViewport()
+      window.setTimeout(() => {
+        window.__refreshAppViewport()
+      }, 80)
+    }
+  }, [location.pathname])
 
   const handleSignOut = async () => {
     setSignOutError('')

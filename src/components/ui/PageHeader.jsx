@@ -29,7 +29,7 @@ function PageHeader({
           ) : null}
         </div>
 
-        {actions ? <PageActions>{actions}</PageActions> : null}
+        {actions ? <PageActions className="page-hero-actions-slot">{actions}</PageActions> : null}
       </div>
 
       {children}

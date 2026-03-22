@@ -21,10 +21,70 @@
         }
       })();
     </script>
+    <script>
+      (function () {
+        var root = document.documentElement;
+
+        function applyViewportSize() {
+          var viewport = window.visualViewport;
+          var width = Math.max(Math.round((viewport && viewport.width) || window.innerWidth || 0), 320);
+          var height = Math.max(Math.round((viewport && viewport.height) || window.innerHeight || 0), 320);
+
+          root.style.setProperty('--app-vw', width + 'px');
+          root.style.setProperty('--app-vh', height + 'px');
+        }
+
+        function recoverViewport() {
+          applyViewportSize();
+          window.requestAnimationFrame(function () {
+            window.requestAnimationFrame(applyViewportSize);
+          });
+        }
+
+        window.__refreshAppViewport = recoverViewport;
+
+        applyViewportSize();
+
+        window.addEventListener('resize', recoverViewport, { passive: true });
+        window.addEventListener(
+          'orientationchange',
+          function () {
+            window.setTimeout(recoverViewport, 80);
+          },
+          { passive: true }
+        );
+        window.addEventListener(
+          'pageshow',
+          function () {
+            window.setTimeout(recoverViewport, 0);
+          },
+          { passive: true }
+        );
+        document.addEventListener(
+          'focusin',
+          function () {
+            window.setTimeout(applyViewportSize, 32);
+          },
+          true
+        );
+        document.addEventListener(
+          'focusout',
+          function () {
+            window.setTimeout(recoverViewport, 120);
+          },
+          true
+        );
+
+        if (window.visualViewport) {
+          window.visualViewport.addEventListener('resize', applyViewportSize, { passive: true });
+          window.visualViewport.addEventListener('scroll', applyViewportSize, { passive: true });
+        }
+      })();
+    </script>
     <meta charset="UTF-8" />
     <meta
       name="viewport"
-      content="width=device-width, initial-scale=1.0, viewport-fit=cover, interactive-widget=resizes-content"
+      content="width=device-width, initial-scale=1, viewport-fit=cover, interactive-widget=resizes-content"
     />
     <meta name="description" content="نظام تشغيل يومي لإدارة الحوالات والتسويات والمدفوعات." />
     <meta name="application-name" content="EDUQUEST" />

@@ -4,6 +4,31 @@ import DetailList from '../ui/DetailList.jsx'
 import InlineMessage from '../ui/InlineMessage.jsx'
 import StatusBadge from '../ui/StatusBadge.jsx'
 
+function formatStatementReference(referenceNumber) {
+  const normalizedReference = String(referenceNumber || '')
+    .replace(/\s+/g, ' ')
+    .trim()
+
+  return normalizedReference || 'حوالة'
+}
+
+function formatStatementDate(value) {
+  if (!value) {
+    return '--'
+  }
+
+  const parsedDate = new Date(value)
+
+  if (Number.isNaN(parsedDate.getTime())) {
+    return value
+  }
+
+  return new Intl.DateTimeFormat('ar', {
+    dateStyle: 'medium',
+    timeStyle: 'short',
+  }).format(parsedDate)
+}
+
 function PrintStatement({
   className = '',
   errorMessage,
@@ -34,6 +59,13 @@ function PrintStatement({
   ]
     .filter(Boolean)
     .join(' ')
+  const displayReference = formatStatementReference(referenceNumber)
+  const displayCreatedAtLabel = formatStatementDate(createdAtLabel)
+  const clientTransferRows = transferRows.filter((row) => {
+    const rowLabel = String(row?.label || '')
+
+    return !/المعرّف الداخلي|المعرف الداخلي|(^|\s)id($|\s)/i.test(rowLabel)
+  })
   const previewPaymentRows = paymentRows.slice(0, 4)
 
   if (errorMessage) {
@@ -59,7 +91,7 @@ function PrintStatement({
           <div className="statement-preview-head">
             <div className="statement-preview-copy">
               <p className="eyebrow">معاينة الطباعة</p>
-              <h3>{referenceNumber || `حوالة #${transferId}`}</h3>
+              <h3>{displayReference}</h3>
               <p>مراجعة سريعة قبل الطباعة أو المشاركة.</p>
             </div>
             <button type="button" className="button primary statement-preview-print-button" onClick={onPrint}>
@@ -88,7 +120,7 @@ function PrintStatement({
               <div className="statement-preview-section">
                 <strong>بيانات الحوالة</strong>
                 <div className="statement-preview-list">
-                  {transferRows.slice(0, 3).map((row) => (
+                  {clientTransferRows.slice(0, 3).map((row) => (
                     <div key={`${row.label}-${row.value}`} className="statement-preview-row">
                       <span>{row.label}</span>
                       <bdi>{row.value}</bdi>
@@ -125,7 +157,7 @@ function PrintStatement({
                           <strong>{payment.amountLabel}</strong>
                           <p>{payment.methodLabel}</p>
                         </div>
-                        <time>{payment.paidAtLabel}</time>
+                        <time>{formatStatementDate(payment.paidAtLabel)}</time>
                       </article>
                     ))}
                   </div>
@@ -142,23 +174,22 @@ function PrintStatement({
             <BrandLogo variant="print" className="statement-brand-logo" />
             <div className="statement-brand-copy">
               <p className="eyebrow">{branding.printTitle}</p>
-              <h2>{referenceNumber || `حوالة #${transferId}`}</h2>
+              <h2>{displayReference}</h2>
               <p>صادر من {branding.officeName} لصالح {customerName}</p>
             </div>
           </div>
 
           <div className="statement-meta">
             <StatusBadge status={status} />
-            <p>رقم المرجع: {referenceNumber}</p>
-            <p className="ltr">ID: {transferId}</p>
-            <p>تاريخ الإنشاء: {createdAtLabel}</p>
+            <p>رقم المرجع: {displayReference}</p>
+            <p>تاريخ الإنشاء: {displayCreatedAtLabel}</p>
           </div>
         </div>
 
         <div className="statement-grid">
           <article className="statement-card">
             <h3>ملخص الحوالة</h3>
-            <DetailList rows={transferRows} className="statement-list" rowClassName="statement-row" />
+            <DetailList rows={clientTransferRows} className="statement-list" rowClassName="statement-row" />
           </article>
 
           <article className="statement-card">
@@ -191,9 +222,9 @@ function PrintStatement({
                     <td>{payment.amountLabel}</td>
                     <td>{payment.methodLabel}</td>
                     <td>
-                      {payment.paidAtLabel}
+                      {formatStatementDate(payment.paidAtLabel)}
                       <br />
-                      <small>تم التسجيل: {payment.createdAtLabel}</small>
+                      <small>تم التسجيل: {formatStatementDate(payment.createdAtLabel)}</small>
                     </td>
                     <td>{payment.noteText}</td>
                   </tr>
