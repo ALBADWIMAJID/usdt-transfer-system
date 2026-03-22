@@ -2426,10 +2426,15 @@ input[type='password'],
 
 .page-hero .page-actions .button.secondary {
   min-height: 34px;
+  width: 68px;
   padding: 0.28rem 0.58rem;
   border-radius: 999px;
   box-shadow: none;
   font-size: 0.76rem;
+}
+
+.page-hero .page-actions .button.secondary:not(:disabled) {
+  opacity: 1;
 }
 
 .page-hero .page-actions .button.primary {
@@ -3655,6 +3660,7 @@ a.dashboard-mobile-lite-tertiary {
 
 .app-section-nav--two {
   grid-template-columns: repeat(2, minmax(0, 1fr));
+  height: 59px;
 }
 
 .app-section-tab {
@@ -6532,9 +6538,11 @@ a:hover article {
   }
 
   .topbar .topbar-connection-badge {
-    min-height: 16px;
+    min-height: 19px;
+    height: 19px;
     width: 16px;
     min-width: 16px;
+    margin: -58px -87px;
     padding: 0;
     gap: 0;
     border-radius: 999px;
@@ -7167,7 +7175,7 @@ a:hover article {
   }
 
   .transfers-queue-page .transfers-queue-page-header.page-hero h1 {
-    font-size: 1rem;
+    font-size: 0px;
     line-height: 1.16;
   }
 
@@ -8221,7 +8229,7 @@ a:hover article {
   }
 
   .customers-portfolio-page .page-hero.customers-page-hero h1 {
-    font-size: 1rem;
+    font-size: 0px;
     line-height: 1.16;
   }
 
@@ -8253,8 +8261,10 @@ a:hover article {
   .customers-portfolio-page .customers-page-hero-meta .support-text-inline {
     display: block;
     margin: 0;
+    width: 383px;
     font-size: var(--type-helper-size);
     line-height: var(--type-helper-leading);
+    text-align: center;
     color: var(--theme-text-secondary);
   }
 
@@ -9929,6 +9939,14 @@ a:hover article {
     border: 0.5px solid var(--mobile-hairline);
   }
 
+  .topbar .topbar-connection-badge {
+    min-height: 19px;
+    height: 19px;
+    margin: -58px -87px;
+    padding: 0;
+    border: none;
+  }
+
   .page-intro p,
   .section-card-copy p,
   .support-text,
@@ -11449,7 +11467,7 @@ a:hover article {
 .app-section-nav {
   position: relative;
   gap: 0.4rem;
-  padding: 0.36rem;
+  padding: 0 0.36rem;
   border-radius: 18px;
   background: rgba(240, 244, 252, 0.92);
   border-color: rgba(var(--brand-secondary-rgb), 0.07);
