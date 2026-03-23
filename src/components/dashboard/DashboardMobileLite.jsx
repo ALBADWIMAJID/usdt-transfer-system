@@ -67,6 +67,27 @@ function DashboardMobileLite({
         </div>
       </PageHeader>
 
+      <section className="dashboard-mobile-utility" aria-label="إجراءات سريعة للرئيسية">
+        <div className="dashboard-mobile-utility-copy">
+          <strong>ملخص اليوم</strong>
+          <span>{lastUpdatedLabel || 'البيانات جاهزة للمراجعة التشغيلية'}</span>
+        </div>
+
+        <div className="dashboard-mobile-utility-actions">
+          <Link className="button primary dashboard-mobile-utility-primary" to="/transfers/new">
+            حوالة جديدة
+          </Link>
+          <button
+            type="button"
+            className="button secondary dashboard-mobile-utility-refresh"
+            onClick={loadDashboard}
+            disabled={loading}
+          >
+            {loading ? 'جار التحديث...' : 'تحديث'}
+          </button>
+        </div>
+      </section>
+
       <div className="dashboard-mobile-lite-status-strip">
         <OfflineSnapshotNotice className="dashboard-mobile-lite-offline" snapshotState={snapshotState} />
         {!isConfigured ? <InlineMessage kind="error">{loadError}</InlineMessage> : null}
@@ -232,7 +253,6 @@ function DashboardMobileLite({
                     ) : null}
                   </div>
                 )}
-
               </>
             ) : null}
           </div>

@@ -19,6 +19,8 @@ function PaymentForm({
   submitLabel,
   compactView = false,
 }) {
+  const resolvedActionMeta = compactView ? actionMeta.slice(0, 2) : actionMeta
+
   return (
     <>
       <FormMessages
@@ -36,18 +38,22 @@ function PaymentForm({
         ]
           .filter(Boolean)
           .join(' ')}
-      >
+        >
         <div className="payment-action-head">
           <div className="payment-action-copy">
-            <p className="eyebrow">منطقة الإجراء</p>
+            {!compactView ? <p className="eyebrow">منطقة الإجراء</p> : null}
             <h3>{actionTitle}</h3>
-            <p>{actionDescription}</p>
+            {actionDescription ? <p>{actionDescription}</p> : null}
           </div>
         </div>
 
-        {actionMeta.length > 0 ? (
-          <div className="payment-action-meta">
-            {actionMeta.map((item) => (
+        {resolvedActionMeta.length > 0 ? (
+          <div
+            className={['payment-action-meta', compactView ? 'payment-action-meta--compact' : '']
+              .filter(Boolean)
+              .join(' ')}
+          >
+            {resolvedActionMeta.map((item) => (
               <div key={`${item.label}-${item.value}`} className="payment-action-meta-item">
                 <span>{item.label}</span>
                 <strong>{item.value}</strong>

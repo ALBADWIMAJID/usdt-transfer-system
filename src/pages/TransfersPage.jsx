@@ -38,7 +38,7 @@ import {
 import { supabase } from '../lib/supabase.js'
 
 const QUEUE_FILTER_OPTIONS = [
-  { value: 'all', label: 'كل السجل' },
+  { value: 'all', label: 'الكل' },
   { value: 'needs_follow_up', label: 'يتطلب متابعة' },
   { value: 'overpaid', label: 'فوق المطلوب' },
   { value: 'partial_outstanding', label: 'مدفوعة جزئيا' },
@@ -57,8 +57,8 @@ const DASHBOARD_FOCUS_LABELS = {
 }
 
 const TRANSFERS_PAGE_SECTIONS = [
-  { key: 'summary', label: 'مؤشرات الصف', description: 'ملخص الأداء العام للصف' },
-  { key: 'queue', label: 'صف المتابعة', description: 'بحث، تصفية، وقائمة الحوالات' },
+  { key: 'summary', label: 'المؤشرات', description: 'ملخص الصف' },
+  { key: 'queue', label: 'المتابعة', description: 'البحث والقائمة' },
 ]
 
 function getValidFilterValue(rawValue, options, fallback = 'all') {
@@ -890,14 +890,17 @@ function TransfersPage() {
 
   const transferCountLabel = loading
     ? 'جار تحميل صف الحوالات...'
-    : `عرض ${filteredTransfers.length} من أصل ${transfers.length} حوالة • ${actionableTransfers.length} بحاجة متابعة`
+    : `${filteredTransfers.length} من ${transfers.length} • ${actionableTransfers.length} متابعة`
   const queueScopeLabel = hasActiveFilters
     ? 'الأولوية الحالية مبنية على نتائج البحث والتصفية المعروضة أمامك.'
     : 'الحوالات مرتبة هنا حسب أولوية المتابعة اليومية: فوق المطلوب، ثم الجزئية، ثم المفتوحة.'
-  const queueContextTitle = hasActiveFilters ? 'نتائج التصفية الحالية' : 'ترتيب المتابعة اليومي'
-  const queueContextSummary = hasActiveFilters
+  const transferMobileCountLabel = loading
     ? transferCountLabel
-    : 'تبدأ الأولوية من الحوالات فوق المطلوب، ثم المدفوعة جزئيا، ثم المفتوحة.'
+    : `${filteredTransfers.length} من ${transfers.length} • ${actionableTransfers.length} متابعة`
+  const compactQueueContextTitle = hasActiveFilters ? 'النتائج الحالية' : 'ترتيب المتابعة'
+  const compactQueueContextSummary = hasActiveFilters
+    ? transferMobileCountLabel
+    : 'فوق المطلوب، ثم الجزئية، ثم المفتوحة.'
   const handleClearFilters = () => {
     setSearchQuery('')
     setStatusFilter('all')
@@ -941,7 +944,10 @@ function TransfersPage() {
         </Link>
 
         <div className="transfers-mobile-utility-meta">
-          <p className="support-text transfers-mobile-count">{transferCountLabel}</p>
+          <div className="transfers-mobile-utility-copy">
+            <strong>الحوالات</strong>
+            <p className="support-text transfers-mobile-count">{transferMobileCountLabel}</p>
+          </div>
 
           <button
             type="button"
@@ -992,8 +998,8 @@ function TransfersPage() {
 
       <div className="app-section-workspace">
         <SectionCard
-          title="مؤشرات صف الحوالات"
-          description="أرقام وأداء صف الحوالات في نظرة واحدة."
+          title="المؤشرات"
+          description="ملخص الصف الحالي."
           className={[
             'app-section-panel',
             'transfers-queue-summary-panel',
@@ -1008,7 +1014,7 @@ function TransfersPage() {
 
         <SectionCard
           title="صف المتابعة"
-          description="ابحث بسرعة وافتح الحوالات التي تحتاج حركة اليوم."
+          description="ابحث ثم افتح الحوالة المطلوبة."
           className={[
             'app-section-panel',
             'transfers-queue-panel',
@@ -1018,8 +1024,8 @@ function TransfersPage() {
             .join(' ')}
         >
           <div className="transfers-queue-context-strip" aria-label="سياق صف المتابعة">
-            <strong>{queueContextTitle}</strong>
-            <p>{queueContextSummary}</p>
+            <strong>{compactQueueContextTitle}</strong>
+            <p>{compactQueueContextSummary}</p>
           </div>
 
           <TransfersFilterBar

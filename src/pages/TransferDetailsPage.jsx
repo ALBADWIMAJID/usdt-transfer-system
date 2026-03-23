@@ -449,6 +449,13 @@ function TransferDetailsPage() {
 
     return window.matchMedia(MOBILE_TRANSFER_DETAILS_QUERY).matches
   })
+  const [isSecondaryInfoOpen, setIsSecondaryInfoOpen] = useState(() => {
+    if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') {
+      return true
+    }
+
+    return !window.matchMedia(MOBILE_TRANSFER_DETAILS_QUERY).matches
+  })
   const [activeSections, setActiveSections] = useState({})
   const [transfer, setTransfer] = useState(null)
   const [transferLoading, setTransferLoading] = useState(Boolean(isConfigured))
@@ -528,6 +535,10 @@ function TransferDetailsPage() {
       mediaQuery.removeEventListener('change', handleChange)
     }
   }, [])
+
+  useEffect(() => {
+    setIsSecondaryInfoOpen(!isCompactMobileLayout)
+  }, [transferId, isCompactMobileLayout])
 
   const handleSectionChange = (nextSection) => {
     setActiveSections((current) => {
@@ -2673,7 +2684,21 @@ function TransferDetailsPage() {
   ]
 
   const overviewFollowUpItems = isCompactMobileLayout ? followUpItems.slice(0, 1) : followUpItems
-  const overviewFollowUpChips = isCompactMobileLayout ? followUpChips.slice(0, 3) : followUpChips
+  const compactOverviewFollowUpChips = [
+    followUpChips[0],
+    hasLocalPendingPayments ? followUpChips.find((chip) => chip.label === 'محلي') : null,
+    hasResolvedCurrentOverpayment
+      ? followUpChips.find((chip) => chip.label === 'نوع المعالجة')
+      : null,
+    followUpChips.find((chip) => chip.label === 'آخر حركة'),
+    followUpChips.find((chip) => chip.label === 'الدفعات'),
+  ]
+    .filter(Boolean)
+    .filter(
+      (chip, index, chips) => chips.findIndex((candidate) => candidate.label === chip.label) === index
+    )
+    .slice(0, 2)
+  const overviewFollowUpChips = isCompactMobileLayout ? compactOverviewFollowUpChips : followUpChips
 
   const paymentEntries = payments.map((payment, index) => ({
     id: payment.id ?? `${payment.created_at}-${payment.amount_rub}`,
@@ -3363,7 +3388,7 @@ function TransferDetailsPage() {
       <div className="app-section-workspace no-print">
         <SectionCard
           title="نظرة عامة"
-          description="ملخص سريع لوضع الحوالة."
+          description={isCompactMobileLayout ? '' : 'ملخص سريع لوضع الحوالة.'}
           className={[
             'app-section-panel',
             'transfer-details-summary-section',
@@ -3400,6 +3425,7 @@ function TransferDetailsPage() {
               tone={followUpState}
               chips={overviewFollowUpChips}
               items={overviewFollowUpItems}
+              compactView={isCompactMobileLayout}
             />
           ) : null}
         </SectionCard>
@@ -3438,9 +3464,9 @@ function TransferDetailsPage() {
         ) : null}
 
         {transfer ? (
-          <SectionCard
-            title="تعديل الحوالة"
-            description="تعديل آمن لبيانات الحوالة."
+        <SectionCard
+          title="تعديل الحوالة"
+          description={isCompactMobileLayout ? '' : 'تعديل آمن لبيانات الحوالة.'}
             className={[
               'app-section-panel',
               'transfer-details-edit-section',
@@ -3691,9 +3717,9 @@ function TransferDetailsPage() {
         ) : null}
 
         {isOverpaid ? (
-          <SectionCard
-            title="معالجة زيادة الدفع"
-            description="تسجيل المعالجة التشغيلية للزيادة الحالية."
+        <SectionCard
+          title={isCompactMobileLayout ? 'معالجة الزيادة' : 'معالجة زيادة الدفع'}
+          description={isCompactMobileLayout ? '' : 'تسجيل المعالجة التشغيلية للزيادة الحالية.'}
             className={[
               'app-section-panel',
               'transfer-details-resolution-section',
@@ -3873,8 +3899,8 @@ function TransferDetailsPage() {
         ) : null}
 
         <SectionCard
-          title="إجراء التحصيل"
-          description="منطقة التحصيل التالية."
+          title={isCompactMobileLayout ? 'تسجيل دفعة' : 'إجراء التحصيل'}
+          description={isCompactMobileLayout ? '' : 'منطقة التحصيل التالية.'}
           className={[
             'app-section-panel',
             'transfer-details-action-section',
@@ -3915,8 +3941,8 @@ function TransferDetailsPage() {
         </SectionCard>
 
         <SectionCard
-          title="سجل التحصيل والحركة المالية"
-          description="قائمة موجزة للحركات المالية."
+          title={isCompactMobileLayout ? 'سجل الدفعات' : 'سجل التحصيل والحركة المالية'}
+          description={isCompactMobileLayout ? '' : 'قائمة موجزة للحركات المالية.'}
           className={[
             'app-section-panel',
             'transfer-details-history-section',
@@ -3965,37 +3991,51 @@ function TransferDetailsPage() {
         {transfer ? (
           <SectionCard
             title="معلومات الملف"
-            description="مرجع وتسعير وملاحظات الحوالة."
+            description={isCompactMobileLayout ? '' : 'مرجع وتسعير وملاحظات الحوالة.'}
+            actions={
+              <button
+                type="button"
+                className="button secondary transfer-details-section-toggle"
+                aria-expanded={isSecondaryInfoOpen}
+                aria-controls="transfer-secondary-details"
+                onClick={() => setIsSecondaryInfoOpen((current) => !current)}
+              >
+                {isSecondaryInfoOpen ? 'إخفاء' : 'إظهار'}
+              </button>
+            }
             className={[
               'app-section-panel',
               'transfer-details-secondary-section',
+              !isSecondaryInfoOpen ? 'is-collapsed' : '',
               activeSection === 'summary' ? 'is-active' : '',
             ]
               .filter(Boolean)
               .join(' ')}
           >
-            <InfoGrid className="transfer-details-secondary-grid">
-              <InfoCard title="رقم المرجع" value={referenceNumber} />
-              <InfoCard title="المعرّف الداخلي" value={displayTransferId} />
-              <InfoCard title="تاريخ إنشاء الحوالة" value={transferCreatedAtLabel} />
-              {summaryItems.map((item) => (
-                <InfoCard
-                  key={item.title}
-                  title={item.title}
-                  value={item.value}
-                  className={item.className}
-                  valueClassName={item.valueClassName}
-                >
-                  {item.children}
-                </InfoCard>
-              ))}
-            </InfoGrid>
+            {isSecondaryInfoOpen ? (
+              <InfoGrid id="transfer-secondary-details" className="transfer-details-secondary-grid">
+                <InfoCard title="رقم المرجع" value={referenceNumber} />
+                <InfoCard title="المعرّف الداخلي" value={displayTransferId} />
+                <InfoCard title="تاريخ إنشاء الحوالة" value={transferCreatedAtLabel} />
+                {summaryItems.map((item) => (
+                  <InfoCard
+                    key={item.title}
+                    title={item.title}
+                    value={item.value}
+                    className={item.className}
+                    valueClassName={item.valueClassName}
+                  >
+                    {item.children}
+                  </InfoCard>
+                ))}
+              </InfoGrid>
+            ) : null}
           </SectionCard>
         ) : null}
 
         <SectionCard
-          title="قفل البيانات الأساسية"
-          description="حالة قفل الحقول الأساسية."
+          title={isCompactMobileLayout ? 'قفل البيانات' : 'قفل البيانات الأساسية'}
+          description={isCompactMobileLayout ? '' : 'حالة قفل الحقول الأساسية.'}
           className={[
             'app-section-panel',
             'transfer-details-lock-section',

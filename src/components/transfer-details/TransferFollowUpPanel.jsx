@@ -9,14 +9,23 @@ function TransferFollowUpPanel({
   tone = 'neutral',
   chips = [],
   items = [],
+  compactView = false,
 }) {
   return (
-    <section className={['transfer-followup-panel', `transfer-followup-panel--${tone}`].join(' ')}>
+    <section
+      className={[
+        'transfer-followup-panel',
+        `transfer-followup-panel--${tone}`,
+        compactView ? 'transfer-followup-panel--compact' : '',
+      ]
+        .filter(Boolean)
+        .join(' ')}
+    >
       <div className="transfer-followup-head">
         <div className="transfer-followup-copy">
-          <p className="eyebrow">ما الذي يجب متابعته الآن؟</p>
+          {!compactView ? <p className="eyebrow">ما الذي يجب متابعته الآن؟</p> : null}
           <h3>{title}</h3>
-          <p>{description}</p>
+          {description ? <p>{description}</p> : null}
         </div>
 
         <div className="transfer-followup-side">
@@ -25,7 +34,11 @@ function TransferFollowUpPanel({
       </div>
 
       {chips.length > 0 ? (
-        <div className="transfer-followup-chips">
+        <div
+          className={['transfer-followup-chips', compactView ? 'transfer-followup-chips--compact' : '']
+            .filter(Boolean)
+            .join(' ')}
+        >
           {chips.map((chip) => (
             <span
               key={`${chip.label}-${chip.value}`}

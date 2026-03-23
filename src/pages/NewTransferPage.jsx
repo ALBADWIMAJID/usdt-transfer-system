@@ -671,6 +671,26 @@ function NewTransferPage() {
 
       <OfflineSnapshotNotice className="new-transfer-snapshot-banner" snapshotState={snapshotState} />
 
+      <section className="new-transfer-mobile-utility" aria-label="إعداد سريع لحوالة جديدة">
+        <div className="new-transfer-mobile-utility-copy">
+          <strong>إدخال سريع</strong>
+          <span>
+            {isOffline
+              ? 'سيُحفظ الإدخال محليًا إلى حين عودة الاتصال.'
+              : 'تحقق من قائمة العملاء وابدأ الإدخال مباشرة.'}
+          </span>
+        </div>
+
+        <button
+          type="button"
+          className="button secondary new-transfer-mobile-refresh-button"
+          onClick={handleCustomerRefresh}
+          disabled={customersLoading}
+        >
+          {customersLoading ? 'جار التحديث...' : 'تحديث العملاء'}
+        </button>
+      </section>
+
       <TransferFormSection
         customersError={customersError}
         customersLoading={customersLoading}

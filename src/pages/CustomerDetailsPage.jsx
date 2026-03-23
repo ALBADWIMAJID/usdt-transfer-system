@@ -1593,6 +1593,17 @@ function CustomerDetailsPage() {
           className: overpaidTransfersCount > 0 ? 'queue-chip--danger' : 'queue-chip--success',
         },
       ]
+  const compactFollowUpChips = [
+    followUpChips.find((chip) => chip.label === 'تحتاج مراجعة' && Number(chip.value) > 0),
+    followUpChips.find((chip) => chip.label === 'جزئية' && Number(chip.value) > 0),
+    followUpChips.find((chip) => chip.label === 'مفتوحة' && Number(chip.value) > 0),
+    ...followUpChips,
+  ]
+    .filter(Boolean)
+    .filter(
+      (chip, index, chips) => chips.findIndex((candidate) => candidate.label === chip.label) === index
+    )
+    .slice(0, 2)
 
   const queueWarningMessage = paymentTotalsError
     ? 'تعذر تحميل بيانات المدفوعات؛ تم ترتيب الحوالات اعتمادا على حالتها الحالية مع إخفاء بعض الإشارات المالية الدقيقة.'
@@ -1762,7 +1773,7 @@ function CustomerDetailsPage() {
       <div className="app-section-workspace">
         <SectionCard
           title="نظرة عامة"
-          description="ملخص سريع لوضع العميل الحالي."
+          description={isCompactMobileLayout ? '' : 'ملخص سريع لوضع العميل الحالي.'}
           className={[
             'app-section-panel',
             'customer-details-summary-section',
@@ -1799,8 +1810,9 @@ function CustomerDetailsPage() {
               title={followUpTitle}
               description={followUpDescription}
               tone={customerStateTone}
-              chips={followUpChips}
+              chips={isCompactMobileLayout ? compactFollowUpChips : followUpChips}
               items={overviewFollowUpItems}
+              compactView={isCompactMobileLayout}
             />
           ) : null}
 
@@ -1836,8 +1848,8 @@ function CustomerDetailsPage() {
         </SectionCard>
 
         <SectionCard
-          title="طابور حوالات العميل"
-          description="قائمة الحوالات حسب أولوية المتابعة."
+          title={isCompactMobileLayout ? 'الحوالات' : 'طابور حوالات العميل'}
+          description={isCompactMobileLayout ? '' : 'قائمة الحوالات حسب أولوية المتابعة.'}
           className={[
             'app-section-panel',
             'customer-details-queue-section',
@@ -1863,8 +1875,8 @@ function CustomerDetailsPage() {
         </SectionCard>
 
         <SectionCard
-          title="الحركة الأخيرة لهذا العميل"
-          description="خلاصة موجزة لأحدث الحركة."
+          title={isCompactMobileLayout ? 'آخر حركة' : 'الحركة الأخيرة لهذا العميل'}
+          description={isCompactMobileLayout ? '' : 'خلاصة موجزة لأحدث الحركة.'}
           className={[
             'app-section-panel',
             'customer-details-recent-section',
@@ -1884,8 +1896,8 @@ function CustomerDetailsPage() {
         </SectionCard>
 
         <SectionCard
-          title="الإجراءات على ملف العميل"
-          description="اختصارات سريعة للعمل على الملف."
+          title={isCompactMobileLayout ? 'الإجراءات' : 'الإجراءات على ملف العميل'}
+          description={isCompactMobileLayout ? '' : 'اختصارات سريعة للعمل على الملف.'}
           className={[
             'app-section-panel',
             'customer-details-actions-section',
@@ -2055,7 +2067,7 @@ function CustomerDetailsPage() {
           {isEditingCustomer && customer ? (
             <CustomersFormSection
               title="تعديل ملف العميل"
-              description="حدّث بيانات الملف فقط."
+              description={isCompactMobileLayout ? '' : 'حدّث بيانات الملف فقط.'}
               className="customer-edit-form-section"
               submitError={editSubmitError}
               submitSuccess={editSubmitSuccess}
@@ -2089,7 +2101,7 @@ function CustomerDetailsPage() {
         {customer ? (
           <SectionCard
             title="معلومات الملف"
-            description="بيانات داخلية مرجعية عند الحاجة."
+            description={isCompactMobileLayout ? '' : 'بيانات داخلية مرجعية عند الحاجة.'}
             className={[
               'app-section-panel',
               'customer-details-secondary-section',

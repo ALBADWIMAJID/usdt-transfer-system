@@ -126,7 +126,7 @@ function Icon({ name }) {
 
 function getCurrentSection(pathname) {
   if (pathname.startsWith('/customers/')) {
-    return { title: 'العميل' }
+    return { title: 'ملف العميل' }
   }
 
   if (pathname.startsWith('/customers')) {
@@ -134,11 +134,11 @@ function getCurrentSection(pathname) {
   }
 
   if (pathname.startsWith('/transfers/new')) {
-    return { title: 'حوالة جديدة' }
+    return { title: 'إنشاء حوالة' }
   }
 
   if (pathname.startsWith('/transfers/') && pathname !== '/transfers/new') {
-    return { title: 'الحوالة' }
+    return { title: 'تفاصيل الحوالة' }
   }
 
   if (pathname.startsWith('/transfers')) {

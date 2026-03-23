@@ -1,25 +1,39 @@
 import InfoCard from '../ui/InfoCard.jsx'
 import InfoGrid from '../ui/InfoGrid.jsx'
 
-function CustomerFollowUpPanel({ title, description, tone = 'neutral', chips = [], items = [] }) {
+function CustomerFollowUpPanel({
+  title,
+  description,
+  tone = 'neutral',
+  chips = [],
+  items = [],
+  compactView = false,
+}) {
   return (
     <section
       className={[
         'transfer-followup-panel',
         'customer-followup-panel',
         `transfer-followup-panel--${tone}`,
-      ].join(' ')}
+        compactView ? 'transfer-followup-panel--compact customer-followup-panel--compact' : '',
+      ]
+        .filter(Boolean)
+        .join(' ')}
     >
       <div className="transfer-followup-head">
         <div className="transfer-followup-copy">
-          <p className="eyebrow">ما الذي يحتاج متابعة لهذا العميل؟</p>
+          {!compactView ? <p className="eyebrow">ما الذي يحتاج متابعة لهذا العميل؟</p> : null}
           <h3>{title}</h3>
-          <p>{description}</p>
+          {description ? <p>{description}</p> : null}
         </div>
       </div>
 
       {chips.length > 0 ? (
-        <div className="transfer-followup-chips">
+        <div
+          className={['transfer-followup-chips', compactView ? 'transfer-followup-chips--compact' : '']
+            .filter(Boolean)
+            .join(' ')}
+        >
           {chips.map((chip) => (
             <span
               key={`${chip.label}-${chip.value}`}

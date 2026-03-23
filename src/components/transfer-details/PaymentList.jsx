@@ -6,6 +6,13 @@ import RecordMeta from '../ui/RecordMeta.jsx'
 import RetryBlock from '../ui/RetryBlock.jsx'
 
 function renderPaymentCard(payment, { isLocalOnly = false, compactView = false } = {}) {
+  const metaItems = compactView
+    ? [{ value: payment.paidAtLabel }]
+    : [
+        { label: isLocalOnly ? 'وقت الحفظ المحلي' : 'وقت الدفع', value: payment.paidAtLabel },
+        { label: 'سياق الحركة', value: payment.activityLabel, className: 'detail-mobile-secondary' },
+      ]
+
   return (
     <RecordCard
       key={payment.id}
@@ -23,17 +30,7 @@ function renderPaymentCard(payment, { isLocalOnly = false, compactView = false }
         title={payment.amountLabel}
         subtitle={payment.methodLabel}
         subtitleClassName="record-muted-strong"
-        metaItems={
-          compactView
-            ? [
-                { value: payment.paidAtLabel },
-                { value: payment.activityLabel },
-              ]
-            : [
-                { label: isLocalOnly ? 'وقت الحفظ المحلي' : 'وقت الدفع', value: payment.paidAtLabel },
-                { label: 'سياق الحركة', value: payment.activityLabel, className: 'detail-mobile-secondary' },
-              ]
-        }
+        metaItems={metaItems}
         aside={
           <>
             {payment.badgeLabel ? (
@@ -100,11 +97,18 @@ function PaymentList({ errorMessage, loading, payments, pendingPayments = [], on
       ) : null}
 
       {hasPendingPayments ? (
-        <section className="payment-history-group payment-history-group--local" aria-label="دفعات محلية">
+        <section
+          className={[
+            'payment-history-group',
+            'payment-history-group--local',
+            compactView ? 'payment-history-group--compact' : '',
+          ]
+            .filter(Boolean)
+            .join(' ')}
+          aria-label="دفعات محلية"
+        >
           <div className="payment-history-group-head">
-            <strong>
-              {compactView ? `محفوظة محليا (${pendingPayments.length})` : 'دفعات محفوظة محليا'}
-            </strong>
+            <strong>{compactView ? `محلي (${pendingPayments.length})` : 'دفعات محفوظة محليا'}</strong>
             {!compactView ? (
               <p>
                 {hasBlockedPendingPayments
@@ -120,9 +124,14 @@ function PaymentList({ errorMessage, loading, payments, pendingPayments = [], on
       ) : null}
 
       {hasConfirmedPayments ? (
-        <section className="payment-history-group" aria-label="دفعات مؤكدة">
+        <section
+          className={['payment-history-group', compactView ? 'payment-history-group--compact' : '']
+            .filter(Boolean)
+            .join(' ')}
+          aria-label="دفعات مؤكدة"
+        >
           <div className="payment-history-group-head">
-            <strong>{compactView ? `دفعات مؤكدة (${payments.length})` : 'دفعات مؤكدة من الخادم'}</strong>
+            <strong>{compactView ? `مؤكد (${payments.length})` : 'دفعات مؤكدة من الخادم'}</strong>
             {!compactView && hasPendingPayments ? (
               <p>هذه الدفعات فقط تدخل في الإجماليات المؤكدة الحالية.</p>
             ) : null}

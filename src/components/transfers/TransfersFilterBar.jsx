@@ -67,8 +67,8 @@ function TransfersFilterBar({
           aria-controls="transfers-advanced-filters"
           onClick={onToggleAdvanced}
         >
-          <span>فلاتر إضافية</span>
-          <strong>{activeAdvancedCount > 0 ? `${activeAdvancedCount} مفعلة` : 'اختيارية'}</strong>
+          <span>الفلاتر</span>
+          <strong>{activeAdvancedCount > 0 ? `${activeAdvancedCount} نشطة` : 'اختيارية'}</strong>
         </button>
 
         {hasActiveFilters ? (

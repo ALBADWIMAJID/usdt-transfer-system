@@ -10,6 +10,10 @@ function CustomerRecordCard({ customer, compact = false, variant = 'default' }) 
     ? customer.totalTransfersLabel
     : customer.activeTransfersLabel
   const isCustomersListVariant = variant === 'customers-list'
+  const compactSubtitle =
+    isCustomersListVariant && (!customer.phone || customer.phone === 'غير مضاف')
+      ? ''
+      : customer.phone
   const compactMetric = customer.hasOverpaid
     ? {
         label: 'الزيادة الحالية',
@@ -27,20 +31,29 @@ function CustomerRecordCard({ customer, compact = false, variant = 'default' }) 
           value: transferCountValue,
           valueClassName: '',
         }
-  const compactMetaLabel = [customer.stateSummary, customer.hasActivityToday ? 'حركة اليوم' : '']
-    .filter(Boolean)
-    .join(' • ')
+  const compactMetaLabel = isCustomersListVariant
+    ? customer.isArchived
+      ? 'ملف مؤرشف'
+      : customer.hasActivityToday
+        ? 'نشط اليوم'
+        : customer.hasOverpaid
+          ? 'مراجعة مالية'
+          : customer.outstandingRub && customer.outstandingRub > 0.009
+            ? 'متابعة مفتوحة'
+            : 'ملف مستقر'
+    : [customer.stateSummary, customer.hasActivityToday ? 'حركة اليوم' : ''].filter(Boolean).join(' • ')
   const listRowChip = customer.isArchived
     ? {
         label: 'مؤرشف',
         className: 'queue-chip queue-chip--neutral',
       }
-    : customer.hasOverpaid
+    : customer.queueLabel
       ? {
-          label: 'مراجعة',
-          className: 'queue-chip queue-chip--danger',
+          label: customer.queueLabel,
+          className: ['queue-chip', customer.queueClassName].filter(Boolean).join(' '),
         }
       : null
+  const showCompactSummary = compact || isCustomersListVariant
 
   return (
     <RecordCard
@@ -58,7 +71,7 @@ function CustomerRecordCard({ customer, compact = false, variant = 'default' }) 
         leading={<InitialsAvatar label={customer.name} className="record-header-avatar record-header-avatar--customer" />}
         eyebrow={compact || isCustomersListVariant ? '' : customer.eyebrow}
         title={customer.name}
-        subtitle={customer.phone}
+        subtitle={compactSubtitle}
         subtitleClassName="record-muted-strong"
         metaItems={
           isCustomersListVariant
@@ -91,8 +104,15 @@ function CustomerRecordCard({ customer, compact = false, variant = 'default' }) 
         }
       />
 
-      {isCustomersListVariant ? null : compact ? (
-        <div className="customer-portfolio-compact-summary">
+      {showCompactSummary ? (
+        <div
+          className={[
+            'customer-portfolio-compact-summary',
+            isCustomersListVariant ? 'customer-portfolio-compact-summary--list-row' : '',
+          ]
+            .filter(Boolean)
+            .join(' ')}
+        >
           <div className="customer-portfolio-compact-metric">
             <span className="customer-portfolio-compact-label">{compactMetric.label}</span>
             <strong

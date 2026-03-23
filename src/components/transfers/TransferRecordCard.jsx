@@ -6,6 +6,23 @@ import StatusBadge from '../ui/StatusBadge.jsx'
 
 function TransferRecordCard({ transfer, compact = false }) {
   const compactRemainingTitle = transfer.isOverpaid ? 'الزيادة' : 'المتبقي'
+  const compactAside = transfer.queueLabel ? (
+    <span className={['queue-chip', transfer.queueClassName].filter(Boolean).join(' ')}>
+      {transfer.queueLabel}
+    </span>
+  ) : (
+    <StatusBadge status={transfer.status} />
+  )
+  const compactFollowUpNote = transfer.isUnresolvedOverpaid
+    ? 'زيادة دفع تحتاج مراجعة'
+    : transfer.isResolvedOverpaid
+      ? 'تم تسجيل معالجة زيادة الدفع'
+      : transfer.isPartial && transfer.hasOutstanding
+        ? `المتبقي ${transfer.remainingRubLabel}`
+        : transfer.isOpen && transfer.hasOutstanding
+          ? 'بانتظار أول دفعة'
+          : ''
+  const noteText = compact ? compactFollowUpNote : transfer.followUpNote
 
   return (
     <RecordCard
@@ -19,14 +36,13 @@ function TransferRecordCard({ transfer, compact = false }) {
         .join(' ')}
     >
       <RecordHeader
-        eyebrow={transfer.eyebrow}
+        eyebrow={compact ? '' : transfer.eyebrow}
         title={compact ? transfer.referenceNumber || transfer.title : transfer.title}
         subtitle={transfer.customerName}
         metaItems={
           compact
             ? [
-                { label: 'العمر التشغيلي', value: transfer.ageLabel },
-                { label: 'الإنشاء', value: transfer.createdAtLabel },
+                { value: transfer.ageLabel },
               ]
             : [
                 { label: 'العمر التشغيلي', value: transfer.ageLabel },
@@ -36,14 +52,14 @@ function TransferRecordCard({ transfer, compact = false }) {
         }
         aside={
           <>
-            <StatusBadge status={transfer.status} />
-            {transfer.queueLabel ? (
+            {compact ? compactAside : <StatusBadge status={transfer.status} />}
+            {!compact && transfer.queueLabel ? (
               <span className={['queue-chip', transfer.queueClassName].filter(Boolean).join(' ')}>
                 {transfer.queueLabel}
               </span>
             ) : null}
             {compact ? (
-              <span className="record-compact-action">فتح المتابعة</span>
+              null
             ) : (
               <RecordMeta value="فتح المتابعة" />
             )}
@@ -76,7 +92,9 @@ function TransferRecordCard({ transfer, compact = false }) {
         </div>
       )}
 
-      <p className={compact ? 'record-note record-note--compact' : 'record-note'}>{transfer.followUpNote}</p>
+      {noteText ? (
+        <p className={compact ? 'record-note record-note--compact' : 'record-note'}>{noteText}</p>
+      ) : null}
     </RecordCard>
   )
 }

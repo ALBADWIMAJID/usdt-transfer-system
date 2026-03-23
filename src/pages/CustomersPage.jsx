@@ -1340,8 +1340,11 @@ function CustomersPage() {
   const customerHeaderCountLabel = loading
     ? '\u062c\u0627\u0631 \u062a\u062d\u0645\u064a\u0644 \u0645\u062d\u0641\u0638\u0629 \u0627\u0644\u0639\u0645\u0644\u0627\u0621...'
     : isCompactMobileLayout
-      ? `عرض ${totalVisibleCustomers} من أصل ${customers.length + archivedCustomers.length} عميل${archivedCustomers.length > 0 ? ` • ${archivedCustomers.length} مؤرشف` : ''}`
+      ? `${totalVisibleCustomers} عميل ظاهر${archivedCustomers.length > 0 ? ` • ${archivedCustomers.length} مؤرشف` : ''}`
       : `\u0639\u0631\u0636 ${totalVisibleCustomers} \u0645\u0646 \u0623\u0635\u0644 ${customers.length + archivedCustomers.length} \u0639\u0645\u064a\u0644 \u2022 ${followUpCustomersInView} \u0628\u062d\u0627\u062c\u0629 \u0645\u062a\u0627\u0628\u0639\u0629${archivedCustomers.length > 0 ? ` \u2022 ${archivedCustomers.length} \u0645\u0624\u0631\u0634\u0641` : ''}${pendingCustomerLabel}`
+  const customerMobileCountLabel = loading
+    ? customerHeaderCountLabel
+    : `${totalVisibleCustomers} عميل ظاهر${archivedCustomers.length > 0 ? ` • ${archivedCustomers.length} مؤرشف` : ''}`
   const customersListScopeLabel = activePortfolioFilterLabel
     ? `\u064a\u062a\u0645 \u0627\u0644\u0622\u0646 \u0627\u0644\u062a\u0631\u0643\u064a\u0632 \u0639\u0644\u0649: ${activePortfolioFilterLabel}. \u0645\u0627 \u0632\u0627\u0644 \u0628\u0625\u0645\u0643\u0627\u0646\u0643 \u0627\u0633\u062a\u062e\u062f\u0627\u0645 \u0627\u0644\u0628\u062d\u062b \u0623\u0648 \u0625\u0644\u063a\u0627\u0621 \u0627\u0644\u062a\u0631\u0643\u064a\u0632 \u0644\u0644\u0639\u0648\u062f\u0629 \u0625\u0644\u0649 \u0643\u0644 \u0627\u0644\u0645\u062d\u0641\u0638\u0629\u060c \u0645\u0639 \u0628\u0642\u0627\u0621 \u0627\u0644\u0645\u0644\u0641\u0627\u062a \u0627\u0644\u0645\u0624\u0631\u0634\u0641\u0629 \u0636\u0645\u0646 \u0645\u062c\u0645\u0648\u0639\u0629 \u0645\u0633\u062a\u0642\u0644\u0629 \u0639\u0646\u062f \u0648\u062c\u0648\u062f\u0647\u0627.`
     : '\u0627\u0644\u0639\u0645\u0644\u0627\u0621 \u0627\u0644\u0646\u0634\u0637\u0648\u0646 \u0645\u0631\u062a\u0628\u0648\u0646 \u0647\u0646\u0627 \u062d\u0633\u0628 \u0623\u0648\u0644\u0648\u064a\u0629 \u0627\u0644\u0645\u062a\u0627\u0628\u0639\u0629: \u0641\u0648\u0642 \u0627\u0644\u0645\u0637\u0644\u0648\u0628\u060c \u062b\u0645 \u0627\u0644\u062a\u062d\u0635\u064a\u0644 \u0627\u0644\u062c\u0632\u0626\u064a\u060c \u062b\u0645 \u0627\u0644\u0645\u0644\u0641\u0627\u062a \u0627\u0644\u0645\u0641\u062a\u0648\u062d\u0629\u060c \u0645\u0639 \u0639\u0631\u0636 \u0627\u0644\u0645\u0644\u0641\u0627\u062a \u0627\u0644\u0645\u0624\u0631\u0634\u0641\u0629 \u0641\u064a \u0645\u062c\u0645\u0648\u0639\u0629 \u0645\u0633\u062a\u0642\u0644\u0629 \u0639\u0646\u062f \u0648\u062c\u0648\u062f\u0647\u0627.'
@@ -1691,7 +1694,10 @@ function CustomersPage() {
         </InlineMessage>
 
         <div className="customers-mobile-utility" aria-label="إجراءات سريعة لصفحة العملاء">
-          <p className="support-text customers-mobile-summary">{customerHeaderCountLabel}</p>
+          <div className="customers-mobile-utility-copy">
+            <strong>العملاء</strong>
+            <p className="support-text customers-mobile-summary">{customerMobileCountLabel}</p>
+          </div>
 
           <button
             type="button"

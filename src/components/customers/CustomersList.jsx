@@ -19,7 +19,7 @@ function CustomersList({
 }) {
   return (
     <SectionCard
-      title="قائمة العملاء"
+      title="العملاء"
       description="ابحث بسرعة ثم افتح ملف العميل مباشرة."
       className="customers-list-section"
     >
@@ -34,8 +34,13 @@ function CustomersList({
         />
 
         {activePortfolioFilterLabel ? (
-          <button type="button" className="button secondary" onClick={onClearPortfolioFilter}>
-            إلغاء التركيز: {activePortfolioFilterLabel}
+          <button
+            type="button"
+            className="button secondary"
+            onClick={onClearPortfolioFilter}
+            aria-label={`إلغاء التركيز: ${activePortfolioFilterLabel}`}
+          >
+            إلغاء التركيز
           </button>
         ) : null}
       </FilterBar>
