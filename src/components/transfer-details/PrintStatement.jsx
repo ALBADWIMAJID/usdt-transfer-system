@@ -86,7 +86,7 @@ function PrintStatement({
   return (
     <section className={rootClassName}>
       {compactView ? (
-        <div className="statement-screen-preview">
+        <div className="statement-screen-preview no-print" aria-hidden="true">
           <div className="statement-preview-head">
             <div className="statement-preview-copy">
               <p className="eyebrow">معاينة الطباعة</p>
