@@ -157,19 +157,21 @@ function TenantProvider({ children }) {
     }
   }, [authLoading, configError, isConfigured, reloadKey, user])
 
+  const exposedTenantState = authLoading || !user ? initialTenantState : tenantState
+
   const value = useMemo(
     () => ({
-      bootstrapError: tenantState.bootstrapError,
-      bootstrapStatus: tenantState.bootstrapStatus,
-      isProvisioned: tenantState.bootstrapStatus === 'ready',
-      isUnprovisioned: tenantState.bootstrapStatus === 'unprovisioned',
-      loading: tenantState.bootstrapStatus === 'loading',
-      orgId: tenantState.orgId,
-      organization: tenantState.organization,
-      profile: tenantState.profile,
+      bootstrapError: exposedTenantState.bootstrapError,
+      bootstrapStatus: exposedTenantState.bootstrapStatus,
+      isProvisioned: exposedTenantState.bootstrapStatus === 'ready',
+      isUnprovisioned: exposedTenantState.bootstrapStatus === 'unprovisioned',
+      loading: exposedTenantState.bootstrapStatus === 'loading',
+      orgId: exposedTenantState.orgId,
+      organization: exposedTenantState.organization,
+      profile: exposedTenantState.profile,
       refreshTenantContext,
     }),
-    [refreshTenantContext, tenantState]
+    [exposedTenantState, refreshTenantContext]
   )
 
   return <TenantContext.Provider value={value}>{children}</TenantContext.Provider>

@@ -1,0 +1,231 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Velora Brand Preview</title>
+    <style>
+      :root {
+        color-scheme: light;
+        --navy: #11293b;
+        --teal: #0d7a72;
+        --gold: #c89a43;
+        --page: #f4f7fb;
+        --card: #ffffff;
+        --line: rgba(17, 41, 59, 0.1);
+        --muted: #617486;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        font-family: Inter, 'SF Pro Display', 'Segoe UI', sans-serif;
+        background:
+          radial-gradient(circle at top left, rgba(13, 122, 114, 0.08), transparent 30%),
+          var(--page);
+        color: var(--navy);
+      }
+
+      main {
+        width: min(1200px, calc(100% - 32px));
+        margin: 0 auto;
+        padding: 32px 0 56px;
+      }
+
+      header {
+        margin-bottom: 28px;
+      }
+
+      h1 {
+        margin: 0;
+        font-size: clamp(2rem, 5vw, 3.4rem);
+        letter-spacing: -0.04em;
+      }
+
+      p {
+        margin: 10px 0 0;
+        max-width: 720px;
+        color: var(--muted);
+        line-height: 1.7;
+      }
+
+      .grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+        gap: 18px;
+      }
+
+      .card {
+        border: 1px solid var(--line);
+        border-radius: 28px;
+        background: rgba(255, 255, 255, 0.92);
+        box-shadow: 0 18px 36px rgba(17, 41, 59, 0.08);
+        overflow: hidden;
+      }
+
+      .card-copy {
+        padding: 18px 18px 0;
+      }
+
+      .card h2 {
+        margin: 0;
+        font-size: 1rem;
+        letter-spacing: 0.02em;
+      }
+
+      .card span {
+        display: block;
+        margin-top: 6px;
+        color: var(--muted);
+        font-size: 0.9rem;
+      }
+
+      .stage {
+        min-height: 300px;
+        display: grid;
+        place-items: center;
+        padding: 24px;
+      }
+
+      .stage img {
+        display: block;
+        max-width: 100%;
+        height: auto;
+      }
+
+      .stage--white {
+        background: linear-gradient(180deg, rgba(255, 255, 255, 0.84), rgba(247, 250, 252, 0.96));
+      }
+
+      .stage--dark {
+        background: linear-gradient(180deg, #173246, #11293b);
+      }
+
+      .stage--icon img {
+        width: min(220px, 70%);
+      }
+
+      .stage--mark img {
+        width: min(180px, 52%);
+      }
+
+      .stage--logo img {
+        width: min(520px, 100%);
+      }
+
+      .swatch-row {
+        display: flex;
+        gap: 10px;
+        padding: 0 18px 18px;
+        flex-wrap: wrap;
+      }
+
+      .swatch {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        padding: 8px 10px;
+        border-radius: 999px;
+        border: 1px solid var(--line);
+        background: rgba(255, 255, 255, 0.72);
+        font-size: 0.82rem;
+      }
+
+      .swatch::before {
+        content: '';
+        width: 12px;
+        height: 12px;
+        border-radius: 999px;
+        background: var(--swatch);
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <header>
+        <h1>Velora Brand Preview</h1>
+        <p>
+          Premium fintech identity built around a custom geometric V monogram:
+          minimal, compact, calm, and iPhone-first.
+        </p>
+      </header>
+
+      <section class="grid">
+        <article class="card">
+          <div class="card-copy">
+            <h2>App Icon</h2>
+            <span>Rounded-square navy icon with the custom teal V and subtle gold settlement accent.</span>
+          </div>
+          <div class="stage stage--dark stage--icon">
+            <img src="./branding/velora-app-icon.svg" alt="Velora app icon" />
+          </div>
+        </article>
+
+        <article class="card">
+          <div class="card-copy">
+            <h2>Mark Only</h2>
+            <span>Primary transparent mark for UI shells, splash layouts, and motion-ready usage.</span>
+          </div>
+          <div class="stage stage--white stage--mark">
+            <img src="./branding/velora-mark.svg" alt="Velora mark" />
+          </div>
+        </article>
+
+        <article class="card">
+          <div class="card-copy">
+            <h2>Logo on Light</h2>
+            <span>Full lockup for white surfaces, decks, and website hero treatments.</span>
+          </div>
+          <div class="stage stage--white stage--logo">
+            <img src="./branding/velora-logo-light.svg" alt="Velora logo on white" />
+          </div>
+        </article>
+
+        <article class="card">
+          <div class="card-copy">
+            <h2>Logo on Dark</h2>
+            <span>High-contrast lockup for navy backgrounds, splash screens, and launch surfaces.</span>
+          </div>
+          <div class="stage stage--dark stage--logo">
+            <img src="./branding/velora-logo-dark.svg" alt="Velora logo on dark" />
+          </div>
+        </article>
+
+        <article class="card">
+          <div class="card-copy">
+            <h2>Monochrome Dark</h2>
+            <span>Single-color navy mark for embossing, print, and reduced-color usage.</span>
+          </div>
+          <div class="stage stage--white stage--mark">
+            <img src="./branding/velora-mark-mono-dark.svg" alt="Velora monochrome dark mark" />
+          </div>
+        </article>
+
+        <article class="card">
+          <div class="card-copy">
+            <h2>Monochrome Light</h2>
+            <span>Single-color light mark for dark chrome, overlays, and reversed environments.</span>
+          </div>
+          <div class="stage stage--dark stage--mark">
+            <img src="./branding/velora-mark-mono-light.svg" alt="Velora monochrome light mark" />
+          </div>
+        </article>
+      </section>
+
+      <section class="card" style="margin-top: 18px;">
+        <div class="card-copy">
+          <h2>Palette</h2>
+          <span>Core premium fintech palette used across the mark, icon, and app branding.</span>
+        </div>
+        <div class="swatch-row">
+          <div class="swatch" style="--swatch: #11293b;">#11293B</div>
+          <div class="swatch" style="--swatch: #0d7a72;">#0D7A72</div>
+          <div class="swatch" style="--swatch: #c89a43;">#C89A43</div>
+        </div>
+      </section>
+    </main>
+  </body>
+</html>

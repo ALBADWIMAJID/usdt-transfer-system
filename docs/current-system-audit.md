@@ -1,34 +1,51 @@
 # Current System Audit
 
-Date: 2026-03-13
+Date: 2026-03-23
 
 Scope:
-- This audit is based on the repository contents only.
-- It reflects the current React + Vite + Supabase codebase state.
-- It does not assume any database objects beyond what the frontend selects/inserts and what the included SQL migration defines.
+- this audit is based on repository contents only
+- it reflects the code and docs currently present on `main`
+- it does not claim live-environment proof where the repo only shows
+  code-alignment
+
+Authority:
+- for the shortest current summary, read `docs/current-release-status.md` first
+- for the detailed feature inventory, read `docs/project-current-state.md`
+- for tenant rollout readiness, read `docs/multi-company-rollout-readiness.md`
 
 ## 1. Current Architecture
 
 Frontend structure:
-- Single-page React app bootstrapped with Vite.
-- Routing is defined in `src/App.jsx`.
-- The app uses a protected shell layout:
-  - `LoginPage`
-  - `ProtectedRoute`
-  - `AppShell`
-  - business pages under the shell
-- Styling is centralized in `src/index.css`, with some page-local inline style objects.
+- React + Vite single-page app
+- routing defined in `src/App.jsx`
+- shared providers wrap the app in this order:
+  - `ThemePreferenceProvider`
+  - `NetworkProvider`
+  - `AuthProvider`
+  - `TenantProvider`
+  - `SyncProvider`
+- protected workspace shell via `ProtectedRoute` + `AppShell`
 
-Auth flow:
-- Supabase client is created in `src/lib/supabase.js` from `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY`.
-- `src/context/AuthProvider.jsx` loads the current session with `supabase.auth.getSession()`.
-- The provider subscribes to `supabase.auth.onAuthStateChange(...)`.
-- Login is email/password only through `supabase.auth.signInWithPassword(...)`.
-- Logout uses `supabase.auth.signOut()`.
-- Route protection is handled in `src/components/ProtectedRoute.jsx`.
+Supabase integration:
+- the browser app talks directly to Supabase through `@supabase/supabase-js`
+- auth uses the anon key from env vars
+- tenant bootstrap depends on:
+  - `user_profiles`
+  - `organizations`
+  - `current_org_id()`
+- reads and writes remain mostly page-local, with small shared helpers for org
+  scoping, offline storage, payment-state derivation, and overpayment-state
+  derivation
+
+Offline/PWA architecture:
+- service worker is shell/static-asset oriented
+- IndexedDB stores:
+  - read snapshots
+  - queued offline mutations
+- replay is current-org scoped and ordered customers -> transfers -> payments
 
 Routing structure:
-- `/` redirects to `/dashboard` or `/login` depending on session state.
+- `/`
 - `/login`
 - `/dashboard`
 - `/customers`
@@ -37,330 +54,102 @@ Routing structure:
 - `/transfers/new`
 - `/transfers/:transferId`
 
-Supabase integration:
-- There is no custom backend service layer in the repo.
-- The frontend talks directly to Supabase from the browser using the anon key.
-- The code assumes Supabase RLS already exists and is correct.
-- Data fetching is page-local and imperative with `useEffect`.
+## 2. Implemented Workflow Coverage
 
-Key pages and responsibilities:
-- `src/pages/LoginPage.jsx`: sign-in form.
-- `src/pages/DashboardPage.jsx`: metrics and recent transfer activity.
-- `src/pages/CustomersPage.jsx`: create customer, list customers, search customers.
-- `src/pages/CustomerDetailsPage.jsx`: customer summary, customer transfer list, customer-level totals.
-- `src/pages/TransfersPage.jsx`: transfer list, search, status/date filters.
-- `src/pages/NewTransferPage.jsx`: simplified transfer creation flow with derived legacy fields.
-- `src/pages/TransferDetailsPage.jsx`: transfer summary, payment entry, balance state, print statement.
+Authentication and tenant safety:
+- email/password sign-in
+- protected routes
+- tenant bootstrap before protected screens render
+- fail-closed handling for missing profile/current-org and bootstrap errors
 
-## 2. Implemented Features
+Customers:
+- customer create
+- customer portfolio/listing/search
+- customer details workspace
+- online customer edit
+- online customer archive/delete with linked-transfer safety checks
+- offline customer creation queue
 
-Authentication:
-- Implemented in `src/context/AuthProvider.jsx`, `src/context/auth-context.js`, `src/pages/LoginPage.jsx`, and `src/components/ProtectedRoute.jsx`.
-- Session-aware redirect flow is implemented.
+Transfers:
+- transfers list/search/filtering
+- online transfer creation
+- offline transfer creation for locally known customers
+- transfer details workspace
+- safe online transfer edit with narrower scope after confirmed payments exist
 
-Application shell:
-- Implemented in `src/components/AppShell.jsx`.
-- Includes nav links to dashboard, customers, transfers, and new transfer.
-- Includes signed-in user email and sign-out action.
+Payments and follow-up:
+- payment creation
+- offline payment creation
+- payment void workflow
+- replacement-payment correction workflow
+- overpayment visibility and resolution workflow
+- active-vs-voided payment truth adopted in major operational pages
 
-Dashboard:
-- Implemented in `src/pages/DashboardPage.jsx`.
-- Fetches:
-  - customer count
-  - all visible transfers
-  - all visible transfer payments
-- Computes:
-  - total transfers
-  - open/partial transfer count
-  - total payable RUB
-  - total remaining RUB
-  - overpaid transfer count
-- Shows recent transfers and links to transfer details and customer details.
+Printing and UI:
+- printable statement flow
+- professional transfer reference numbers
+- Arabic RTL desktop/mobile UI
+- theme preference: light / dark / auto
 
-Customers page:
-- Implemented in `src/pages/CustomersPage.jsx`.
-- Supports:
-  - customer creation
-  - customer list rendering
-  - search by name or phone
-  - direct navigation to customer profile
+## 3. Database / Repo Baseline State
 
-Customer details page:
-- Implemented in `src/pages/CustomerDetailsPage.jsx`.
-- Loads one customer and all transfers for that customer.
-- Computes customer-level totals:
-  - total transfers
-  - total payable RUB
-  - total paid RUB
-  - total remaining RUB
-  - open/partial count
-- Supports transfer status filtering.
-- Provides direct link to create a new transfer for that customer.
+The repo now includes more than the original March 13 migration set. The visible
+repo-side database history includes, at minimum:
+- transfer reference numbers and payment lock
+- customer archive state
+- transfer payment voids
+- transfer overpayment resolutions
+- active-payment DB-truth alignment
+- tenant hardening for payment voids and overpayment resolutions
+- trigger refresh for transfer status after payment-void mutations
 
-Transfers list:
-- Implemented in `src/pages/TransfersPage.jsx`.
-- Loads transfers plus related customer names.
-- Supports:
-  - search by reference number or customer
-  - status filter
-  - created-from date filter
-- Each transfer links to its independent transfer details page.
+Still true:
+- the base schema for older core tables is not fully reconstructed from scratch
+  in this repo
+- the live Supabase project remains the authoritative source for some schema,
+  function, and RLS truth
+- supporting baseline material lives under `supabase/baselines/`
 
-New transfer flow:
-- Implemented in `src/pages/NewTransferPage.jsx`.
-- Simplified operator workflow is present:
-  - customer
-  - amount
-  - global rate
-  - value before percentage
-  - percentage
-  - value after percentage
-  - notes
-- The page derives and persists legacy schema fields:
-  - `usdt_amount`
-  - `market_rate`
-  - `client_rate`
-  - `pricing_mode`
-  - `commission_pct`
-  - `commission_rub`
-  - `gross_rub`
-  - `payable_rub`
-  - `status`
-- After insert it reads back `id` and `reference_number` and redirects to the transfer details page.
+## 4. Verification Status
 
-Transfer details page:
-- Implemented in `src/pages/TransferDetailsPage.jsx`.
-- Loads one transfer and the related customer name.
-- Loads transfer payments.
-- Supports:
-  - payment recording
-  - balance calculation
-  - overpayment visibility
-  - print action via `window.print()`
-- Shows:
-  - transfer summary
-  - payment history
-  - edit-safety warning
-  - print statement
+Verified in repo on 2026-03-23:
+- `npm run lint` passed
+- `npm run build` passed
 
-Partial payments:
-- Implemented in `src/pages/TransferDetailsPage.jsx`.
-- Payments are inserted into `public.transfer_payments`.
-- Payment history is listed newest first by `paid_at`, then `created_at`.
+Also aligned in this repo:
+- GitHub Actions now runs `npm run lint` and `npm run build`, matching the
+  scripts that actually exist
+- `TenantProvider` no longer exposes stale tenant context when the session is
+  signed out
 
-Payment method / bank selection:
-- Implemented in `src/pages/TransferDetailsPage.jsx`.
-- Current fixed options:
-  - Sberbank
-  - Tinkoff
-  - VTB
-  - Alfa Bank
-  - Raiffeisen
-  - Cash
-  - Other bank
+Not yet verified from this environment:
+- live tenant smoke validation
+- deployment readiness checklist
+- physical iPhone/Safari/Home Screen validation
 
-Overpayment support:
-- Implemented in `src/pages/TransferDetailsPage.jsx` and `src/pages/DashboardPage.jsx`.
-- Negative remaining balance is intentionally supported and surfaced in the UI.
-- Customer-level and dashboard-level totals also account for overpayment math.
+## 5. Known Limitations And Risks
 
-Printable transfer statement:
-- Implemented in `src/pages/TransferDetailsPage.jsx`.
-- Print-specific CSS is implemented in `src/index.css`.
-- Statement includes:
-  - transfer overview
-  - pricing summary
-  - payment history
-  - totals
+- no automated tests currently exist
+- the build still emits a large chunk-size warning
+- the simplified transfer workflow still persists into legacy transfer-schema
+  fields
+- live tenant/RLS/runtime behavior still needs privileged environment proof
+- open product/data questions remain around:
+  - canonical transfer statuses
+  - `paid_at` behavior
+  - long-term legacy-schema direction
 
-Transfer reference numbers:
-- Implemented in `supabase/migrations/20260313_add_transfer_reference_numbers_and_payment_lock.sql`.
-- The migration adds:
-  - `public.transfers.reference_number`
-  - yearly counter table
-  - insert-time generator
-  - backfill logic
-  - uniqueness
-  - format check
-  - immutability trigger
-- UI surfaces already display the reference number in:
-  - dashboard
-  - transfers list
-  - customer transfer list
-  - transfer details
-  - printable statement
+## 6. Practical Conclusion
 
-Payment-lock safety:
-- Implemented in `supabase/migrations/20260313_add_transfer_reference_numbers_and_payment_lock.sql`.
-- The trigger blocks updates to core transfer pricing/customer fields once related payments exist.
-- The frontend currently only communicates this in the UI; no edit form exists yet.
+This repo is feature-rich and materially beyond a basic MVP, but it is still not
+at a clean final-release state yet.
 
-## 3. Database State Assumptions
+Current reality:
+- the codebase already implements the main operational workflows
+- the remaining gates are mainly release-validation, environment-proof, and
+  documentation/quality issues rather than missing core screens
 
-The frontend currently expects these tables:
-- `public.customers`
-- `public.transfers`
-- `public.transfer_payments`
-
-The frontend currently expects at least these customer columns:
-- `id`
-- `full_name`
-- `phone`
-- `notes`
-- `created_at`
-
-The frontend currently expects at least these transfer columns:
-- `id`
-- `reference_number`
-- `customer_id`
-- `usdt_amount`
-- `market_rate`
-- `client_rate`
-- `pricing_mode`
-- `commission_pct`
-- `commission_rub`
-- `gross_rub`
-- `payable_rub`
-- `status`
-- `notes`
-- `created_at`
-
-The frontend currently expects at least these transfer payment columns:
-- `id`
-- `transfer_id`
-- `amount_rub`
-- `payment_method`
-- `note`
-- `paid_at`
-- `created_at`
-
-Important migration state:
-- The repo only contains one SQL migration:
-  - `supabase/migrations/20260313_add_transfer_reference_numbers_and_payment_lock.sql`
-- That migration does not create the base `customers`, `transfers`, or `transfer_payments` tables.
-- That migration also does not define RLS policies.
-
-Important assumptions and risks:
-- The app relies completely on pre-existing database tables and RLS policies that are not versioned in this repo.
-- `transfer_payments.paid_at` is read and sorted, but the current payment form does not set it explicitly.
-- The app assumes `created_at` exists and is populated for customers, transfers, and payments.
-- The app assumes transfer IDs are already generated by the database, likely UUIDs, but no base migration confirms that.
-- The frontend writes `pricing_mode: 'hybrid'` even though the visible operator workflow no longer exposes legacy pricing concepts directly.
-
-## 4. Business Workflow Coverage
-
-Customer management:
-- Strong for MVP create/list/view.
-- Not implemented for edit/delete/archive.
-
-Transfer creation:
-- Strong for a simplified create-only operator workflow.
-- The page maps simplified inputs into legacy transfer fields successfully.
-
-Transfer tracking:
-- Strong for list/detail visibility.
-- Each transfer has its own details page and customer linkage.
-
-Payments:
-- Strong for add/list/view of partial payments.
-- Payment method and notes are supported.
-- Bank/cash labeling is already present.
-
-Overpayment:
-- Clearly supported in math and UI.
-- Negative balances are treated as valid and intentionally visible.
-
-Printing:
-- Implemented and reasonably structured.
-- Print mode hides the surrounding shell and focuses on the statement.
-
-Dashboard reporting:
-- Solid for a lightweight operational view.
-- Metrics are useful and already go beyond simple counts.
-
-## 5. Incomplete / Weak Areas
-
-Base database definition is missing from the repo:
-- The largest structural gap is the absence of foundational schema migrations for:
-  - `customers`
-  - `transfers`
-  - `transfer_payments`
-  - RLS policies
-
-README is not project-specific:
-- `README.md` is still the stock Vite template and does not explain setup, schema, workflow, or Supabase expectations.
-
-No test harness is present:
-- There is no test script in `package.json`.
-- No automated coverage exists for calculations, route protection, or data workflows.
-
-Some backend rules are only implied:
-- Payment method options are enforced only by the UI, not by any visible database constraint in the repo.
-- Transfer status values are normalized in the UI, but no visible enum/check constraint exists in the repo.
-
-Payment timestamp handling is unclear:
-- The UI sorts and displays `paid_at`, but the current payment insert does not send it.
-- If the database does not default `paid_at`, operator-entered payment chronology may be weak.
-
-Edit flow is not implemented:
-- The DB has a payment-lock trigger, but the app has no transfer edit page yet.
-- This means part of the safety work is preparatory rather than fully exercised by the UI.
-
-Legacy schema mapping remains visible:
-- `pricing_mode`, `client_rate`, `commission_pct`, `commission_rub`, and `gross_rub` are still part of the saved model.
-- The operator sees a simplified workflow, but the underlying persistence model is still more complex and legacy-shaped.
-
-Some code quality issues remain:
-- `src/pages/NewTransferPage.jsx` still contains `console.log(payload)`.
-- Status badge logic and formatting helpers are duplicated across multiple pages instead of being shared.
-
-Migration scope is mixed:
-- The single migration combines transfer reference numbers and transfer payment-lock rules.
-- Future database history will be easier to reason about if concerns are separated in later migrations.
-
-Customer-facing print output may still expose internal data:
-- The printable statement still includes the internal transfer ID alongside the professional reference number.
-- That may or may not match the desired customer-facing policy.
-
-## 6. Risk of Repeating Work
-
-The following areas are already implemented and should not be rebuilt from scratch:
-- Supabase email/password login flow
-- protected routing and shell layout
-- dashboard metrics card view
-- customer creation and customer list search
-- customer details page with transfer list
-- transfer list with filters
-- simplified new transfer form
-- independent transfer details page
-- partial payment recording
-- bank/cash payment method selection
-- overpayment and negative balance handling
-- printable transfer statement
-- transfer reference number generation and UI display
-- database-level transfer core-field lock after payments exist
-
-The following areas are only partially complete and should be extended carefully rather than restarted:
-- dashboard reporting
-- print polish
-- transfer safety controls
-- legacy-to-simplified transfer field mapping
-- search and filtering
-
-## 7. What Should Not Be Rebuilt
-
-Do not rebuild:
-- login/auth routing
-- the customer page flow
-- the customer details transfer list concept
-- the transfer details page concept
-- the partial payment model
-- overpayment handling
-- printable transfer statement capability
-- transfer reference number system
-- basic dashboard metrics structure
-
-Instead:
-- extend or harden what already exists
-- document the schema assumptions
-- fill in missing backend foundations
+Before declaring the tenant-aware release ready:
+- execute `docs/multi-company-live-smoke-checklist.md`
+- execute `docs/deployment-readiness-checklist.md`
+- execute `docs/iphone-qa-checklist.md`

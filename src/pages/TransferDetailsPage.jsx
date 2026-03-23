@@ -2387,6 +2387,7 @@ function TransferDetailsPage() {
                       ? `المتبقي الحالي ${formatNumber(remainingRub, 2)} RUB.`
                       : 'بانتظار أول دفعة.'
     : pageDescription
+  const followUpDisplayTone = followUpState === 'neutral' ? 'muted' : followUpState
 
   const highlightItems = transfer
     ? [
@@ -3246,16 +3247,15 @@ function TransferDetailsPage() {
   return (
     <div className="stack transfer-details-page">
       <PageHeader
-        eyebrow="الحوالة"
+        eyebrow={isCompactMobileLayout ? '' : 'الحوالة'}
         title={transfer?.reference_number || (transferId ? `حوالة #${transferId}` : 'حوالة')}
         description={resolvedPageDescription}
-        showDescriptionOnMobile
         className="no-print transfer-details-page-hero"
         actions={
           <div className="transfer-details-hero-actions">
             <div className="transfer-details-hero-utility-row">
               <Link className="button secondary transfer-details-utility-action" to="/transfers">
-                العودة
+                {isCompactMobileLayout ? 'رجوع' : 'العودة'}
               </Link>
               <button
                 type="button"
@@ -3283,27 +3283,40 @@ function TransferDetailsPage() {
         }
       >
         {transfer ? (
-          <div className="page-hero-highlights transfer-details-hero-highlights">
+          isCompactMobileLayout ? (
             <p
               className={[
-                'support-text',
-                'support-text-inline',
-                'page-hero-highlight',
-                `page-hero-highlight--${followUpState === 'neutral' ? 'muted' : followUpState}`,
+                'transfer-details-hero-status',
+                `transfer-details-hero-status--${followUpDisplayTone}`,
               ]
                 .filter(Boolean)
                 .join(' ')}
             >
               {statusLabel}
             </p>
-            <p className="support-text support-text-inline page-hero-highlight">{displayCustomerName}</p>
-            <p className="support-text support-text-inline page-hero-highlight page-hero-highlight--accent">
-              المتبقي {remainingMessage}
-            </p>
-            <p className="support-text support-text-inline page-hero-highlight">
-              المحصل {totalPaidRub === null ? '--' : `${formatNumber(totalPaidRub, 2)} RUB`}
-            </p>
-          </div>
+          ) : (
+            <div className="page-hero-highlights transfer-details-hero-highlights">
+              <p
+                className={[
+                  'support-text',
+                  'support-text-inline',
+                  'page-hero-highlight',
+                  `page-hero-highlight--${followUpDisplayTone}`,
+                ]
+                  .filter(Boolean)
+                  .join(' ')}
+              >
+                {statusLabel}
+              </p>
+              <p className="support-text support-text-inline page-hero-highlight">{displayCustomerName}</p>
+              <p className="support-text support-text-inline page-hero-highlight page-hero-highlight--accent">
+                المتبقي {remainingMessage}
+              </p>
+              <p className="support-text support-text-inline page-hero-highlight">
+                المحصل {totalPaidRub === null ? '--' : `${formatNumber(totalPaidRub, 2)} RUB`}
+              </p>
+            </div>
+          )
         ) : null}
       </PageHeader>
 

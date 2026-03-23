@@ -1,0 +1,22 @@
+<svg width="1024" height="1024" viewBox="0 0 1024 1024" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="velora-icon-glow" x1="186" y1="124" x2="836" y2="928" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#1A3A53" />
+      <stop offset="1" stop-color="#11293B" />
+    </linearGradient>
+    <mask id="velora-icon-cut" maskUnits="userSpaceOnUse" x="0" y="0" width="1024" height="1024">
+      <rect width="1024" height="1024" fill="white" />
+      <path
+        d="M512 318C456 361 430 431 434 503L490 609C500 631 507 653 512 679C517 653 524 631 534 609L590 503C594 431 568 361 512 318Z"
+        fill="black"
+      />
+    </mask>
+  </defs>
+  <rect x="64" y="64" width="896" height="896" rx="224" fill="url(#velora-icon-glow)" />
+  <ellipse cx="322" cy="216" rx="248" ry="174" fill="white" opacity="0.035" />
+  <g mask="url(#velora-icon-cut)">
+    <rect x="330" y="208" width="148" height="604" rx="74" transform="rotate(-24 404 510)" fill="#0D7A72" />
+    <rect x="546" y="208" width="148" height="604" rx="74" transform="rotate(24 620 510)" fill="#0D7A72" />
+  </g>
+  <rect x="462" y="702" width="100" height="20" rx="10" fill="#C89A43" />
+</svg>

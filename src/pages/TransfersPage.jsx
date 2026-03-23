@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { useLocation, useSearchParams } from 'react-router-dom'
+import { Link, useLocation, useSearchParams } from 'react-router-dom'
 import TransfersFilterBar from '../components/transfers/TransfersFilterBar.jsx'
 import TransfersHeader from '../components/transfers/TransfersHeader.jsx'
 import TransfersList from '../components/transfers/TransfersList.jsx'
@@ -934,6 +934,25 @@ function TransfersPage() {
         className="transfers-page-snapshot-banner"
         snapshotState={snapshotState}
       />
+
+      <div className="transfers-mobile-utility" aria-label="إجراءات سريعة لصفحة الحوالات">
+        <Link className="button primary transfers-mobile-primary-action" to="/transfers/new">
+          حوالة جديدة
+        </Link>
+
+        <div className="transfers-mobile-utility-meta">
+          <p className="support-text transfers-mobile-count">{transferCountLabel}</p>
+
+          <button
+            type="button"
+            className="button secondary transfers-mobile-refresh-button"
+            onClick={handleRefresh}
+            disabled={loading}
+          >
+            تحديث
+          </button>
+        </div>
+      </div>
 
       <div className="app-section-nav-shell">
         <nav className="app-section-nav app-section-nav--two" aria-label="أقسام صفحة الحوالات">

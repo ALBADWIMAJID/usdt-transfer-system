@@ -1,5 +1,49 @@
 # Implementation Log
 
+## 2026-03-23 - Release-status source-of-truth cleanup + CI/session hardening
+
+Scope: establish one concise release-status source of truth, align older summary
+docs with the actual current repo, fix the broken GitHub Actions command path,
+and stop signed-out sessions from exposing stale tenant context through the
+tenant provider. No new business workflows, schema work, or rollout-scope
+implementation were started here.
+
+Files changed:
+
+- `README.md` - rewrites the top-level project summary around the actual current
+  repo state, points readers to the authoritative status docs, and replaces the
+  outdated limitation wording
+- `docs/current-release-status.md` **(new)** - adds a concise source of truth
+  for what is implemented, what is verified, what still blocks release, and the
+  exact next actions
+- `docs/current-system-audit.md` - replaces the outdated 2026-03-13 audit with
+  a current repo-based audit that matches the implemented workflows and known
+  release gates
+- `docs/project-current-state.md` - adds a pointer so readers use the concise
+  release-status doc before the long-form implementation inventory
+- `.github/workflows/node.js.yml` - removes the broken `npm test` step and runs
+  `npm run lint` plus `npm run build`, which now matches `package.json`
+- `src/context/TenantProvider.jsx` - prevents signed-out sessions from exposing
+  the previously loaded tenant context by deriving the exposed state from the
+  current auth state
+- `docs/implementation-log.md`
+- `docs/last-change-summary.md`
+
+Key result:
+
+- the repo now has one concise release-status source of truth instead of
+  conflicting short summaries
+- the top-level docs no longer claim that important online edit/correction flows
+  are missing when they already exist in code
+- GitHub Actions now matches the scripts that actually exist
+- tenant context fails closed on signed-out state instead of leaking the last
+  loaded org/profile through the provider value
+
+Verification:
+
+- `npm run lint` - passed
+- `npm run build` - passed (chunk-size warning still remains)
+
 ## 2026-03-21 - Final manual live tenant smoke-validation package
 
 Scope: documentation/checklist only. Converts the remaining live tenant-validation gate into one repo-ready manual

@@ -883,6 +883,16 @@ input[type='password'],
   filter: drop-shadow(0 14px 28px rgba(var(--brand-secondary-rgb), 0.22));
 }
 
+.brand-orbit-mark__image {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  z-index: 3;
+  filter: drop-shadow(0 14px 28px rgba(var(--brand-secondary-rgb), 0.22));
+}
+
 .brand-orbit-mark__ring,
 .brand-orbit-mark__orbit {
   border-radius: 50%;
@@ -1613,6 +1623,15 @@ input[type='password'],
   min-width: 0;
 }
 
+.brand-lockup-image {
+  display: block;
+  width: min(100%, 176px);
+  max-width: 100%;
+  height: auto;
+  flex: 0 1 auto;
+  object-fit: contain;
+}
+
 .brand-lockup-copy {
   min-width: 0;
 }
@@ -1717,6 +1736,10 @@ input[type='password'],
   max-width: 100%;
 }
 
+.brand-lockup--sidebar .brand-lockup-image {
+  width: min(100%, 148px);
+}
+
 .brand-lockup--sidebar .brand-lockup-copy {
   display: grid;
   gap: 0.12rem;
@@ -1729,6 +1752,10 @@ input[type='password'],
 
 .brand-lockup--auth {
   align-items: center;
+}
+
+.brand-lockup--auth .brand-lockup-image {
+  width: min(100%, 204px);
 }
 
 .brand-lockup--auth .brand-system-name {
@@ -3446,6 +3473,11 @@ a.dashboard-mobile-lite-tertiary {
 
 .customers-page-toolbar {
   gap: 0.75rem;
+}
+
+.customers-mobile-utility,
+.transfers-mobile-utility {
+  display: none;
 }
 
 .customers-workspace-flow {
@@ -7751,17 +7783,21 @@ a:hover article {
     box-shadow: none;
   }
 
+  .transfer-details-page .page-hero.transfer-details-page-hero .eyebrow {
+    display: none;
+  }
+
   .transfer-details-page .page-hero.transfer-details-page-hero .page-actions {
     margin-top: 0;
   }
 
   .transfer-details-page .page-hero.transfer-details-page-hero h1 {
-    font-size: 1rem;
+    font-size: 1.06rem;
     line-height: 1.16;
   }
 
   .transfer-details-page .transfer-details-hero-actions {
-    gap: 0.18rem;
+    gap: 0.28rem;
   }
 
   .transfer-details-page .transfer-details-primary-action.button.primary {
@@ -7775,15 +7811,52 @@ a:hover article {
   .transfer-details-page .transfer-details-hero-utility-row {
     display: grid;
     grid-template-columns: repeat(3, minmax(0, 1fr));
-    gap: 0.22rem;
+    gap: 0.26rem;
   }
 
   .transfer-details-page .transfer-details-utility-action.button.secondary {
-    min-height: 31px;
-    padding: 0.22rem 0.3rem;
+    min-height: 33px;
+    padding: 0.24rem 0.32rem;
     border-radius: 999px;
     box-shadow: none;
-    font-size: 0.64rem;
+    font-size: 0.66rem;
+  }
+
+  .transfer-details-page .transfer-details-hero-status {
+    display: inline-flex;
+    align-items: center;
+    width: fit-content;
+    max-width: 100%;
+    margin: 0.04rem 0 0;
+    padding: 0.24rem 0.56rem;
+    border-radius: 999px;
+    border: 0.5px solid rgba(255, 255, 255, 0.08);
+    background: rgba(255, 255, 255, 0.05);
+    font-size: 0.7rem;
+    line-height: 1.3;
+    color: var(--mobile-ink-muted);
+  }
+
+  .transfer-details-page .transfer-details-hero-status--danger {
+    border-color: rgba(252, 165, 165, 0.2);
+    background: rgba(239, 68, 68, 0.12);
+    color: var(--theme-status-danger-text);
+  }
+
+  .transfer-details-page .transfer-details-hero-status--warning {
+    border-color: rgba(251, 191, 36, 0.2);
+    background: rgba(245, 158, 11, 0.12);
+    color: var(--theme-status-warning-text);
+  }
+
+  .transfer-details-page .transfer-details-hero-status--success {
+    border-color: rgba(110, 231, 183, 0.2);
+    background: rgba(34, 197, 94, 0.12);
+    color: var(--theme-status-success-text);
+  }
+
+  .transfer-details-page .transfer-details-hero-status--muted {
+    color: var(--mobile-ink-muted);
   }
 
   .transfer-details-page .app-section-nav-shell {
@@ -8903,39 +8976,80 @@ a:hover article {
     box-shadow: none;
   }
 
+  .customer-details-page .page-hero.customer-details-page-hero .eyebrow {
+    display: none;
+  }
+
   .customer-details-page .page-hero.customer-details-page-hero .page-actions {
     margin-top: 0;
   }
 
   .customer-details-page .page-hero.customer-details-page-hero h1 {
-    font-size: 1rem;
+    font-size: 1.06rem;
     line-height: 1.16;
   }
 
   .customer-details-page .customer-details-hero-actions {
-    gap: 0.22rem;
+    gap: 0.28rem;
   }
 
   .customer-details-page .customer-details-primary-action.button.primary {
     width: 100%;
-    min-height: 38px;
-    padding: 0.34rem 0.56rem;
-    border-radius: 13px;
-    font-size: 0.78rem;
+    min-height: 40px;
+    padding: 0.38rem 0.68rem;
+    border-radius: 999px;
+    font-size: 0.76rem;
   }
 
   .customer-details-page .customer-details-hero-utility-row {
     display: grid;
     grid-template-columns: repeat(3, minmax(0, 1fr));
-    gap: 0.22rem;
+    gap: 0.26rem;
   }
 
   .customer-details-page .customer-details-utility-action.button.secondary {
-    min-height: 31px;
-    padding: 0.22rem 0.3rem;
+    min-height: 33px;
+    padding: 0.24rem 0.32rem;
     border-radius: 999px;
     box-shadow: none;
-    font-size: 0.64rem;
+    font-size: 0.66rem;
+  }
+
+  .customer-details-page .customer-details-hero-status {
+    display: inline-flex;
+    align-items: center;
+    width: fit-content;
+    max-width: 100%;
+    margin: 0.04rem 0 0;
+    padding: 0.24rem 0.56rem;
+    border-radius: 999px;
+    border: 0.5px solid rgba(255, 255, 255, 0.08);
+    background: rgba(255, 255, 255, 0.05);
+    font-size: 0.7rem;
+    line-height: 1.3;
+    color: var(--mobile-ink-muted);
+  }
+
+  .customer-details-page .customer-details-hero-status--danger {
+    border-color: rgba(252, 165, 165, 0.2);
+    background: rgba(239, 68, 68, 0.12);
+    color: var(--theme-status-danger-text);
+  }
+
+  .customer-details-page .customer-details-hero-status--warning {
+    border-color: rgba(251, 191, 36, 0.2);
+    background: rgba(245, 158, 11, 0.12);
+    color: var(--theme-status-warning-text);
+  }
+
+  .customer-details-page .customer-details-hero-status--success {
+    border-color: rgba(110, 231, 183, 0.2);
+    background: rgba(34, 197, 94, 0.12);
+    color: var(--theme-status-success-text);
+  }
+
+  .customer-details-page .customer-details-hero-status--muted {
+    color: var(--mobile-ink-muted);
   }
 
   .customer-details-page .app-section-nav-shell {
@@ -9491,6 +9605,7 @@ a:hover article {
     min-height: 34px;
     padding: 0.28rem 0.56rem;
     font-size: 0.7rem;
+    margin-top: 0.28rem;
   }
 
   .new-transfer-page .new-transfer-summary-details {
@@ -11607,6 +11722,60 @@ a:hover article {
   color: rgba(252, 165, 165, 0.9);
 }
 
+:root[data-theme='dark'] .record-meta-label {
+  color: rgba(176, 192, 212, 0.84);
+}
+
+:root[data-theme='dark'] .record-muted-strong {
+  color: rgba(235, 241, 249, 0.92);
+}
+
+:root[data-theme='dark'] .record-compact-action {
+  color: rgba(120, 210, 198, 0.94);
+}
+
+:root[data-theme='dark'] .record-compact-meta {
+  color: rgba(186, 200, 219, 0.9);
+}
+
+:root[data-theme='dark'] .transfer-queue-group-copy h3 {
+  color: rgba(240, 246, 255, 0.96);
+}
+
+:root[data-theme='dark'] .transfers-filters-toggle {
+  border-color: rgba(255, 255, 255, 0.1);
+  background: rgba(255, 255, 255, 0.06);
+  color: rgba(235, 241, 249, 0.94);
+}
+
+:root[data-theme='dark'] .transfers-filters-toggle strong {
+  color: rgba(120, 210, 198, 0.94);
+}
+
+:root[data-theme='dark'] .queue-chip--warning {
+  border-color: rgba(251, 191, 36, 0.26);
+  background: rgba(245, 158, 11, 0.2);
+  color: #fde68a;
+}
+
+:root[data-theme='dark'] .queue-chip--danger {
+  border-color: rgba(252, 165, 165, 0.24);
+  background: rgba(239, 68, 68, 0.18);
+  color: #fecaca;
+}
+
+:root[data-theme='dark'] .queue-chip--neutral {
+  border-color: rgba(120, 210, 198, 0.18);
+  background: rgba(255, 255, 255, 0.08);
+  color: rgba(230, 238, 248, 0.9);
+}
+
+:root[data-theme='dark'] .queue-chip--success {
+  border-color: rgba(110, 231, 183, 0.24);
+  background: rgba(34, 197, 94, 0.18);
+  color: #bbf7d0;
+}
+
 /* Transfer queue / filter chips */
 .transfers-quick-filter-chip {
   border-radius: 999px;
@@ -13099,6 +13268,70 @@ a:hover article {
 }
 
 @media (max-width: 767px) {
+  .dashboard-mobile-lite-header.page-hero,
+  .customers-portfolio-page .page-hero.customers-page-hero,
+  .transfers-queue-page .page-hero.transfers-queue-page-header,
+  .new-transfer-page .page-hero.new-transfer-page-hero {
+    display: none;
+  }
+
+  .customers-mobile-utility,
+  .transfers-mobile-utility {
+    display: grid;
+    gap: 0.4rem;
+  }
+
+  .customers-mobile-utility {
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: center;
+  }
+
+  .customers-mobile-summary,
+  .transfers-mobile-count {
+    margin: 0;
+    min-width: 0;
+    font-size: 0.72rem;
+    line-height: 1.35;
+    color: var(--mobile-ink-muted);
+  }
+
+  .customers-mobile-refresh-button.button.secondary,
+  .transfers-mobile-refresh-button.button.secondary {
+    min-height: 34px;
+    padding: 0.28rem 0.62rem;
+    border-radius: 999px;
+    box-shadow: none;
+  }
+
+  .transfers-mobile-primary-action.button.primary {
+    width: 100%;
+    min-height: 40px;
+    border-radius: 999px;
+    justify-content: center;
+    box-shadow: none;
+  }
+
+  .transfers-mobile-utility-meta {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: center;
+    gap: 0.5rem;
+  }
+
+  .transfers-queue-page .transfers-queue-context-strip {
+    display: none;
+  }
+
+  :root[data-theme='dark'] .topbar-leading .icon-button {
+    background: rgba(255, 255, 255, 0.08);
+    color: rgba(235, 241, 249, 0.94);
+    border: 0.5px solid rgba(255, 255, 255, 0.08);
+  }
+
+  .new-transfer-page .new-transfer-snapshot-banner.status-banner {
+    margin-top: 0;
+  }
+
   /* Delivery polish follow-up: compress tall mobile heroes on operational pages */
   .transfers-queue-page .page-hero.transfers-queue-page-header,
   .customers-portfolio-page .page-hero.customers-page-hero,

@@ -1,7 +1,7 @@
 {
-  "name": "eduquest",
-  "short_name": "eduquest",
-  "description": "نظام تشغيل يومي لإدارة الحوالات والتسويات والمدفوعات.",
+  "name": "Velora",
+  "short_name": "Velora",
+  "description": "Premium transfer and settlement operations platform.",
   "lang": "ar",
   "dir": "rtl",
   "id": "./",
@@ -10,7 +10,7 @@
   "display": "standalone",
   "display_override": ["standalone", "browser"],
   "orientation": "portrait",
-  "background_color": "#f4f7fb",
+  "background_color": "#11293b",
   "theme_color": "#11293b",
   "prefer_related_applications": false,
   "icons": [
@@ -24,6 +24,12 @@
       "src": "icons/icon-512.png",
       "sizes": "512x512",
       "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "branding/velora-app-icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
       "purpose": "any"
     },
     {

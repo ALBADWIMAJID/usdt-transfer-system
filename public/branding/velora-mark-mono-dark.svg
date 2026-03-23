@@ -1,0 +1,15 @@
+<svg width="1024" height="1024" viewBox="0 0 1024 1024" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <mask id="velora-mark-mono-dark-cut" maskUnits="userSpaceOnUse" x="0" y="0" width="1024" height="1024">
+      <rect width="1024" height="1024" fill="white" />
+      <path
+        d="M512 286C446 336 415 418 420 500L484 620C496 643 505 670 512 701C519 670 528 643 540 620L604 500C609 418 578 336 512 286Z"
+        fill="black"
+      />
+    </mask>
+  </defs>
+  <g mask="url(#velora-mark-mono-dark-cut)">
+    <rect x="314" y="184" width="156" height="640" rx="78" transform="rotate(-24 392 504)" fill="#11293B" />
+    <rect x="554" y="184" width="156" height="640" rx="78" transform="rotate(24 632 504)" fill="#11293B" />
+  </g>
+</svg>

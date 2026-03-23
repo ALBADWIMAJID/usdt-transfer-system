@@ -1,4 +1,4 @@
-const SHELL_CACHE = 'usdt-transfer-shell-v8'
+const SHELL_CACHE = 'usdt-transfer-shell-v9'
 const SCOPE_URL = new URL('./', self.location.href)
 const APP_SHELL_KEY = new URL('__app-shell__', SCOPE_URL).toString()
 
@@ -24,18 +24,18 @@ const PRECACHE_URLS = [
   './',
   'offline.html',
   'manifest.webmanifest',
-  'favicon.ico',
   'apple-touch-icon.png',
   'icons/favicon.png',
-  'branding/image.png',
-  'branding/image-ui.png',
-  'branding/image-mark.png',
-  'branding/eduquest-logo.png',
-  'branding/eduquest-logo-print.png',
-  'branding/eduquest-mark.png',
-  'icons/eduquest-icon-192.png',
-  'icons/eduquest-icon-512.png',
-  'icons/eduquest-icon-maskable-512.png',
+  'icons/icon-192.png',
+  'icons/icon-512.png',
+  'icons/icon-maskable-512.png',
+  'branding/velora-app-icon.svg',
+  'branding/velora-logo.svg',
+  'branding/velora-logo-light.svg',
+  'branding/velora-logo-dark.svg',
+  'branding/velora-mark.svg',
+  'branding/velora-mark-mono-dark.svg',
+  'branding/velora-mark-mono-light.svg',
 ].map(toScopedUrl)
 
 self.addEventListener('message', (event) => {
@@ -171,7 +171,7 @@ self.addEventListener('fetch', (event) => {
   event.respondWith(
     cacheFirst(request).catch(async () => {
       if (request.destination === 'image') {
-        return caches.match(toScopedUrl('icons/eduquest-icon-192.png'))
+        return caches.match(toScopedUrl('icons/icon-192.png'))
       }
 
       return caches.match(toScopedUrl('offline.html'))

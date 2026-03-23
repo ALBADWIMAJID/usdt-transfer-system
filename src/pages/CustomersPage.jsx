@@ -1690,6 +1690,19 @@ function CustomersPage() {
           {portfolioWarning}
         </InlineMessage>
 
+        <div className="customers-mobile-utility" aria-label="إجراءات سريعة لصفحة العملاء">
+          <p className="support-text customers-mobile-summary">{customerHeaderCountLabel}</p>
+
+          <button
+            type="button"
+            className="button secondary customers-mobile-refresh-button"
+            onClick={handleRefresh}
+            disabled={loading}
+          >
+            تحديث
+          </button>
+        </div>
+
         <div className="customers-page-toolbar">
           <div className="app-section-nav-shell">
             <nav className="app-section-nav" aria-label="أقسام صفحة العملاء">

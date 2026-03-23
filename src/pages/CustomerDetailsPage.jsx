@@ -1339,6 +1339,12 @@ function CustomerDetailsPage() {
 
   const resolvedCustomerStateTone = isArchivedCustomer ? 'neutral' : customerStateTone
   const resolvedCustomerStateLabel = isArchivedCustomer ? 'مؤرشف' : customerStateLabel
+  const resolvedCustomerStateDisplayTone =
+    resolvedCustomerStateTone === 'accent'
+      ? 'warning'
+      : resolvedCustomerStateTone === 'neutral'
+        ? 'muted'
+        : resolvedCustomerStateTone
   const resolvedPageDescription = isArchivedCustomer
     ? customer?.archived_at
       ? `تمت أرشفة هذا العميل في ${formatDate(customer.archived_at)} للاحتفاظ بسجل حوالاته ومراجعته تاريخيا. لن يظهر ضمن اختيارات إنشاء الحوالات الجديدة.`
@@ -1641,10 +1647,9 @@ function CustomerDetailsPage() {
     <div className="stack customer-details-page">
       <PageHeader
         className="customer-details-page-hero"
-        eyebrow="العميل"
+        eyebrow={isCompactMobileLayout ? '' : 'العميل'}
         title={customer?.full_name || 'ملف العميل'}
         description={resolvedPageDescription}
-        showDescriptionOnMobile
         actions={
           <div className="customer-details-hero-actions">
             {customerId ? (
@@ -1652,12 +1657,12 @@ function CustomerDetailsPage() {
                 className="button primary customer-details-primary-action"
                 to={`/transfers/new?customerId=${customerId}`}
               >
-                حوالة جديدة للعميل
+                {isCompactMobileLayout ? 'حوالة جديدة' : 'حوالة جديدة للعميل'}
               </Link>
             ) : null}
             <div className="customer-details-hero-utility-row">
               <Link className="button secondary customer-details-utility-action" to="/customers">
-                العودة
+                {isCompactMobileLayout ? 'رجوع' : 'العودة'}
               </Link>
               <button
                 type="button"
@@ -1679,33 +1684,40 @@ function CustomerDetailsPage() {
         }
       >
         {customer ? (
-          <div className="page-hero-highlights customer-details-hero-highlights">
+          isCompactMobileLayout ? (
             <p
               className={[
-                'support-text',
-                'support-text-inline',
-                'page-hero-highlight',
-                `page-hero-highlight--${
-                  resolvedCustomerStateTone === 'accent'
-                    ? 'warning'
-                    : resolvedCustomerStateTone === 'neutral'
-                      ? 'muted'
-                      : resolvedCustomerStateTone
-                }`,
+                'customer-details-hero-status',
+                `customer-details-hero-status--${resolvedCustomerStateDisplayTone}`,
               ]
                 .filter(Boolean)
                 .join(' ')}
             >
               {resolvedCustomerStateLabel}
             </p>
-            <p className="support-text support-text-inline page-hero-highlight">
-              {customer.phone || 'لا يوجد رقم هاتف مسجل'}
-            </p>
-            <p className="support-text support-text-inline page-hero-highlight page-hero-highlight--accent">
-              المتبقي {totalRemainingValue}
-            </p>
-            <p className="support-text support-text-inline page-hero-highlight">{totalTransfers} حوالة</p>
-          </div>
+          ) : (
+            <div className="page-hero-highlights customer-details-hero-highlights">
+              <p
+                className={[
+                  'support-text',
+                  'support-text-inline',
+                  'page-hero-highlight',
+                  `page-hero-highlight--${resolvedCustomerStateDisplayTone}`,
+                ]
+                  .filter(Boolean)
+                  .join(' ')}
+              >
+                {resolvedCustomerStateLabel}
+              </p>
+              <p className="support-text support-text-inline page-hero-highlight">
+                {customer.phone || 'لا يوجد رقم هاتف مسجل'}
+              </p>
+              <p className="support-text support-text-inline page-hero-highlight page-hero-highlight--accent">
+                المتبقي {totalRemainingValue}
+              </p>
+              <p className="support-text support-text-inline page-hero-highlight">{totalTransfers} حوالة</p>
+            </div>
+          )
         ) : null}
       </PageHeader>
 

@@ -6,17 +6,17 @@ function resolveBrandAsset(pathname) {
 }
 
 export const branding = {
-  systemName: 'eduquest',
-  officeName: 'eduquest',
-  shortName: 'eduquest',
-  tagline: 'تشغيل احترافي للحوالات والتسويات والمدفوعات اليومية',
+  systemName: 'Velora',
+  officeName: 'Velora',
+  shortName: 'Velora',
+  tagline: 'تشغيل احترافي للتحويلات والتسويات والمدفوعات اليومية',
   printTitle: 'كشف الحوالة الرسمي',
   logoMode: 'asset',
   assets: {
-    logo: resolveBrandAsset('branding/image-ui.png'),
-    printLogo: resolveBrandAsset('branding/image-ui.png'),
-    mark: resolveBrandAsset('branding/image-mark.png'),
-    appIcon: resolveBrandAsset('icons/icon-512.png'),
+    logo: resolveBrandAsset('branding/velora-logo.svg'),
+    printLogo: resolveBrandAsset('branding/velora-logo-light.svg'),
+    mark: resolveBrandAsset('branding/velora-mark.svg'),
+    appIcon: resolveBrandAsset('branding/velora-app-icon.svg'),
     appleTouchIcon: resolveBrandAsset('apple-touch-icon.png'),
   },
   palette: {

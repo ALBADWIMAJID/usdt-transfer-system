@@ -7,6 +7,12 @@ USDT Transfer System
 React + Vite + Supabase application with Arabic RTL operations UI for customers,
 transfers, payments, print statements, and operator follow-up workflows.
 
+Important:
+- for the concise current release verdict and blocker list, read
+  `docs/current-release-status.md` first
+- this file remains the detailed implementation inventory, not the shortest
+  rollout summary
+
 ## Current Baseline
 
 Implemented:
