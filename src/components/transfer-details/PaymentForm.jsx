@@ -115,9 +115,16 @@ function PaymentForm({
           />
         </FieldShell>
 
-        {remainingHelpText ? <p className={remainingHelpClassName}>{remainingHelpText}</p> : null}
-
         <div className="transfer-payment-submit-slot">
+          {remainingHelpText ? (
+            <p
+              className={['transfer-payment-help-note', remainingHelpClassName]
+                .filter(Boolean)
+                .join(' ')}
+            >
+              {remainingHelpText}
+            </p>
+          ) : null}
           <button type="submit" className="button primary payment-submit-button" disabled={disabled}>
             {submitting ? 'جار الحفظ...' : submitLabel}
           </button>
