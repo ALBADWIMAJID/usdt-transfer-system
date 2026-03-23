@@ -7945,6 +7945,14 @@ a:hover article {
     order: 6;
   }
 
+  .transfer-details-page .transfer-details-edit-section {
+    order: 7;
+  }
+
+  .transfer-details-page .transfer-details-resolution-section {
+    order: 8;
+  }
+
   /* Phase 7 — Transfer details: mobile transaction / follow-up refinement */
   .transfer-details-page.stack {
     gap: 0.72rem;
@@ -7973,12 +7981,12 @@ a:hover article {
   }
 
   .transfer-details-page .page-hero.transfer-details-page-hero h1 {
-    font-size: 1.06rem;
-    line-height: 1.16;
+    font-size: 1rem;
+    line-height: 1.14;
   }
 
   .transfer-details-page .transfer-details-hero-actions {
-    gap: 0.28rem;
+    gap: 0.2rem;
   }
 
   .transfer-details-page .transfer-details-primary-action.button.primary {
@@ -7991,16 +7999,16 @@ a:hover article {
 
   .transfer-details-page .transfer-details-hero-utility-row {
     display: grid;
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-    gap: 0.26rem;
+    grid-template-columns: repeat(2, minmax(0, 1fr)) auto;
+    gap: 0.22rem;
   }
 
   .transfer-details-page .transfer-details-utility-action.button.secondary {
-    min-height: 33px;
-    padding: 0.24rem 0.32rem;
-    border-radius: 999px;
+    min-height: 34px;
+    padding: 0.24rem 0.38rem;
+    border-radius: 14px;
     box-shadow: none;
-    font-size: 0.66rem;
+    font-size: 0.69rem;
   }
 
   .transfer-details-page .transfer-details-hero-status {
@@ -8016,6 +8024,33 @@ a:hover article {
     font-size: 0.7rem;
     line-height: 1.3;
     color: var(--mobile-ink-muted);
+  }
+
+  .transfer-details-page .transfer-details-refresh-icon.button.secondary {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 34px;
+    width: 34px;
+    padding: 0;
+  }
+
+  .transfer-details-page .transfer-details-refresh-icon svg {
+    width: 15px;
+    height: 15px;
+  }
+
+  .transfer-details-page .transfer-details-hero-mobile-meta {
+    display: grid;
+    gap: 0.14rem;
+    margin-top: 0.02rem;
+  }
+
+  .transfer-details-page .transfer-details-hero-mobile-subline {
+    margin: 0;
+    font-size: 0.68rem;
+    line-height: 1.28;
+    color: var(--theme-text-secondary);
   }
 
   .transfer-details-page .transfer-details-hero-status--danger {
@@ -8091,52 +8126,101 @@ a:hover article {
   }
 
   .transfer-details-page .transfer-details-summary-identity {
-    padding: 0.2rem 0.04rem 0.36rem;
-    gap: 0.24rem;
-    border-bottom: 0.5px solid var(--mobile-hairline);
-    margin-bottom: 0.3rem;
+    padding: 0.52rem 0.58rem;
+    gap: 0.42rem;
+    border: 0.5px solid var(--mobile-hairline);
+    border-radius: 16px;
+    background:
+      linear-gradient(180deg, rgba(255, 255, 255, 0.05), rgba(255, 255, 255, 0.02)),
+      var(--mobile-surface-grouped);
+    margin-bottom: 0.42rem;
   }
 
   .transfer-details-page .transfer-details-summary-identity .eyebrow {
     display: none;
   }
 
+  .transfer-details-page .transfer-details-summary-identity.record-header {
+    align-items: center;
+  }
+
+  .transfer-details-page .transfer-details-summary-identity .record-header-leading {
+    padding-top: 0;
+  }
+
   .transfer-details-page .transfer-details-summary-identity .record-title {
-    font-size: var(--type-row-title-size);
+    font-size: 0.94rem;
     font-weight: var(--type-row-title-weight);
-    line-height: var(--type-row-metadata-leading);
+    line-height: 1.18;
     color: var(--theme-text-primary);
   }
 
   .transfer-details-page .transfer-details-summary-identity .record-header-side {
     align-self: center;
+    gap: 0.22rem;
+  }
+
+  .transfer-details-page .transfer-details-summary-identity .status-badge {
+    font-size: 0.68rem;
+    padding: 0.34rem 0.7rem !important;
+    border-radius: 999px !important;
+    box-shadow: none !important;
+  }
+
+  .transfer-details-page .transfer-details-summary-identity .detail-mobile-secondary {
+    font-size: 0.62rem;
+    line-height: 1.25;
+    color: var(--theme-text-secondary);
   }
 
   .transfer-details-page .transfer-summary-grid--highlight {
     grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 0.28rem;
-    margin-top: 0.26rem;
+    gap: 0.34rem;
+    margin-top: 0;
   }
 
   .transfer-details-page .transfer-summary-grid--highlight .info-card {
     width: auto !important;
     height: auto !important;
     margin: 0 !important;
-    padding: 0.44rem 0.46rem !important;
-    border-radius: 12px;
-    min-height: 0;
+    padding: 0.56rem 0.58rem !important;
+    border-radius: 14px;
+    min-height: 84px;
+    display: grid;
+    align-content: start;
+    gap: 0.16rem;
   }
 
   .transfer-details-page .transfer-summary-grid--highlight .info-card-title {
     width: auto !important;
-    font-size: 0.62rem;
+    font-size: 0.58rem;
+    line-height: 1.24;
     color: var(--theme-text-secondary);
   }
 
+  .transfer-details-page .transfer-summary-grid--highlight .info-card-value {
+    margin-top: 0.14rem;
+    line-height: 1.22;
+    overflow-wrap: anywhere;
+  }
+
   .transfer-details-page .transfer-summary-grid--highlight .info-card-value--metric {
-    font-size: 0.86rem !important;
+    font-size: 0.84rem !important;
     font-weight: var(--type-value-emphasis-weight);
-    line-height: 1.2;
+    line-height: 1.18;
+  }
+
+  .transfer-details-page .transfer-summary-grid--highlight > .info-card:nth-child(1).info-card--accent,
+  .transfer-details-page .transfer-summary-grid--highlight > .info-card:nth-child(2),
+  .transfer-details-page .transfer-summary-grid--highlight > .info-card:nth-child(3) {
+    width: auto;
+    height: auto;
+    margin: 0;
+    padding: 0.56rem 0.58rem;
+  }
+
+  .transfer-details-page .transfer-summary-grid--highlight > .info-card:nth-child(3) {
+    grid-column: 1 / -1;
   }
 
   .transfer-details-page .balance-summary-grid {
@@ -8182,10 +8266,23 @@ a:hover article {
 
   .transfer-details-page .transfer-followup-panel--compact .transfer-followup-head {
     align-items: flex-start;
+    gap: 0.48rem;
   }
 
   .transfer-details-page .transfer-followup-panel--compact .transfer-followup-side {
     justify-items: end;
+  }
+
+  .transfer-details-page .transfer-followup-panel--compact {
+    margin-top: 0.68rem;
+    padding: 0.86rem 0.92rem;
+    border-radius: 20px;
+    box-shadow: none;
+  }
+
+  .transfer-details-page .transfer-followup-panel--compact .transfer-followup-copy {
+    display: grid;
+    gap: 0.14rem;
   }
 
   .transfer-details-page .transfer-followup-chips--compact {
@@ -8195,6 +8292,28 @@ a:hover article {
   .transfer-details-page .transfer-followup-chips .queue-chip {
     padding: 0.16rem 0.34rem;
     font-size: 0.58rem;
+  }
+
+  .transfer-details-page .transfer-followup-panel--compact .transfer-followup-grid {
+    grid-template-columns: 1fr;
+    gap: 0.34rem;
+    margin-top: 0.34rem;
+  }
+
+  .transfer-details-page .transfer-followup-panel--compact .transfer-followup-grid .info-card {
+    padding: 0.48rem 0.52rem;
+    border-radius: 13px;
+    min-height: 0;
+  }
+
+  .transfer-details-page .transfer-followup-panel--compact .transfer-followup-grid .info-card-title {
+    font-size: 0.58rem;
+  }
+
+  .transfer-details-page .transfer-followup-panel--compact .transfer-followup-grid .info-card-value {
+    margin-top: 0.14rem;
+    font-size: 0.76rem;
+    line-height: 1.25;
   }
 
   .transfer-details-page .payment-action-copy .eyebrow {
@@ -9826,7 +9945,7 @@ a:hover article {
     padding: 0.52rem 0.58rem;
     position: fixed;
     inset-inline: 0.56rem;
-    bottom: calc(4.85rem + env(safe-area-inset-bottom));
+    bottom: calc(3.95rem + env(safe-area-inset-bottom));
     z-index: 9;
     border-radius: 18px;
     box-shadow: 0 16px 38px rgba(var(--brand-secondary-rgb), 0.14);
@@ -13860,8 +13979,8 @@ a:hover article {
   .transfers-mobile-utility,
   .new-transfer-mobile-utility {
     display: grid;
-    gap: 0.5rem;
-    padding: 0.74rem 0.8rem;
+    gap: 0.38rem;
+    padding: 0.58rem 0.7rem;
     border: 0.5px solid var(--theme-sheet-border);
     border-radius: 18px;
     background: var(--mobile-surface-elevated);
@@ -13881,7 +14000,7 @@ a:hover article {
   .transfers-mobile-utility-copy,
   .new-transfer-mobile-utility-copy {
     display: grid;
-    gap: 0.14rem;
+    gap: 0.08rem;
     min-width: 0;
   }
 
@@ -13889,7 +14008,7 @@ a:hover article {
   .customers-mobile-utility-copy strong,
   .transfers-mobile-utility-copy strong,
   .new-transfer-mobile-utility-copy strong {
-    font-size: 0.84rem;
+    font-size: 0.78rem;
     line-height: 1.2;
     color: var(--theme-text-primary);
   }
@@ -13899,40 +14018,41 @@ a:hover article {
   .transfers-mobile-count,
   .new-transfer-mobile-utility-copy span {
     margin: 0;
-    font-size: 0.7rem;
-    line-height: 1.35;
+    font-size: 0.63rem;
+    line-height: 1.25;
     color: var(--theme-text-secondary);
   }
 
   .dashboard-mobile-utility-actions {
     display: grid;
     grid-template-columns: minmax(0, 1fr) auto;
-    gap: 0.42rem;
+    gap: 0.32rem;
     align-items: center;
   }
 
   .customers-mobile-utility {
     grid-template-columns: minmax(0, 1fr) auto;
     align-items: center;
-    gap: 0.46rem;
+    gap: 0.34rem;
   }
 
   .transfers-mobile-utility {
-    gap: 0.46rem;
+    gap: 0.34rem;
   }
 
   .transfers-mobile-utility-meta {
     display: grid;
     grid-template-columns: minmax(0, 1fr) auto;
     align-items: center;
-    gap: 0.42rem;
+    gap: 0.32rem;
   }
 
   .dashboard-mobile-utility-primary.button.primary,
   .transfers-mobile-primary-action.button.primary {
     width: 100%;
-    min-height: 42px;
-    border-radius: 16px;
+    min-height: 38px;
+    padding-inline: 0.82rem;
+    border-radius: 15px;
     justify-content: center;
     box-shadow: none;
   }
@@ -13945,6 +14065,96 @@ a:hover article {
     padding: 0.3rem 0.72rem;
     border-radius: 14px;
     box-shadow: none;
+  }
+
+  .transfers-mobile-refresh-icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 38px;
+    min-width: 38px;
+    height: 38px;
+    padding: 0;
+    border: 0.5px solid var(--theme-border-default);
+    border-radius: 14px;
+    background: var(--theme-surface-muted);
+    color: var(--theme-text-secondary);
+    box-shadow: none;
+    appearance: none;
+  }
+
+  .transfers-mobile-refresh-icon:hover {
+    color: var(--theme-text-primary);
+    background: var(--theme-surface-elevated);
+  }
+
+  .transfers-mobile-refresh-icon:disabled {
+    opacity: 0.7;
+  }
+
+  .transfers-mobile-refresh-icon svg {
+    width: 16px;
+    height: 16px;
+  }
+
+  .customers-mobile-refresh-icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 38px;
+    min-width: 38px;
+    height: 38px;
+    padding: 0;
+    border: 0.5px solid var(--theme-border-default);
+    border-radius: 14px;
+    background: var(--theme-surface-muted);
+    color: var(--theme-text-secondary);
+    box-shadow: none;
+    appearance: none;
+  }
+
+  .customers-mobile-refresh-icon:hover {
+    color: var(--theme-text-primary);
+    background: var(--theme-surface-elevated);
+  }
+
+  .customers-mobile-refresh-icon:disabled {
+    opacity: 0.7;
+  }
+
+  .customers-mobile-refresh-icon svg {
+    width: 16px;
+    height: 16px;
+  }
+
+  .dashboard-mobile-utility-refresh-icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 38px;
+    min-width: 38px;
+    height: 38px;
+    padding: 0;
+    border: 0.5px solid var(--theme-border-default);
+    border-radius: 14px;
+    background: var(--theme-surface-muted);
+    color: var(--theme-text-secondary);
+    box-shadow: none;
+    appearance: none;
+  }
+
+  .dashboard-mobile-utility-refresh-icon:hover {
+    color: var(--theme-text-primary);
+    background: var(--theme-surface-elevated);
+  }
+
+  .dashboard-mobile-utility-refresh-icon:disabled {
+    opacity: 0.7;
+  }
+
+  .dashboard-mobile-utility-refresh-icon svg {
+    width: 16px;
+    height: 16px;
   }
 
   .new-transfer-mobile-utility {
@@ -14333,6 +14543,39 @@ a:hover article {
     box-shadow:
       inset 0 1px 0 rgba(255, 255, 255, 0.05),
       0 12px 28px rgba(0, 0, 0, 0.18);
+  }
+
+  :root[data-theme='dark'] .dashboard-mobile-utility-refresh-icon {
+    border-color: rgba(255, 255, 255, 0.08);
+    background: rgba(255, 255, 255, 0.04);
+    color: var(--theme-text-secondary);
+  }
+
+  :root[data-theme='dark'] .dashboard-mobile-utility-refresh-icon:hover {
+    background: rgba(255, 255, 255, 0.08);
+    color: var(--theme-text-primary);
+  }
+
+  :root[data-theme='dark'] .transfers-mobile-refresh-icon {
+    border-color: rgba(255, 255, 255, 0.08);
+    background: rgba(255, 255, 255, 0.04);
+    color: var(--theme-text-secondary);
+  }
+
+  :root[data-theme='dark'] .transfers-mobile-refresh-icon:hover {
+    background: rgba(255, 255, 255, 0.08);
+    color: var(--theme-text-primary);
+  }
+
+  :root[data-theme='dark'] .customers-mobile-refresh-icon {
+    border-color: rgba(255, 255, 255, 0.08);
+    background: rgba(255, 255, 255, 0.04);
+    color: var(--theme-text-secondary);
+  }
+
+  :root[data-theme='dark'] .customers-mobile-refresh-icon:hover {
+    background: rgba(255, 255, 255, 0.08);
+    color: var(--theme-text-primary);
   }
 
   :root[data-theme='dark'] .dashboard-mobile-lite-nav,

@@ -87,6 +87,25 @@ const emptyReplacementPaymentForm = {
   paid_at: '',
 }
 
+function RefreshIcon() {
+  return (
+    <svg
+      width="18"
+      height="18"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.9"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
+      <path d="M20 11a8 8 0 1 0 2 5.3" />
+      <path d="M20 4v7h-7" />
+    </svg>
+  )
+}
+
 const TRANSFER_STATUS_EDIT_OPTIONS = [
   { value: 'open', label: getTransferStatusMeta('open').label },
   { value: 'partial', label: getTransferStatusMeta('partial').label },
@@ -2438,7 +2457,19 @@ function TransferDetailsPage() {
       ]
     : []
 
-  const overviewHighlightItems = isCompactMobileLayout ? highlightItems.slice(0, 3) : highlightItems
+  const overviewHighlightItems = isCompactMobileLayout
+    ? highlightItems.slice(0, 3).map((item, index) => {
+        if (index !== 2 || !isOverpaid) {
+          return item
+        }
+
+        return {
+          ...item,
+          title: 'زيادة الدفع',
+          value: `${formatNumber(overpaidAmountRub, 2)} RUB`,
+        }
+      })
+    : highlightItems
 
   const summaryItems = transfer
     ? [
@@ -3274,7 +3305,7 @@ function TransferDetailsPage() {
       <PageHeader
         eyebrow={isCompactMobileLayout ? '' : 'الحوالة'}
         title={transfer?.reference_number || (transferId ? `حوالة #${transferId}` : 'حوالة')}
-        description={resolvedPageDescription}
+        description={isCompactMobileLayout ? '' : resolvedPageDescription}
         className="no-print transfer-details-page-hero"
         actions={
           <div className="transfer-details-hero-actions">
@@ -3298,10 +3329,12 @@ function TransferDetailsPage() {
               </button>
               <button
                 type="button"
-                className="button secondary transfer-details-utility-action"
+                className="button secondary transfer-details-utility-action transfer-details-refresh-icon"
                 onClick={handlePaymentsRefresh}
+                aria-label={paymentsLoading ? 'جار تحديث تفاصيل الحوالة' : 'تحديث تفاصيل الحوالة'}
+                title={paymentsLoading ? 'جار التحديث...' : 'تحديث'}
               >
-                تحديث
+                <RefreshIcon />
               </button>
             </div>
           </div>
@@ -3309,16 +3342,19 @@ function TransferDetailsPage() {
       >
         {transfer ? (
           isCompactMobileLayout ? (
-            <p
-              className={[
-                'transfer-details-hero-status',
-                `transfer-details-hero-status--${followUpDisplayTone}`,
-              ]
-                .filter(Boolean)
-                .join(' ')}
-            >
-              {statusLabel}
-            </p>
+            <div className="transfer-details-hero-mobile-meta">
+              <p
+                className={[
+                  'transfer-details-hero-status',
+                  `transfer-details-hero-status--${followUpDisplayTone}`,
+                ]
+                  .filter(Boolean)
+                  .join(' ')}
+              >
+                {statusLabel}
+              </p>
+              <p className="transfer-details-hero-mobile-subline">{displayCustomerName}</p>
+            </div>
           ) : (
             <div className="page-hero-highlights transfer-details-hero-highlights">
               <p
@@ -3462,6 +3498,178 @@ function TransferDetailsPage() {
             />
           </SectionCard>
         ) : null}
+
+        <SectionCard
+          title={isCompactMobileLayout ? 'تسجيل دفعة' : 'إجراء التحصيل'}
+          description={isCompactMobileLayout ? '' : 'منطقة التحصيل التالية.'}
+          className={[
+            'app-section-panel',
+            'transfer-details-action-section',
+            activeSection === 'payments' ? 'is-active' : '',
+          ]
+            .filter(Boolean)
+            .join(' ')}
+        >
+          <PendingMutationNotice
+            activeCount={localPaymentCount}
+            blockedCount={blockedLocalPaymentCount}
+            failedCount={failedLocalPaymentCount}
+            isOffline={isOffline}
+            syncing={queueSyncing}
+            totalAmountLabel={localPendingAmountLabel}
+            onSyncNow={handleSyncPendingPayments}
+          />
+          <PaymentForm
+            actionTitle={paymentActionTitle}
+            actionDescription={
+              isCompactMobileLayout ? compactPaymentActionDescription : paymentActionDescription
+            }
+            actionTone={followUpState}
+            actionMeta={resolvedPaymentActionMeta}
+            errorMessage={paymentSubmitError}
+            successMessage={paymentSubmitSuccess}
+            values={paymentForm}
+            paymentMethodOptions={PAYMENT_METHOD_OPTIONS}
+            onChange={handlePaymentChange}
+            onSubmit={handlePaymentSubmit}
+            remainingHelpText={remainingHelpText}
+            remainingHelpClassName={remainingSupportClass}
+            submitting={paymentSubmitting}
+            disabled={paymentSubmitting || Boolean(transferError) || !transfer || !isConfigured}
+            submitLabel={paymentSubmitLabel}
+            compactView={isCompactMobileLayout}
+          />
+        </SectionCard>
+
+        <SectionCard
+          title={isCompactMobileLayout ? 'سجل الدفعات' : 'سجل التحصيل والحركة المالية'}
+          description={isCompactMobileLayout ? '' : 'قائمة موجزة للحركات المالية.'}
+          className={[
+            'app-section-panel',
+            'transfer-details-history-section',
+            activeSection === 'history' ? 'is-active' : '',
+          ]
+            .filter(Boolean)
+            .join(' ')}
+        >
+          {hasPartialTransferOnlyOfflineState ? (
+            <InlineMessage kind="warning" className="transfer-details-history-inline-status">
+              {isCompactMobileLayout
+                ? `${paymentsError} يظهر المتاح فقط من السجل.`
+                : `${paymentsError} سيظهر أدناه ما توفر فقط من السجل المؤكد والعناصر المحلية.`}
+            </InlineMessage>
+          ) : null}
+          {paymentVoidSubmitSuccess ? (
+            <InlineMessage kind="success" className="transfer-details-history-inline-status">
+              {isCompactMobileLayout ? 'تم حفظ إلغاء الدفعة.' : paymentVoidSubmitSuccess}
+            </InlineMessage>
+          ) : null}
+          {replacementPaymentSubmitSuccess ? (
+            <InlineMessage kind="success" className="transfer-details-history-inline-status">
+              {isCompactMobileLayout ? 'تم حفظ الدفعة البديلة.' : replacementPaymentSubmitSuccess}
+            </InlineMessage>
+          ) : null}
+          {paymentVoidActionDisabledReason && hasEligibleConfirmedPaymentForVoid ? (
+            <InlineMessage kind="warning" className="transfer-details-history-inline-status">
+              {paymentVoidActionDisabledReason}
+            </InlineMessage>
+          ) : null}
+          {replacementPaymentActionDisabledReason && hasEligibleVoidedPaymentForReplacement ? (
+            <InlineMessage kind="warning" className="transfer-details-history-inline-status">
+              {replacementPaymentActionDisabledReason}
+            </InlineMessage>
+          ) : null}
+          <PaymentList
+            errorMessage={paymentsError}
+            loading={paymentsLoading}
+            payments={paymentEntriesWithVoidState}
+            pendingPayments={pendingPaymentEntries}
+            onRetry={handlePaymentsRefresh}
+            compactView={isCompactMobileLayout}
+          />
+        </SectionCard>
+
+        {transfer ? (
+          <SectionCard
+            title="معلومات الملف"
+            description={isCompactMobileLayout ? '' : 'مرجع وتسعير وملاحظات الحوالة.'}
+            actions={
+              <button
+                type="button"
+                className="button secondary transfer-details-section-toggle"
+                aria-expanded={isSecondaryInfoOpen}
+                aria-controls="transfer-secondary-details"
+                onClick={() => setIsSecondaryInfoOpen((current) => !current)}
+              >
+                {isSecondaryInfoOpen ? 'إخفاء' : 'إظهار'}
+              </button>
+            }
+            className={[
+              'app-section-panel',
+              'transfer-details-secondary-section',
+              !isSecondaryInfoOpen ? 'is-collapsed' : '',
+              activeSection === 'summary' ? 'is-active' : '',
+            ]
+              .filter(Boolean)
+              .join(' ')}
+          >
+            {isSecondaryInfoOpen ? (
+              <InfoGrid id="transfer-secondary-details" className="transfer-details-secondary-grid">
+                <InfoCard title="رقم المرجع" value={referenceNumber} />
+                <InfoCard title="المعرّف الداخلي" value={displayTransferId} />
+                <InfoCard title="تاريخ إنشاء الحوالة" value={transferCreatedAtLabel} />
+                {summaryItems.map((item) => (
+                  <InfoCard
+                    key={item.title}
+                    title={item.title}
+                    value={item.value}
+                    className={item.className}
+                    valueClassName={item.valueClassName}
+                  >
+                    {item.children}
+                  </InfoCard>
+                ))}
+              </InfoGrid>
+            ) : null}
+          </SectionCard>
+        ) : null}
+
+        <SectionCard
+          title={isCompactMobileLayout ? 'قفل البيانات' : 'قفل البيانات الأساسية'}
+          description={isCompactMobileLayout ? '' : 'حالة قفل الحقول الأساسية.'}
+          className={[
+            'app-section-panel',
+            'transfer-details-lock-section',
+            activeSection === 'summary' ? 'is-active' : '',
+          ]
+            .filter(Boolean)
+            .join(' ')}
+        >
+          {paymentsLoading && payments.length === 0 ? (
+            <p>جار التحقق من حالة قفل الحوالة...</p>
+          ) : null}
+          {!paymentsLoading && paymentsError ? (
+            <InlineMessage kind="warning">
+              {isCompactMobileLayout
+                ? compactLockMessage
+                : `${paymentsError} لذلك لا يمكن تأكيد حالة قفل الحوالة محليًا بشكل كامل حتى يعود سجل المدفوعات المؤكد أو يُعاد تحميله من الخادم.`}
+            </InlineMessage>
+          ) : null}
+          {!paymentsLoading && hasConfirmedServerPayments ? (
+            <InlineMessage kind="warning">
+              {isCompactMobileLayout
+                ? compactLockMessage
+                : `تحتوي هذه الحوالة بالفعل على ${payments.length} دفعة. يجب اعتبار الحقول الأساسية مثل العميل والكمية والأسعار ووضع التسعير والعمولة والإجمالي والمبلغ المستحق مقفلة. كما أن قاعدة البيانات تمنع تعديل هذه القيم بعد وجود دفعات.`}
+            </InlineMessage>
+          ) : null}
+          {!paymentsLoading && !paymentsError && !hasConfirmedServerPayments ? (
+            <p className="support-text">
+              {isCompactMobileLayout
+                ? compactLockMessage
+                : 'لا توجد مدفوعات مسجلة بعد. إذا تمت إضافة واجهة تعديل لاحقًا فيمكن إبقاء القيم الأساسية قابلة للتعديل حتى أول دفعة.'}
+            </p>
+          ) : null}
+        </SectionCard>
 
         {transfer ? (
         <SectionCard
@@ -3897,178 +4105,6 @@ function TransferDetailsPage() {
             )}
           </SectionCard>
         ) : null}
-
-        <SectionCard
-          title={isCompactMobileLayout ? 'تسجيل دفعة' : 'إجراء التحصيل'}
-          description={isCompactMobileLayout ? '' : 'منطقة التحصيل التالية.'}
-          className={[
-            'app-section-panel',
-            'transfer-details-action-section',
-            activeSection === 'payments' ? 'is-active' : '',
-          ]
-            .filter(Boolean)
-            .join(' ')}
-        >
-          <PendingMutationNotice
-            activeCount={localPaymentCount}
-            blockedCount={blockedLocalPaymentCount}
-            failedCount={failedLocalPaymentCount}
-            isOffline={isOffline}
-            syncing={queueSyncing}
-            totalAmountLabel={localPendingAmountLabel}
-            onSyncNow={handleSyncPendingPayments}
-          />
-          <PaymentForm
-            actionTitle={paymentActionTitle}
-            actionDescription={
-              isCompactMobileLayout ? compactPaymentActionDescription : paymentActionDescription
-            }
-            actionTone={followUpState}
-            actionMeta={resolvedPaymentActionMeta}
-            errorMessage={paymentSubmitError}
-            successMessage={paymentSubmitSuccess}
-            values={paymentForm}
-            paymentMethodOptions={PAYMENT_METHOD_OPTIONS}
-            onChange={handlePaymentChange}
-            onSubmit={handlePaymentSubmit}
-            remainingHelpText={remainingHelpText}
-            remainingHelpClassName={remainingSupportClass}
-            submitting={paymentSubmitting}
-            disabled={paymentSubmitting || Boolean(transferError) || !transfer || !isConfigured}
-            submitLabel={paymentSubmitLabel}
-            compactView={isCompactMobileLayout}
-          />
-        </SectionCard>
-
-        <SectionCard
-          title={isCompactMobileLayout ? 'سجل الدفعات' : 'سجل التحصيل والحركة المالية'}
-          description={isCompactMobileLayout ? '' : 'قائمة موجزة للحركات المالية.'}
-          className={[
-            'app-section-panel',
-            'transfer-details-history-section',
-            activeSection === 'history' ? 'is-active' : '',
-          ]
-            .filter(Boolean)
-            .join(' ')}
-        >
-          {hasPartialTransferOnlyOfflineState ? (
-            <InlineMessage kind="warning" className="transfer-details-history-inline-status">
-              {isCompactMobileLayout
-                ? `${paymentsError} يظهر المتاح فقط من السجل.`
-                : `${paymentsError} سيظهر أدناه ما توفر فقط من السجل المؤكد والعناصر المحلية.`}
-            </InlineMessage>
-          ) : null}
-          {paymentVoidSubmitSuccess ? (
-            <InlineMessage kind="success" className="transfer-details-history-inline-status">
-              {isCompactMobileLayout ? 'تم حفظ إلغاء الدفعة.' : paymentVoidSubmitSuccess}
-            </InlineMessage>
-          ) : null}
-          {replacementPaymentSubmitSuccess ? (
-            <InlineMessage kind="success" className="transfer-details-history-inline-status">
-              {isCompactMobileLayout ? 'تم حفظ الدفعة البديلة.' : replacementPaymentSubmitSuccess}
-            </InlineMessage>
-          ) : null}
-          {paymentVoidActionDisabledReason && hasEligibleConfirmedPaymentForVoid ? (
-            <InlineMessage kind="warning" className="transfer-details-history-inline-status">
-              {paymentVoidActionDisabledReason}
-            </InlineMessage>
-          ) : null}
-          {replacementPaymentActionDisabledReason && hasEligibleVoidedPaymentForReplacement ? (
-            <InlineMessage kind="warning" className="transfer-details-history-inline-status">
-              {replacementPaymentActionDisabledReason}
-            </InlineMessage>
-          ) : null}
-          <PaymentList
-            errorMessage={paymentsError}
-            loading={paymentsLoading}
-            payments={paymentEntriesWithVoidState}
-            pendingPayments={pendingPaymentEntries}
-            onRetry={handlePaymentsRefresh}
-            compactView={isCompactMobileLayout}
-          />
-        </SectionCard>
-
-        {transfer ? (
-          <SectionCard
-            title="معلومات الملف"
-            description={isCompactMobileLayout ? '' : 'مرجع وتسعير وملاحظات الحوالة.'}
-            actions={
-              <button
-                type="button"
-                className="button secondary transfer-details-section-toggle"
-                aria-expanded={isSecondaryInfoOpen}
-                aria-controls="transfer-secondary-details"
-                onClick={() => setIsSecondaryInfoOpen((current) => !current)}
-              >
-                {isSecondaryInfoOpen ? 'إخفاء' : 'إظهار'}
-              </button>
-            }
-            className={[
-              'app-section-panel',
-              'transfer-details-secondary-section',
-              !isSecondaryInfoOpen ? 'is-collapsed' : '',
-              activeSection === 'summary' ? 'is-active' : '',
-            ]
-              .filter(Boolean)
-              .join(' ')}
-          >
-            {isSecondaryInfoOpen ? (
-              <InfoGrid id="transfer-secondary-details" className="transfer-details-secondary-grid">
-                <InfoCard title="رقم المرجع" value={referenceNumber} />
-                <InfoCard title="المعرّف الداخلي" value={displayTransferId} />
-                <InfoCard title="تاريخ إنشاء الحوالة" value={transferCreatedAtLabel} />
-                {summaryItems.map((item) => (
-                  <InfoCard
-                    key={item.title}
-                    title={item.title}
-                    value={item.value}
-                    className={item.className}
-                    valueClassName={item.valueClassName}
-                  >
-                    {item.children}
-                  </InfoCard>
-                ))}
-              </InfoGrid>
-            ) : null}
-          </SectionCard>
-        ) : null}
-
-        <SectionCard
-          title={isCompactMobileLayout ? 'قفل البيانات' : 'قفل البيانات الأساسية'}
-          description={isCompactMobileLayout ? '' : 'حالة قفل الحقول الأساسية.'}
-          className={[
-            'app-section-panel',
-            'transfer-details-lock-section',
-            activeSection === 'summary' ? 'is-active' : '',
-          ]
-            .filter(Boolean)
-            .join(' ')}
-        >
-          {paymentsLoading && payments.length === 0 ? (
-            <p>جار التحقق من حالة قفل الحوالة...</p>
-          ) : null}
-          {!paymentsLoading && paymentsError ? (
-            <InlineMessage kind="warning">
-              {isCompactMobileLayout
-                ? compactLockMessage
-                : `${paymentsError} لذلك لا يمكن تأكيد حالة قفل الحوالة محليًا بشكل كامل حتى يعود سجل المدفوعات المؤكد أو يُعاد تحميله من الخادم.`}
-            </InlineMessage>
-          ) : null}
-          {!paymentsLoading && hasConfirmedServerPayments ? (
-            <InlineMessage kind="warning">
-              {isCompactMobileLayout
-                ? compactLockMessage
-                : `تحتوي هذه الحوالة بالفعل على ${payments.length} دفعة. يجب اعتبار الحقول الأساسية مثل العميل والكمية والأسعار ووضع التسعير والعمولة والإجمالي والمبلغ المستحق مقفلة. كما أن قاعدة البيانات تمنع تعديل هذه القيم بعد وجود دفعات.`}
-            </InlineMessage>
-          ) : null}
-          {!paymentsLoading && !paymentsError && !hasConfirmedServerPayments ? (
-            <p className="support-text">
-              {isCompactMobileLayout
-                ? compactLockMessage
-                : 'لا توجد مدفوعات مسجلة بعد. إذا تمت إضافة واجهة تعديل لاحقًا فيمكن إبقاء القيم الأساسية قابلة للتعديل حتى أول دفعة.'}
-            </p>
-          ) : null}
-        </SectionCard>
       </div>
 
       <PrintStatement

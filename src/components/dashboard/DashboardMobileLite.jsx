@@ -18,6 +18,25 @@ const ATTENTION_PREVIEW = 3
 const QUEUE_PREVIEW_EACH = 2
 const ACTIVITY_PREVIEW = 3
 
+function RefreshIcon() {
+  return (
+    <svg
+      width="18"
+      height="18"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.9"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
+      <path d="M20 11a8 8 0 1 0 2 5.3" />
+      <path d="M20 4v7h-7" />
+    </svg>
+  )
+}
+
 function DashboardMobileLite({
   loading,
   loadDashboard,
@@ -68,9 +87,9 @@ function DashboardMobileLite({
       </PageHeader>
 
       <section className="dashboard-mobile-utility" aria-label="إجراءات سريعة للرئيسية">
-        <div className="dashboard-mobile-utility-copy">
+        <div className="dashboard-mobile-utility-copy dashboard-mobile-utility-copy--compact">
           <strong>ملخص اليوم</strong>
-          <span>{lastUpdatedLabel || 'البيانات جاهزة للمراجعة التشغيلية'}</span>
+          {lastUpdatedLabel ? <span>{lastUpdatedLabel}</span> : null}
         </div>
 
         <div className="dashboard-mobile-utility-actions">
@@ -79,11 +98,13 @@ function DashboardMobileLite({
           </Link>
           <button
             type="button"
-            className="button secondary dashboard-mobile-utility-refresh"
+            className="dashboard-mobile-utility-refresh-icon"
             onClick={loadDashboard}
             disabled={loading}
+            aria-label={loading ? 'جار تحديث لوحة التحكم' : 'تحديث لوحة التحكم'}
+            title={loading ? 'جار التحديث...' : 'تحديث'}
           >
-            {loading ? 'جار التحديث...' : 'تحديث'}
+            <RefreshIcon />
           </button>
         </div>
       </section>

@@ -37,6 +37,25 @@ import {
 } from '../lib/transfer-ui.js'
 import { supabase } from '../lib/supabase.js'
 
+function RefreshIcon() {
+  return (
+    <svg
+      width="18"
+      height="18"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.9"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
+      <path d="M20 11a8 8 0 1 0 2 5.3" />
+      <path d="M20 4v7h-7" />
+    </svg>
+  )
+}
+
 const QUEUE_FILTER_OPTIONS = [
   { value: 'all', label: 'الكل' },
   { value: 'needs_follow_up', label: 'يتطلب متابعة' },
@@ -944,18 +963,20 @@ function TransfersPage() {
         </Link>
 
         <div className="transfers-mobile-utility-meta">
-          <div className="transfers-mobile-utility-copy">
+          <div className="transfers-mobile-utility-copy transfers-mobile-utility-copy--compact">
             <strong>الحوالات</strong>
             <p className="support-text transfers-mobile-count">{transferMobileCountLabel}</p>
           </div>
 
           <button
             type="button"
-            className="button secondary transfers-mobile-refresh-button"
+            className="transfers-mobile-refresh-icon"
             onClick={handleRefresh}
             disabled={loading}
+            aria-label={loading ? 'جار تحديث صفحة الحوالات' : 'تحديث صفحة الحوالات'}
+            title={loading ? 'جار التحديث...' : 'تحديث'}
           >
-            تحديث
+            <RefreshIcon />
           </button>
         </div>
       </div>

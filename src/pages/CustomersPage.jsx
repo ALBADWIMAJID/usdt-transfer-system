@@ -46,6 +46,25 @@ import {
 } from '../lib/customerProfile.js'
 import { supabase } from '../lib/supabase.js'
 
+function RefreshIcon() {
+  return (
+    <svg
+      width="18"
+      height="18"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.9"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
+      <path d="M20 11a8 8 0 1 0 2 5.3" />
+      <path d="M20 4v7h-7" />
+    </svg>
+  )
+}
+
 const emptyForm = createEmptyCustomerForm()
 
 const emptyPortfolioStats = {
@@ -1694,18 +1713,20 @@ function CustomersPage() {
         </InlineMessage>
 
         <div className="customers-mobile-utility" aria-label="إجراءات سريعة لصفحة العملاء">
-          <div className="customers-mobile-utility-copy">
+          <div className="customers-mobile-utility-copy customers-mobile-utility-copy--compact">
             <strong>العملاء</strong>
             <p className="support-text customers-mobile-summary">{customerMobileCountLabel}</p>
           </div>
 
           <button
             type="button"
-            className="button secondary customers-mobile-refresh-button"
+            className="customers-mobile-refresh-icon"
             onClick={handleRefresh}
             disabled={loading}
+            aria-label={loading ? 'جار تحديث صفحة العملاء' : 'تحديث صفحة العملاء'}
+            title={loading ? 'جار التحديث...' : 'تحديث'}
           >
-            تحديث
+            <RefreshIcon />
           </button>
         </div>
 
