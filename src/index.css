@@ -14177,7 +14177,9 @@ a:hover article {
 
   .dashboard-mobile-lite-kpi.dashboard-snapshot-card--primary .dashboard-mobile-lite-kpi-meta,
   .dashboard-mobile-lite-kpi.dashboard-snapshot-card--wide .dashboard-mobile-lite-kpi-meta {
-    display: none;
+    display: block;
+    font-size: 0.54rem;
+    line-height: 1.22;
   }
 
   .dashboard-mobile-lite-kpi-label {

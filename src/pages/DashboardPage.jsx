@@ -225,13 +225,20 @@ function compareTransfersByPriority(left, right) {
 }
 
 function compareTransfersByProfit(left, right) {
+  const createdAtDifference =
+    (parseDateValue(right.createdAt)?.getTime() || 0) - (parseDateValue(left.createdAt)?.getTime() || 0)
+
+  if (createdAtDifference !== 0) {
+    return createdAtDifference
+  }
+
   const profitDifference = (Number(right.commissionRub) || 0) - (Number(left.commissionRub) || 0)
 
   if (Math.abs(profitDifference) > 0.009) {
     return profitDifference
   }
 
-  return (parseDateValue(right.createdAt)?.getTime() || 0) - (parseDateValue(left.createdAt)?.getTime() || 0)
+  return String(right.referenceNumber || '').localeCompare(String(left.referenceNumber || ''))
 }
 
 function getQueueMeta(transfer) {
