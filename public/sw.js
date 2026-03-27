@@ -1,4 +1,4 @@
-const SHELL_CACHE = 'usdt-transfer-shell-v9'
+const SHELL_CACHE = 'usdt-transfer-shell-v11'
 const SCOPE_URL = new URL('./', self.location.href)
 const APP_SHELL_KEY = new URL('__app-shell__', SCOPE_URL).toString()
 
@@ -24,11 +24,11 @@ const PRECACHE_URLS = [
   './',
   'offline.html',
   'manifest.webmanifest',
-  'apple-touch-icon.png',
+  'apple-touch-icon-v3.png',
   'icons/favicon.png',
-  'icons/icon-192.png',
-  'icons/icon-512.png',
-  'icons/icon-maskable-512.png',
+  'icons/icon-192-v3.png',
+  'icons/icon-512-v3.png',
+  'icons/icon-maskable-512-v3.png',
   'branding/velora-app-icon.svg',
   'branding/velora-logo.svg',
   'branding/velora-logo-light.svg',
@@ -171,7 +171,7 @@ self.addEventListener('fetch', (event) => {
   event.respondWith(
     cacheFirst(request).catch(async () => {
       if (request.destination === 'image') {
-        return caches.match(toScopedUrl('icons/icon-192.png'))
+        return caches.match(toScopedUrl('icons/icon-192-v3.png'))
       }
 
       return caches.match(toScopedUrl('offline.html'))

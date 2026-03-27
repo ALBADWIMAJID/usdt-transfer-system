@@ -17,7 +17,7 @@ export const branding = {
     printLogo: resolveBrandAsset('branding/velora-logo-light.svg'),
     mark: resolveBrandAsset('branding/velora-mark.svg'),
     appIcon: resolveBrandAsset('branding/velora-app-icon.svg'),
-    appleTouchIcon: resolveBrandAsset('apple-touch-icon.png'),
+    appleTouchIcon: resolveBrandAsset('apple-touch-icon-v3.png'),
   },
   palette: {
     primary: '#0d7a72',
