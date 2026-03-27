@@ -1,7 +1,17 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useAuth } from './auth-context.js'
+import useNetworkStatus from '../hooks/useNetworkStatus.js'
 import { TenantContext } from './tenant-context.js'
+import {
+  clearTenantBootstrapCache,
+  readTenantBootstrapCache,
+  saveTenantBootstrapCache,
+} from '../lib/bootstrapCache.js'
+import { isLikelyOfflineReadFailure, withLiveReadTimeout } from '../lib/offline/readCache.js'
 import { supabase } from '../lib/supabase.js'
+
+const offlineBootstrapMessage =
+  'لا يوجد اتصال حالياً ولا توجد جهة تشغيل محفوظة محلياً لهذا الحساب. أعد الاتصال ثم افتح النظام مرة واحدة على الأقل لحفظ بيئة التشغيل.'
 
 const initialTenantState = {
   bootstrapError: '',
@@ -9,12 +19,76 @@ const initialTenantState = {
   orgId: null,
   organization: null,
   profile: null,
+  userId: '',
+}
+
+function createLoadingTenantState(userId = '') {
+  return {
+    ...initialTenantState,
+    bootstrapStatus: 'loading',
+    userId,
+  }
+}
+
+function createReadyTenantState({ orgId = null, organization = null, profile = null, userId = '' }) {
+  return {
+    ...initialTenantState,
+    bootstrapStatus: 'ready',
+    orgId,
+    organization,
+    profile,
+    userId,
+  }
+}
+
+function createErrorTenantState({ bootstrapError = '', orgId = null, profile = null, userId = '' }) {
+  return {
+    ...initialTenantState,
+    bootstrapError,
+    bootstrapStatus: 'error',
+    orgId,
+    profile,
+    userId,
+  }
+}
+
+function createUnprovisionedTenantState({ orgId = null, profile = null, userId = '' }) {
+  return {
+    ...initialTenantState,
+    bootstrapStatus: 'unprovisioned',
+    orgId,
+    profile,
+    userId,
+  }
+}
+
+function getCachedTenantState(userId = '') {
+  const cachedTenant = readTenantBootstrapCache(userId)
+
+  if (!cachedTenant) {
+    return null
+  }
+
+  return createReadyTenantState({
+    orgId: cachedTenant.orgId,
+    organization: cachedTenant.organization,
+    profile: cachedTenant.profile,
+    userId,
+  })
 }
 
 function TenantProvider({ children }) {
   const { configError, isConfigured, loading: authLoading, user } = useAuth()
+  const { isOffline } = useNetworkStatus()
+  const activeUserId = user?.id ?? ''
   const [reloadKey, setReloadKey] = useState(0)
-  const [tenantState, setTenantState] = useState(initialTenantState)
+  const [tenantState, setTenantState] = useState(() => {
+    if (!activeUserId || authLoading) {
+      return initialTenantState
+    }
+
+    return getCachedTenantState(activeUserId) ?? createLoadingTenantState(activeUserId)
+  })
 
   const refreshTenantContext = useCallback(() => {
     setReloadKey((current) => current + 1)
@@ -25,129 +99,242 @@ function TenantProvider({ children }) {
       return undefined
     }
 
-    if (!user) {
+    if (!activeUserId) {
       return undefined
     }
 
     let cancelled = false
+    const cachedTenantState = getCachedTenantState(activeUserId)
+
+    const applyTenantState = (nextState) => {
+      if (cancelled) {
+        return
+      }
+
+      setTenantState(nextState)
+    }
+
+    const applyCachedTenantState = () => {
+      if (!cachedTenantState) {
+        return false
+      }
+
+      applyTenantState(cachedTenantState)
+      return true
+    }
+
+    if (cachedTenantState) {
+      applyTenantState(cachedTenantState)
+    } else {
+      applyTenantState(createLoadingTenantState(activeUserId))
+    }
+
+    if (!isConfigured || !supabase) {
+      applyTenantState(
+        createErrorTenantState({
+          bootstrapError: configError,
+          userId: activeUserId,
+        })
+      )
+      return undefined
+    }
+
+    if (isOffline) {
+      if (!applyCachedTenantState()) {
+        applyTenantState(
+          createErrorTenantState({
+            bootstrapError: offlineBootstrapMessage,
+            userId: activeUserId,
+          })
+        )
+      }
+
+      return undefined
+    }
 
     const bootstrapTenantContext = async () => {
-      if (!isConfigured || !supabase) {
-        setTenantState({
-          ...initialTenantState,
-          bootstrapError: configError,
-          bootstrapStatus: 'error',
-        })
-        return
-      }
+      try {
+        const [profileResult, currentOrgResult] = await withLiveReadTimeout(
+          Promise.all([
+            supabase
+              .from('user_profiles')
+              .select('user_id, org_id, full_name, role, is_active, created_at, updated_at')
+              .eq('user_id', activeUserId)
+              .maybeSingle(),
+            supabase.rpc('current_org_id'),
+          ]),
+          {
+            timeoutMessage: 'Timed out while loading tenant bootstrap context.',
+          }
+        )
 
-      setTenantState({
-        ...initialTenantState,
-        bootstrapStatus: 'loading',
-      })
+        if (cancelled) {
+          return
+        }
 
-      const [profileResult, currentOrgResult] = await Promise.all([
-        supabase
-          .from('user_profiles')
-          .select('user_id, org_id, full_name, role, is_active, created_at, updated_at')
-          .eq('user_id', user.id)
-          .maybeSingle(),
-        supabase.rpc('current_org_id'),
-      ])
+        if (profileResult.error || currentOrgResult.error) {
+          const bootstrapError = profileResult.error || currentOrgResult.error
 
-      if (cancelled) {
-        return
-      }
+          if (isLikelyOfflineReadFailure(bootstrapError)) {
+            if (!applyCachedTenantState()) {
+              applyTenantState(
+                createErrorTenantState({
+                  bootstrapError: offlineBootstrapMessage,
+                  userId: activeUserId,
+                })
+              )
+            }
 
-      if (profileResult.error || currentOrgResult.error) {
-        setTenantState({
-          ...initialTenantState,
-          bootstrapError:
-            profileResult.error?.message ||
-            currentOrgResult.error?.message ||
-            'تعذر تحميل بيانات التهيئة الخاصة بجهة التشغيل الحالية.',
-          bootstrapStatus: 'error',
-        })
-        return
-      }
+            return
+          }
 
-      const profile = profileResult.data ?? null
-      const currentOrgId = currentOrgResult.data ?? null
-      const profileOrgId = profile?.org_id ?? null
+          applyTenantState(
+            createErrorTenantState({
+              bootstrapError: bootstrapError?.message || 'تعذر تحميل بيانات التهيئة الخاصة بجهة التشغيل الحالية.',
+              userId: activeUserId,
+            })
+          )
+          return
+        }
 
-      if (profile && profile.is_active === false) {
-        setTenantState({
-          ...initialTenantState,
-          bootstrapStatus: 'unprovisioned',
-          profile,
-        })
-        return
-      }
+        const profile = profileResult.data ?? null
+        const currentOrgId = currentOrgResult.data ?? null
+        const profileOrgId = profile?.org_id ?? null
 
-      if (profileOrgId && currentOrgId && profileOrgId !== currentOrgId) {
-        setTenantState({
-          ...initialTenantState,
-          bootstrapError:
-            'تم رصد تعارض في جهة التشغيل النشطة لهذه الجلسة. أعد المحاولة أو تواصل مع مسؤول النظام.',
-          bootstrapStatus: 'error',
-          orgId: currentOrgId,
-          profile,
-        })
-        return
-      }
+        if (profile && profile.is_active === false) {
+          clearTenantBootstrapCache()
+          applyTenantState(
+            createUnprovisionedTenantState({
+              profile,
+              userId: activeUserId,
+            })
+          )
+          return
+        }
 
-      const resolvedOrgId = currentOrgId ?? null
+        if (profileOrgId && currentOrgId && profileOrgId !== currentOrgId) {
+          clearTenantBootstrapCache()
+          applyTenantState(
+            createErrorTenantState({
+              bootstrapError:
+                'تم رصد تعارض في جهة التشغيل النشطة لهذه الجلسة. أعد المحاولة أو تواصل مع مسؤول النظام.',
+              orgId: currentOrgId,
+              profile,
+              userId: activeUserId,
+            })
+          )
+          return
+        }
 
-      if (!profile || !resolvedOrgId) {
-        setTenantState({
-          ...initialTenantState,
-          bootstrapStatus: 'unprovisioned',
+        const resolvedOrgId = currentOrgId ?? null
+
+        if (!profile || !resolvedOrgId) {
+          clearTenantBootstrapCache()
+          applyTenantState(
+            createUnprovisionedTenantState({
+              orgId: resolvedOrgId,
+              profile,
+              userId: activeUserId,
+            })
+          )
+          return
+        }
+
+        const { data: organization, error: organizationError } = await withLiveReadTimeout(
+          supabase
+            .from('organizations')
+            .select('id, name, owner_user_id, created_at')
+            .eq('id', resolvedOrgId)
+            .maybeSingle(),
+          {
+            timeoutMessage: 'Timed out while loading active organization.',
+          }
+        )
+
+        if (cancelled) {
+          return
+        }
+
+        if (organizationError) {
+          if (isLikelyOfflineReadFailure(organizationError)) {
+            if (!applyCachedTenantState()) {
+              applyTenantState(
+                createErrorTenantState({
+                  bootstrapError: offlineBootstrapMessage,
+                  userId: activeUserId,
+                })
+              )
+            }
+
+            return
+          }
+
+          applyTenantState(
+            createErrorTenantState({
+              bootstrapError: organizationError.message || 'تعذر تحميل جهة التشغيل الحالية الخاصة بهذه الجلسة.',
+              orgId: resolvedOrgId,
+              profile,
+              userId: activeUserId,
+            })
+          )
+          return
+        }
+
+        if (!organization) {
+          clearTenantBootstrapCache()
+          applyTenantState(
+            createUnprovisionedTenantState({
+              orgId: resolvedOrgId,
+              profile,
+              userId: activeUserId,
+            })
+          )
+          return
+        }
+
+        saveTenantBootstrapCache({
           orgId: resolvedOrgId,
+          organization,
           profile,
+          userId: activeUserId,
         })
-        return
+
+        applyTenantState(
+          createReadyTenantState({
+            orgId: resolvedOrgId,
+            organization,
+            profile,
+            userId: activeUserId,
+          })
+        )
+      } catch (error) {
+        if (cancelled) {
+          return
+        }
+
+        if (isLikelyOfflineReadFailure(error)) {
+          if (!applyCachedTenantState()) {
+            applyTenantState(
+              createErrorTenantState({
+                bootstrapError: offlineBootstrapMessage,
+                userId: activeUserId,
+              })
+            )
+          }
+
+          return
+        }
+
+        applyTenantState(
+          createErrorTenantState({
+            bootstrapError:
+              error instanceof Error
+                ? error.message
+                : 'تعذر تحميل بيانات التهيئة الخاصة بجهة التشغيل الحالية.',
+            userId: activeUserId,
+          })
+        )
       }
-
-      const { data: organization, error: organizationError } = await supabase
-        .from('organizations')
-        .select('id, name, owner_user_id, created_at')
-        .eq('id', resolvedOrgId)
-        .maybeSingle()
-
-      if (cancelled) {
-        return
-      }
-
-      if (organizationError) {
-        setTenantState({
-          ...initialTenantState,
-          bootstrapError:
-            organizationError.message ||
-            'تعذر تحميل جهة التشغيل الحالية الخاصة بهذه الجلسة.',
-          bootstrapStatus: 'error',
-          orgId: resolvedOrgId,
-          profile,
-        })
-        return
-      }
-
-      if (!organization) {
-        setTenantState({
-          ...initialTenantState,
-          bootstrapStatus: 'unprovisioned',
-          orgId: resolvedOrgId,
-          profile,
-        })
-        return
-      }
-
-      setTenantState({
-        bootstrapError: '',
-        bootstrapStatus: 'ready',
-        orgId: resolvedOrgId,
-        organization,
-        profile,
-      })
     }
 
     bootstrapTenantContext()
@@ -155,9 +342,27 @@ function TenantProvider({ children }) {
     return () => {
       cancelled = true
     }
-  }, [authLoading, configError, isConfigured, reloadKey, user])
+  }, [activeUserId, authLoading, configError, isConfigured, isOffline, reloadKey])
 
-  const exposedTenantState = authLoading || !user ? initialTenantState : tenantState
+  const cachedTenantState = useMemo(() => {
+    if (authLoading || !activeUserId) {
+      return null
+    }
+
+    return getCachedTenantState(activeUserId)
+  }, [activeUserId, authLoading])
+
+  const exposedTenantState = useMemo(() => {
+    if (authLoading || !activeUserId) {
+      return initialTenantState
+    }
+
+    if (tenantState.userId !== activeUserId) {
+      return cachedTenantState ?? createLoadingTenantState(activeUserId)
+    }
+
+    return tenantState
+  }, [activeUserId, authLoading, cachedTenantState, tenantState])
 
   const value = useMemo(
     () => ({
